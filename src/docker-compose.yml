@@ -37,8 +37,9 @@ services:
       - app-network
 
   # MLflow Tracking Server
+  # Updated to v3.5.0 to address security vulnerabilities
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.19.0
+    image: ghcr.io/mlflow/mlflow:v3.5.0
     container_name: 4dt907-mlflow
     ports:
       - "5000:5000"

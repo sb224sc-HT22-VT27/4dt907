@@ -10,4 +10,8 @@ matplotlib==3.10.8
 scikit-learn==1.8.0
 
 # MLflow client
-mlflow==2.19.0
+# Updated to 3.5.0 to address security vulnerabilities:
+# - DNS rebinding attacks (CVE fixed in 3.5.0)
+# - Weak password requirements authentication bypass (CVE fixed in 2.22.0rc0)
+# - Directory traversal RCE (CVE fixed in 2.22.4)
+mlflow==3.5.0

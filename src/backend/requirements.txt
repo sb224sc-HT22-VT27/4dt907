@@ -5,7 +5,11 @@ pydantic==2.10.6
 pydantic-settings==2.7.1
 
 # MLflow for ML experiment tracking
-mlflow==2.19.0
+# Updated to 3.5.0 to address security vulnerabilities:
+# - DNS rebinding attacks (CVE fixed in 3.5.0)
+# - Weak password requirements authentication bypass (CVE fixed in 2.22.0rc0)
+# - Directory traversal RCE (CVE fixed in 2.22.4)
+mlflow==3.5.0
 
 # Testing
 pytest==8.3.4
