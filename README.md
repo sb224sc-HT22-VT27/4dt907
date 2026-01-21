@@ -1,5 +1,16 @@
 # 4dt907 - Project in data intensive systems
 
+## Roles
+Samuel - Scrum Master (DevOps)
+Nasser - Developer (full-stack)
+Emil - Developer (tester)
+Jesper - Developer (data scientist)
+
+## Agile development
+- Every other day stand-up via slack or in person on campus.
+- Review of sprint during lecture weekly
+- retrospective Mondays for approx 1 hour
+
 ## Refrence for repository setup
 - Example [repository setup](https://github.com/SamuelFredricBerg/E2E-chat)
 - Refrence for commit messages [Conventional commits](https://www.conventionalcommits.org/en/v1.0.0/)
