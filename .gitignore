@@ -1,7 +1,6 @@
 # Other
 .vscode/
 .DS_Store
-.env
 *.log
 **/cache/
 *.pdf
