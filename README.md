@@ -53,7 +53,7 @@ All branches should be merged via Pull Requests with code review.
 
 * Docker and Docker Compose installed
 * Python 3.12.x installed
-* Node.js 20.x installed (for frontend development)
+* Node.js 22.x (LTS) installed (for frontend development)
 * Git configured
 
 ### Setup Steps
