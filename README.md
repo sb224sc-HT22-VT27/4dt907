@@ -1,10 +1,10 @@
 # 4dt907 - Project in data intensive systems
 
 ## Roles
-Samuel - Scrum Master (DevOps)
-Nasser - Developer (full-stack)
-Emil - Developer (tester)
-Jesper - Developer (data scientist)
+* Samuel - Scrum Master (DevOps)
+* Nasser - Developer (full-stack)
+* Emil - Developer (tester)
+* Jesper - Developer (data scientist)
 
 ## Agile development
 - Every other day stand-up via slack or in person on campus.
