@@ -76,7 +76,7 @@ All branches should be merged via Pull Requests with code review.
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
-   python main.py
+   python -m app.main
    ```
 
 4. For frontend development:
