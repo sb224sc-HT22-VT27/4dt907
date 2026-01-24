@@ -6,6 +6,7 @@ React frontend application for 4dt907 ML data-intensive system.
 
 ## Getting Started
 
+
 ### Prerequisites
 
 - Node.js 22.x (LTS)
