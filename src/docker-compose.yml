@@ -8,9 +8,9 @@ services:
             dockerfile: Dockerfile
         container_name: 4dt907-backend
         ports:
-            - "8000:8000"
+            - "8080:8080"
         environment:
-            - MLFLOW_TRACKING_URI=http://mlflow:5000
+            - MLFLOW_TRACKING_URI=http://mlflow:5050
         volumes:
             - ./backend:/app
         depends_on:
@@ -35,20 +35,18 @@ services:
         restart: unless-stopped
         networks:
             - app-network
-
-    # MLflow Tracking Server
-    # Updated to v3.5.0 to address security vulnerabilities
+    # ML-Flow Service
     mlflow:
         image: ghcr.io/mlflow/mlflow:v3.5.0
         container_name: 4dt907-mlflow
         ports:
-            - "5000:5000"
+            - "5050:5050"
         volumes:
             - mlflow-data:/mlflow
         command: >
             mlflow server
             --host 0.0.0.0
-            --port 5000
+            --port 5050
             --backend-store-uri sqlite:///mlflow/mlflow.db
             --default-artifact-root /mlflow/artifacts
         restart: unless-stopped
