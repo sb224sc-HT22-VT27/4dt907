@@ -9,8 +9,8 @@ RUN npm run build
 
 FROM nginx:alpine
 
-ARG FRONTEND_PORT=3000
-ENV FRONTEND_PORT=${FRONTEND_PORT}
+ARG FRONTEND_PORT
+ENV FRONTEND_PORT=${FRONTEND_PORT:-3030}
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 
