@@ -1,0 +1,67 @@
+name: Master CI/CD
+
+on:
+    push:
+        branches: ["main"]
+    pull_request:
+        branches: ["main"]
+
+jobs:
+    backend-test:
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ./src/backend
+        steps:
+            - uses: actions/checkout@v4
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+                  cache: "pip"
+            - name: Install dependencies
+              run: |
+                  pip install -r requirements.txt
+                  pip install flake8 pytest
+            - name: Run Tests
+              run: |
+                  export PYTHONPATH=$PYTHONPATH:$(pwd)
+                  pytest tests/
+
+    frontend-test:
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ./src/frontend
+        steps:
+            - uses: actions/checkout@v4
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "npm"
+                  cache-dependency-path: ./src/frontend/package-lock.json
+            - name: Install & Lint
+              run: |
+                  npm ci
+                  npm run lint
+
+    docker-build:
+        needs: [backend-test, frontend-test]
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Environment
+              run: |
+                  echo "BACKEND_PORT=${{ secrets.BACKEND_PORT }}" >> .env
+                  echo "FRONTEND_PORT=${{ secrets.FRONTEND_PORT }}" >> .env
+
+            - name: Docker Compose Build & Test
+              run: |
+                  docker-compose -f src/docker-compose.yml up -d --build
+                  sleep 30
+                  docker ps
+                  curl -f http://localhost:${{ secrets.BACKEND_PORT }}/docs || exit 1
+                  curl -f http://localhost:${{ secrets.FRONTEND_PORT }} || exit 1
+                  docker-compose -f src/docker-compose.yml down
