@@ -1,7 +1,6 @@
 """
 FastAPI backend application for 4dt907 project.
 
-Hello world API foundation for the ML-powered data-intensive system.
 """
 
 from fastapi import FastAPI
@@ -9,7 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
 from app.api.v1.router import router as v1_router
-from app.api.v2.router import router as v2_router
+#from app.api.v2.router import router as v2_router
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 app = FastAPI(title="4dt907 Backend API")
 
@@ -28,7 +31,6 @@ def root():
         "message": "Backend is running",
         "docs": "/docs",
         "hello_v1": "/api/v1/hello",
-        "hello_v2": "/api/v2/hello",
         "health": "/health",
     }
 
@@ -37,9 +39,9 @@ app.include_router(health_router)
 
 # Versioned API routers
 app.include_router(v1_router, prefix="/api/v1")
-app.include_router(v2_router, prefix="/api/v2")
+#app.include_router(v2_router, prefix="/api/v2")
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True) #host=(HOST_PORT) OR BACKEND_PORT ??
