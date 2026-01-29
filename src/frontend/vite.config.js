@@ -3,7 +3,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, process.cwd(), "");
+    const envFile = loadEnv(mode, process.cwd(), "");
+    const env = { ...process.env, ...envFile };
 
     return {
         plugins: [tailwindcss(), react()],
@@ -12,7 +13,8 @@ export default defineConfig(({ mode }) => {
             port: parseInt(env.FRONTEND_PORT) || 3030,
             proxy: {
                 "/api": {
-                    target: env.BACKEND_URL || `http://backend:8080`,
+                    target:
+                        env.BACKEND_URL || `http://backend:${env.BACKEND_PORT}`,
                     changeOrigin: true,
                 },
             },

@@ -62,7 +62,7 @@ jobs:
                   sleep 10
                   docker ps
 
-                  # curl -f http://localhost:$secrets.BACKEND_PORT/docs || exit 1
-                  curl -f http://localhost:$secrets.FRONTEND_PORT || exit 1
+                  # curl -f http://localhost:${BACKEND_PORT}/docs || exit 1
+                  curl -f http://localhost:${FRONTEND_PORT} || exit 1
 
                   docker compose -f src/docker-compose.yml down

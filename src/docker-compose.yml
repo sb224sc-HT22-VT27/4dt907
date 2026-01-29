@@ -20,8 +20,8 @@ services:
             args:
                 - FRONTEND_PORT=${FRONTEND_PORT}
         container_name: 4dt907-frontend
-        # env_file:
-        #     - .env
+        environment:
+            - FRONTEND_PORT=${FRONTEND_PORT}
         ports:
             - "${FRONTEND_PORT}:${FRONTEND_PORT}"
         volumes:
