@@ -15,8 +15,8 @@ jobs:
 
             - name: Docker Compose Build & Test
               env:
-                  BACKEND_PORT: ${{ secrets.BACKEND_PORT || 8080 }}
-                  FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || 3030 }}
+                  BACKEND_PORT: ${{ secrets.BACKEND_PORT || '8080' }}
+                  FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || '3030' }}
               run: |
                   docker compose -f src/docker-compose.yml up -d --build
 
