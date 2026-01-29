@@ -14,7 +14,8 @@ export default defineConfig(({ mode }) => {
             proxy: {
                 "/api": {
                     target:
-                        env.BACKEND_URL || `http://backend:${env.BACKEND_PORT}`,
+                        env.BACKEND_URL ||
+                        `http://backend:${env.BACKEND_PORT || "8080"}`,
                     changeOrigin: true,
                 },
             },
