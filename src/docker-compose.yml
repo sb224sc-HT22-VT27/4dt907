@@ -23,7 +23,6 @@ services:
         container_name: 4dt907-frontend
         environment:
             - FRONTEND_PORT=${FRONTEND_PORT}
-
         ports:
             - "${FRONTEND_PORT}:${FRONTEND_PORT}"
         volumes:
