@@ -52,16 +52,17 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
-            - name: Set up Environment
-              run: |
-                  echo "BACKEND_PORT=${{ secrets.BACKEND_PORT }}" >> .env
-                  echo "FRONTEND_PORT=${{ secrets.FRONTEND_PORT }}" >> .env
-
             - name: Docker Compose Build & Test
+              env:
+                  BACKEND_PORT: ${{ secrets.BACKEND_PORT }}
+                  FRONTEND_PORT: ${{ secrets.FRONTEND_PORT }}
               run: |
-                  docker compose --env-file .env -f src/docker-compose.yml up -d --build
+                  docker compose -f src/docker-compose.yml up -d --build
+
                   sleep 10
                   docker ps
-                  # curl -f http://localhost:${{ secrets.BACKEND_PORT }}/docs || exit 1
-                  curl -f http://localhost:${{ secrets.FRONTEND_PORT }} || exit 1
+
+                  # curl -f http://localhost:$secrets.BACKEND_PORT/docs || exit 1
+                  curl -f http://localhost:$secrets.FRONTEND_PORT || exit 1
+
                   docker compose -f src/docker-compose.yml down

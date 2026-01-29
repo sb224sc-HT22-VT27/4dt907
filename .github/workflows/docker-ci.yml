@@ -13,21 +13,18 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v4
 
-            - name: Set up Environment
+            - name: Docker Compose Build & Test
+              env:
+                  BACKEND_PORT: ${{ secrets.BACKEND_PORT }}
+                  FRONTEND_PORT: ${{ secrets.FRONTEND_PORT }}
               run: |
-                  echo "BACKEND_PORT=${{ secrets.BACKEND_PORT }}" >> .env
-                  echo "FRONTEND_PORT=${{ secrets.FRONTEND_PORT }}" >> .env
+                  docker compose -f src/docker-compose.yml up -d --build
 
-            - name: Spin up containers
-              run: docker compose --env-file .env -f src/docker-compose.yml up -d --build
-
-            - name: Check running containers
-              run: docker ps
-
-            - name: Test Connection
-              run: |
                   sleep 10
-                  curl -f http://localhost:${{ secrets.FRONTEND_PORT }} || exit 1
+                  docker ps
+
+                  # curl -f http://localhost:$secrets.BACKEND_PORT/docs || exit 1
+                  curl -f http://localhost:$secrets.FRONTEND_PORT || exit 1
 
             - name: Stop containers
               if: always()

@@ -5,8 +5,8 @@ services:
             args:
                 - BACKEND_PORT=${BACKEND_PORT}
         container_name: 4dt907-backend
-        env_file:
-            - .env
+        # env_file:
+        #     - .env
         volumes:
             - ./backend:/backend_app
             - /opt/.venv
@@ -20,8 +20,8 @@ services:
             args:
                 - FRONTEND_PORT=${FRONTEND_PORT}
         container_name: 4dt907-frontend
-        env_file:
-            - .env
+        # env_file:
+        #     - .env
         ports:
             - "${FRONTEND_PORT}:${FRONTEND_PORT}"
         volumes:
