@@ -1,0 +1,40 @@
+name: CI/CD Backend
+
+on:
+    push:
+        branches: ["develop"]
+    pull_request:
+        branches: ["develop"]
+
+jobs:
+    backend-ci:
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: ./src/backend
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+                  cache: "pip"
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.txt
+                  pip install pytest-mock
+
+            - name: Lint with flake8
+              run: |
+                  flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+                  flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+            - name: Test with pytest
+              env:
+                  BACKEND_PORT: ${{ secrets.BACKEND_PORT }}
+              run: |
+                  export PYTHONPATH=$PYTHONPATH:$(pwd)
+                  pytest tests/ -v --tb=short
