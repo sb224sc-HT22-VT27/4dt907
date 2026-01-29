@@ -1,16 +1,21 @@
-FROM node:20-slim
+FROM node:22-slim AS builder
 
 WORKDIR /app
-
-# Install dependencies
 COPY package*.json ./
 RUN npm ci
 
-# Copy application code
 COPY . .
+RUN npm run build
 
-# Expose port
-EXPOSE 3000
+FROM nginx:alpine
 
-# Run the application
-CMD ["npm", "run", "dev"]
+ARG FRONTEND_PORT
+ENV FRONTEND_PORT=${FRONTEND_PORT:-3030}
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+
+EXPOSE ${FRONTEND_PORT}
+
+CMD ["nginx", "-g", "daemon off;"]
