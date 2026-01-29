@@ -37,34 +37,14 @@ All branches should be merged via Pull Requests with code review.
 
    ```bash
    cd src
-   docker-compose up --build
+   docker-compose up -d # On Windows: docker compose up -d
    ```
 
-3. For Python/ML development:
+3. [For backend development](src/backend/README.md)
 
-   ```bash
-   cd src/backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   python -m app.main
-   ```
+4. [For frontend development](src/frontend/README.md)
 
-4. For frontend development:
-
-   ```bash
-   cd src/frontend
-   npm install
-   npm run dev
-   ```
-
-5. For Jupyter notebooks:
-
-   ```bash
-   pip install jupyter notebook
-   jupyter notebook
-   # Navigate to src/ml-research/
-   ```
+5. [For ML notebooks](src/ml-research/README.md):
 
 ## Project Structure
 
