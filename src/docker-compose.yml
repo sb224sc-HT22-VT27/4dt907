@@ -9,7 +9,7 @@ services:
             - .env
         volumes:
             - ./backend:/backend_app
-            - /backend_app/opt/.venv
+            - /opt/.venv
         restart: unless-stopped
         networks:
             - app-network

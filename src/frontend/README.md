@@ -50,8 +50,6 @@ docker build -t 4dt907-frontend .
 docker run -p 3000:3000 4dt907-frontend
 ```
 
-## Features
-
 ### API Integration
 
 The frontend communicates with the backend API at <http://localhost:8000>

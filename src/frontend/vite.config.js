@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
         plugins: [tailwindcss(), react()],
         server: {
             host: true,
-            port: parseInt(env.FRONTEND_PORT) || 3000,
+            port: parseInt(env.FRONTEND_PORT) || 3030,
             proxy: {
                 "/api": {
                     target: env.BACKEND_URL || `http://backend:8080`,

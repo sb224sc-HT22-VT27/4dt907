@@ -17,10 +17,9 @@ app = FastAPI(title="4dt907 Backend API")
 
 ALLOWED_ORIGINS = [
     f"http://localhost:{os.getenv('FRONTEND_PORT', '3030')}",
-    "http://localhost",
 ]
 
-HOST_PORT = os.getenv("BACKEND_PORT", "8080")
+HOST_PORT = int(os.getenv("BACKEND_PORT", "8080"))
 
 # For Assignment 1 simplicity (client-server demo): allow frontend calls.
 app.add_middleware(

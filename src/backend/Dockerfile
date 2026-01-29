@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN useradd -m appuser && chown -R appuser /backend_app
+RUN useradd -m appuser && chown -R appuser /backend_app /opt/.venv
 USER appuser
 
 EXPOSE ${BACKEND_PORT}
