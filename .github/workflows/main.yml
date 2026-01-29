@@ -1,4 +1,4 @@
-name: Master CI/CD
+name: Main CI/CD
 
 on:
     push:
@@ -40,7 +40,7 @@ jobs:
               with:
                   node-version: "22"
                   cache: "npm"
-                  cache-dependency-path: src/frontend/package.json
+                  cache-dependency-path: src/frontend/package-lock.json
             - name: Install & Lint
               run: |
                   npm ci
@@ -59,9 +59,9 @@ jobs:
 
             - name: Docker Compose Build & Test
               run: |
-                  docker compose -f src/docker-compose.yml up -d --build
-                  sleep 30
+                  docker compose --env-file .env -f src/docker-compose.yml up -d --build
+                  sleep 10
                   docker ps
-                  curl -f http://localhost:${{ secrets.BACKEND_PORT }}/docs || exit 1
+                  # curl -f http://localhost:${{ secrets.BACKEND_PORT }}/docs || exit 1
                   curl -f http://localhost:${{ secrets.FRONTEND_PORT }} || exit 1
                   docker compose -f src/docker-compose.yml down

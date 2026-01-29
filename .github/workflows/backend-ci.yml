@@ -7,7 +7,7 @@ on:
         branches: ["develop"]
 
 jobs:
-    python-ci:
+    backend-ci:
         runs-on: ubuntu-latest
         defaults:
             run:
