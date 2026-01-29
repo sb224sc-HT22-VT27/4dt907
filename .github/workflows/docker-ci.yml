@@ -19,7 +19,7 @@ jobs:
                   echo "FRONTEND_PORT=${{ secrets.FRONTEND_PORT }}" >> .env
 
             - name: Spin up containers
-              run: docker-compose -f src/docker-compose.yml up -d --build
+              run: docker compose -f src/docker-compose.yml up -d --build
 
             - name: Check running containers
               run: docker ps
@@ -31,4 +31,4 @@ jobs:
 
             - name: Stop containers
               if: always()
-              run: docker-compose -f src/docker-compose.yml down
+              run: docker compose -f src/docker-compose.yml down
