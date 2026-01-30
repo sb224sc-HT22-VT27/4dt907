@@ -3,3 +3,7 @@ uvicorn[standard]
 pytest
 httpx
 flake8
+mlflow
+numpy
+pandas
+python-dotenv

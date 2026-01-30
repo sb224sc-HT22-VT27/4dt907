@@ -22,6 +22,13 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+### Environment variables (.env)
+
+This backend loads MLflow models from DagsHub. Create a `.env` file for local development:
+
+`src/backend/.env`
+
+
 ### Running the Application
 
 ```bash
@@ -66,6 +73,11 @@ black .
 ### Root Endpoints
 
 ### API v1
+
+#### Prediction
+
+- `POST /api/v1/predict/champion`
+- `POST /api/v1/predict/latest`
 
 ## Docker
 
