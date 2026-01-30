@@ -1,11 +1,10 @@
+import logging
 from fastapi import APIRouter, HTTPException
+
 from app.schemas.prediction import PredictRequest, PredictResponse
 from app.services.model_service import predict_one
 
-import logging
-
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
 @router.post("/predict/champion", response_model=PredictResponse)
@@ -14,9 +13,7 @@ def predict_champion(req: PredictRequest):
         pred, uri = predict_one(req.features, "champion")
         return PredictResponse(prediction=pred, model_uri=uri)
     except ValueError as e:
-    # client sent wrong number of inputs
         raise HTTPException(status_code=422, detail=str(e))
-
     except Exception as e:
         logger.exception("Prediction failed")
         raise HTTPException(status_code=503, detail=f"{type(e).__name__}: {e}")
@@ -27,9 +24,7 @@ def predict_latest(req: PredictRequest):
         pred, uri = predict_one(req.features, "latest")
         return PredictResponse(prediction=pred, model_uri=uri)
     except ValueError as e:
-    # client sent wrong number of inputs
         raise HTTPException(status_code=422, detail=str(e))
-
     except Exception as e:
         logger.exception("Prediction failed")
         raise HTTPException(status_code=503, detail=f"{type(e).__name__}: {e}")
