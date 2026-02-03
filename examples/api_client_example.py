@@ -78,7 +78,7 @@ class PredictionClient:
             # Try to get JSON response
             try:
                 data = response.json()
-            except:
+            except requests.exceptions.JSONDecodeError:
                 data = {}
             
             # Handle error responses
@@ -124,7 +124,7 @@ def main():
     # Example 1: Predict with champion model
     print("2. Getting prediction from CHAMPION model...")
     try:
-        features = [1.0, 2.0]  # Replace with your actual feature values
+        features = [1.0, 2.0, 3.0]  # Replace with your actual feature values
         result = client.predict(features, model="champion")
         print(f"   Features: {features}")
         print(f"   Prediction: {result['prediction']}")
@@ -137,7 +137,7 @@ def main():
     # Example 2: Predict with latest model
     print("3. Getting prediction from LATEST model...")
     try:
-        features = [1.5, 2.5]  # Replace with your actual feature values
+        features = [1.5, 2.5, 3.5]  # Replace with your actual feature values
         result = client.predict(features, model="latest")
         print(f"   Features: {features}")
         print(f"   Prediction: {result['prediction']}")
