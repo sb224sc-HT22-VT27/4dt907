@@ -3,6 +3,7 @@
 .DS_Store
 **/cache/
 *.pdf
+outputs/
 
 # Node.js
 node_modules/
