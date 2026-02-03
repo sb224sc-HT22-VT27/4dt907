@@ -76,7 +76,11 @@ def _latest_source_uri(model_name: str) -> str:
 
 def _is_models_alias_uri(uri: str) -> bool:
     # True for: models:/Name@alias
-    return uri.startswith("models:/") and ("@" in uri) and ("/" not in uri.replace("models:/", "", 1).split("@", 1)[0])
+    return (
+        uri.startswith("models:/")
+        and ("@" in uri)
+        and ("/" not in uri.replace("models:/", "", 1).split("@", 1)[0])
+    )
 
 
 def _parse_models_alias_uri(uri: str) -> tuple[str, str]:
@@ -112,7 +116,8 @@ def _resolve_alias_to_version_uri(model_name: str, alias: str) -> str:
 
     if a in {"prod", "production"}:
         prod_candidates = [
-            mv for mv in versions_sorted
+            mv
+            for mv in versions_sorted
             if (getattr(mv, "current_stage", "") or "").lower() == "production"
         ]
         chosen = prod_candidates[-1] if prod_candidates else latest
