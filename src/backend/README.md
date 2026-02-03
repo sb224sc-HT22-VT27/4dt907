@@ -22,11 +22,38 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Environment variables (.env)
+### Environment Variables (.env)
 
 This backend loads MLflow models from DagsHub. Create a `.env` file for local development:
 
-`src/backend/.env`
+```bash
+# Copy the example file
+cp .env.example .env
+```
+
+Edit `.env` and configure the following variables:
+
+```bash
+# Required: MLflow tracking URI (DagsHub)
+MLFLOW_TRACKING_URI=https://dagshub.com/<YOUR_USERNAME>/<YOUR_REPO>.mlflow
+
+# Required: Model URIs pointing to your trained models
+MODEL_URI_PROD=models:/Best_Production_Model@production
+MODEL_URI_DEV=models:/Latest_Model@latest
+
+# Optional: Backup model
+MODEL_URI_BACKUP=models:/Backup_Model@backup
+
+# Optional: Model registry names (fallback if direct URIs not set)
+MLFLOW_BEST_MODEL_NAME=Best_Production_Model
+MLFLOW_LATEST_MODEL_NAME=Latest_Model
+
+# Optional: Authentication for private DagsHub repositories
+# MLFLOW_TRACKING_USERNAME=<YOUR_DAGSHUB_USERNAME>
+# MLFLOW_TRACKING_PASSWORD=<YOUR_DAGSHUB_TOKEN>
+```
+
+See the [Deployment Guide](../../DEPLOYMENT.md) for detailed configuration instructions.
 
 
 ### Running the Application

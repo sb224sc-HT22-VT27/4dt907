@@ -15,7 +15,41 @@
 
 All branches should be merged via Pull Requests with code review.
 
-## Local execution for development
+## Model Deployment & API Service
+
+This project includes a complete ML model deployment solution with:
+- FastAPI backend service that loads models from DagsHub MLflow
+- React frontend for making predictions via web interface
+- Docker Compose for easy deployment
+
+📖 **[Read the Deployment Guide](DEPLOYMENT.md)** for complete setup and usage instructions.
+
+## Quick Start
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/sb224sc-HT22-VT27/4dt907.git
+   cd 4dt907
+   ```
+
+2. Configure environment variables:
+   ```bash
+   cd src
+   cp .env.example .env
+   # Edit .env with your DagsHub MLflow configuration
+   ```
+
+3. Start the services:
+   ```bash
+   docker compose up -d
+   ```
+
+4. Access the application:
+   - Frontend: http://localhost:3030
+   - Backend API: http://localhost:8080
+   - API Docs: http://localhost:8080/docs
+
+## Local Development
 
 ### Prerequisites
 
@@ -23,28 +57,17 @@ All branches should be merged via Pull Requests with code review.
 * Python 3.12.x installed
 * Node.js 22.x (LTS) installed (for frontend development)
 * Git configured
+* DagsHub account with MLflow models
 
 ### Setup Steps
 
-1. Clone the repository:
+1. [Model Deployment & API Service](DEPLOYMENT.md) - Complete deployment guide
 
-   ```bash
-   git clone https://github.com/sb224sc-HT22-VT27/4dt907.git
-   cd 4dt907
-   ```
+2. [For backend development](src/backend/README.md)
 
-2. For full stack development with Docker:
+3. [For frontend development](src/frontend/README.md)
 
-   ```bash
-   cd src
-   docker-compose up -d # On Windows: docker compose up -d
-   ```
-
-3. [For backend development](src/backend/README.md)
-
-4. [For frontend development](src/frontend/README.md)
-
-5. [For ML notebooks](src/ml-research/README.md):
+4. [For ML notebooks](src/ml-research/README.md):
 
 ## Project Structure
 
