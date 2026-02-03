@@ -5,9 +5,9 @@ class MLUtils:
         self.client = MlflowClient()
         self.model_name = model_name
 
-    def auto_check_challenger(self, run_id, metric_name="accuracy"):
+    def auto_check_challenger(self, run_id, metric_name="R2_Mean"):
         """
-        Function to check if new model should be saved or not depending on accuracy.
+        Function to check if new model should be saved or not depending on R2_Mean.
         Returns true if new model beat @dev
         Returns false if new model does not beat @dev
         """
