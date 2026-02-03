@@ -1,4 +1,6 @@
 name: CI/CD Backend
+permissions:
+    contents: read
 
 on:
     push:

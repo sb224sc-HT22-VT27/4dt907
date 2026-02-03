@@ -1,29 +1,24 @@
-"""Tests for backend API."""
-
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
 
 
+def test_root_endpoint():
+    response = client.get("/")
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["message"] == "Backend is running"
+    assert body["docs"] == "/docs"
+    assert body["health"] == "/health"
+    assert body["predict_champion"] == "/api/v1/predict/champion"
+    assert body["predict_latest"] == "/api/v1/predict/latest"
+    assert body["v2_status"] == "/api/v2/status"
+
+
 def test_health_endpoint():
-    r = client.get("/health")
-    assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
-
-
-def test_hello_v1_endpoint():
-    r = client.get("/api/v1/hello")
-    assert r.status_code == 200
-    data = r.json()
-    assert data["api_version"] == "v1"
-    assert data["message"] == "Hello World from 4dt907!"
-
-
-def test_hello_v2_endpoint():
-    r = client.get("/api/v2/hello")
-    assert r.status_code == 200
-    data = r.json()
-    assert data["api_version"] == "v2"
-    assert data["message"] == "Hello World from 4dt907!"
-    assert "server_time_utc" in data
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
