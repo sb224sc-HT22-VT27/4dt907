@@ -58,7 +58,7 @@ class MLUtils:
                 self.client.delete_model_version(self.model_name, backup_ver.version)
             else:
                 print(f"Warning: @backup is @prod. Not deleting.")
-        except:
+        except Exception:
             pass # No backup existed to delete
 
     def promote_dev_to_prod(self):
