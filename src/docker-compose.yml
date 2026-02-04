@@ -4,9 +4,17 @@ services:
             context: ./backend
             args:
                 - BACKEND_PORT=${BACKEND_PORT}
+                - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+                - MODEL_URI_PROD=${MODEL_URI_PROD}
+                - MODEL_URI_DEV=${MODEL_URI_DEV}
+                - MODEL_URI_BACKUP=${MODEL_URI_BACKUP}
         container_name: 4dt907-backend
         environment:
             - BACKEND_PORT=${BACKEND_PORT}
+            - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+            - MODEL_URI_PROD=${MODEL_URI_PROD}
+            - MODEL_URI_DEV=${MODEL_URI_DEV}
+            - MODEL_URI_BACKUP=${MODEL_URI_BACKUP}
         volumes:
             - ./backend:/backend_app
             - /opt/.venv
@@ -19,9 +27,12 @@ services:
             context: ./frontend
             args:
                 - BACKEND_PORT=${BACKEND_PORT}
+                - BACKEND_URL=${BACKEND_URL}
                 - FRONTEND_PORT=${FRONTEND_PORT}
         container_name: 4dt907-frontend
         environment:
+            - BACKEND_PORT=${BACKEND_PORT}
+            - BACKEND_URL=${BACKEND_URL}
             - FRONTEND_PORT=${FRONTEND_PORT}
         ports:
             - "${FRONTEND_PORT}:${FRONTEND_PORT}"
@@ -37,5 +48,3 @@ services:
 networks:
     app-network:
         driver: bridge
-
-# TODO: Add DagsHub
