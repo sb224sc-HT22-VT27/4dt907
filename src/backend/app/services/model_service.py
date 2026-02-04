@@ -9,13 +9,19 @@ from mlflow.exceptions import RestException
 
 _lock = threading.Lock()
 _cache: Dict[str, Tuple[object, str]] = {}  # cache_key -> (model, uri_used)
-_mlflow_inited = False
 
 
 def _clean_uri(value: str | None) -> str | None:
     if not value:
         return None
     return value.strip().strip('"').strip("'")
+
+
+# Perform one-time mlflow URI initialization at import time if configured.
+_initial_tracking_uri = os.getenv("MLFLOW_TRACKING_URI")
+if _initial_tracking_uri:
+    mlflow.set_tracking_uri(_initial_tracking_uri)
+    mlflow.set_registry_uri(_initial_tracking_uri)
 
 
 # * Expected "entry point"
@@ -31,15 +37,9 @@ def _direct_uri_for_variant(variant: str) -> str | None:
 
 
 def _init_mlflow() -> str:
-    global _mlflow_inited
     uri = os.getenv("MLFLOW_TRACKING_URI")
     if not uri:
         raise RuntimeError("MLFLOW_TRACKING_URI is not set")
-
-    if not _mlflow_inited:
-        mlflow.set_tracking_uri(uri)
-        mlflow.set_registry_uri(uri)
-        _mlflow_inited = True
 
     return uri
 
@@ -154,7 +154,7 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
         raise
 
 
-def get_model(variant: str = "champion") -> Tuple[object, str] | None:
+def get_model(variant: str = "champion") -> Tuple[object, str] | RestException:
     _init_mlflow()
     try:
         direct_uri = _direct_uri_for_variant(variant)
