@@ -48,13 +48,19 @@ jobs:
               run: |
                   npm ci
                   npm run lint
+              # npm run test
 
     docker-build:
         needs: [backend-test, frontend-test]
         runs-on: ubuntu-latest
         env:
             BACKEND_PORT: ${{ secrets.BACKEND_PORT || '8080' }}
+            BACKEND_URL: ${{ secrets.BACKEND_URL }}
             FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || '3030' }}
+            MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+            MODEL_URI_PROD: ${{ secrets.MODEL_URI_PROD }}
+            MODEL_URI_DEV: ${{ secrets.MODEL_URI_DEV }}
+            MODEL_URI_BACKUP: ${{ secrets.MODEL_URI_BACKUP }}
         steps:
             - uses: actions/checkout@v4
 
@@ -78,4 +84,4 @@ jobs:
                   # curl -f http://localhost:$BACKEND_PORT/docs || exit 1
                   curl -f http://localhost:$FRONTEND_PORT || exit 1
 
-                  docker compose -f src/docker-compose.yml down
+                  docker compose -f src/docker-compose.yml down --rmi all

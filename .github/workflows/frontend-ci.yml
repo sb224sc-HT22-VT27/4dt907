@@ -39,6 +39,7 @@ jobs:
 
             - name: Build
               env:
-                  FRONTEND_PORT: ${{ secrets.FRONTEND_PORT }}
+                  BACKEND_PORT: ${{ secrets.BACKEND_PORT }}
                   BACKEND_URL: ${{ secrets.BACKEND_URL }}
+                  FRONTEND_PORT: ${{ secrets.FRONTEND_PORT }}
               run: npm run build

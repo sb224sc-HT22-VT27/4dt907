@@ -18,6 +18,7 @@ def _clean_uri(value: str | None) -> str | None:
     return value.strip().strip('"').strip("'")
 
 
+# * Expected "entry point"
 def _direct_uri_for_variant(variant: str) -> str | None:
     v = (variant or "").lower().strip()
     if v in {"champion", "best", "prod", "production"}:
@@ -43,6 +44,7 @@ def _init_mlflow() -> str:
     return uri
 
 
+# * Current "entry point"
 def _model_name_for_variant(variant: str) -> str:
     v = (variant or "").lower().strip()
     if v in {"champion", "best"}:
@@ -152,31 +154,21 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
         raise
 
 
-def get_model(variant: str = "champion") -> Tuple[object, str]:
+def get_model(variant: str = "champion") -> Tuple[object, str] | None:
     _init_mlflow()
+    try:
+        direct_uri = _direct_uri_for_variant(variant)
+        if direct_uri:
+            cache_key = direct_uri
+            with _lock:
+                if cache_key in _cache:
+                    return _cache[cache_key]
 
-    direct_uri = _direct_uri_for_variant(variant)
-    if direct_uri:
-        cache_key = direct_uri
-        with _lock:
-            if cache_key in _cache:
-                return _cache[cache_key]
-
-            model, uri_used = _load_model_with_alias_fallback(direct_uri)
-            _cache[cache_key] = (model, uri_used)
-            return model, uri_used
-
-    # Fallback: old behavior using registered model names (if still used somewhere)
-    model_name = _model_name_for_variant(variant)
-    cache_key = model_name
-    with _lock:
-        if cache_key in _cache:
-            return _cache[cache_key]
-
-        uri = _latest_source_uri(model_name)
-        model = mlflow.pyfunc.load_model(uri)
-        _cache[cache_key] = (model, uri)
-        return model, uri
+                model, uri_used = _load_model_with_alias_fallback(direct_uri)
+                _cache[cache_key] = (model, uri_used)
+                return model, uri_used
+    except RestException:
+        raise
 
 
 def _expected_feature_count_from_model(model: object) -> int | None:
@@ -186,7 +178,7 @@ def _expected_feature_count_from_model(model: object) -> int | None:
     return int(n) if n is not None else None
 
 
-def expected_feature_count(variant: str = "latest") -> int | None:
+def expected_feature_count(variant: str = "champion") -> int | None:
     model, _uri = get_model(variant)
     return _expected_feature_count_from_model(model)
 
