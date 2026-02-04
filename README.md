@@ -37,7 +37,7 @@ All branches should be merged via Pull Requests with code review.
 
    ```bash
    cd src
-   docker-compose up -d # On Windows: docker compose up -d
+   docker compose up -d
    ```
 
 3. [For backend development](src/backend/README.md)
