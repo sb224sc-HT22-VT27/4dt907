@@ -154,7 +154,7 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
         raise
 
 
-def get_model(variant: str = "champion") -> Tuple[object, str] | RestException:
+def get_model(variant: str = "champion") -> Tuple[object, str] | None:
     _init_mlflow()
     try:
         direct_uri = _direct_uri_for_variant(variant)
@@ -168,7 +168,7 @@ def get_model(variant: str = "champion") -> Tuple[object, str] | RestException:
                 _cache[cache_key] = (model, uri_used)
                 return model, uri_used
     except RestException:
-        raise
+        return None
 
 
 def _expected_feature_count_from_model(model: object) -> int | None:

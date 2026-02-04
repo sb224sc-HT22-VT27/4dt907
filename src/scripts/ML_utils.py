@@ -107,7 +107,7 @@ class MLUtils:
         Swaps @prod and @backup.
         Used if the current @prod is buggy and you need to restore the previous stable version.
         """
-        print(f"Attempting to swap @backup to @prod")
+        print("Attempting to swap @backup to @prod")
 
         try:
             back_ver = self.client.get_model_version_by_alias(
@@ -121,7 +121,7 @@ class MLUtils:
 
             self.client.set_registered_model_alias(self.model_name, "backup", prod_ver)
 
-            print(f"Success: @backup is now swapped with @prod.")
+            print("Success: @backup is now swapped with @prod.")
         except Exception as e:
             print(
                 f"An unexpected error occurred during revert (Probably missing some alias): {e}"
