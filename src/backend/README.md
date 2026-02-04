@@ -16,10 +16,29 @@ FastAPI backend service for 4dt907 ML data-intensive system.
 ```bash
 # Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+```
+
+### Environment variables (.env)
+
+This backend loads MLflow models from DagsHub. Create a `.env` file for local development:
+
+`src/.env`
+
+```env
+# Web service
+BACKEND_PORT=<port>
+BACKEND_URL="http://backend:${BACKEND_PORT}"
+FRONTEND_PORT=<port>
+
+# Dagshub
+MODEL_URI_PROD="models:/<model>@<tag>"
+MODEL_URI_DEV="models:/<model>@<tag>"
+MODEL_URI_BACKUP="models:/<model>@<tag>"
+MLFLOW_TRACKING_URI="https://dagshub.com/<Repo-owner>/<Repo-name>.mlflow"
 ```
 
 ### Running the Application
@@ -66,6 +85,11 @@ black .
 ### Root Endpoints
 
 ### API v1
+
+#### Prediction
+
+- `POST /api/v1/predict/champion`
+- `POST /api/v1/predict/latest`
 
 ## Docker
 

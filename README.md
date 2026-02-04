@@ -1,41 +1,9 @@
 # 4dt907 - Project in data intensive systems
 
-## Roles
-
-* Samuel - Scrum Master (DevOps)
-* Nasser - Developer (full-stack)
-* Emil - Developer (tester)
-* Jesper - Developer (data scientist)
-
-## Agile development
-
-* Every other day stand-up via slack or in person on campus.
-* Review of sprint during lecture weekly
-* retrospective Mondays for approx 1 hour
-
 ## Refrence for repository setup
 
 * Example [repository setup](https://github.com/SamuelFredricBerg/E2E-chat)
 * Refrence for commit messages [Conventional commits](https://www.conventionalcommits.org/en/v1.0.0/)
-* Reference for pull request template ...
-* Merging strategy ...
-* Rulesets setup ...
-
-## Planning 21/01/2026
-
-* Fast-API
-* CI/CD via github actions
-* Docker
-* React for frontend
-* MLFlow
-* Jupyter notebook for documentation
-* Communication: Slack
-* Request access to CScloud via lnu
-* NodeJS version
-* Python 3.12.X
-* Docker version
-* docker-compose version
-* Secrets handling via github
 
 ## Branching strategy
 
@@ -69,43 +37,16 @@ All branches should be merged via Pull Requests with code review.
 
    ```bash
    cd src
-   docker-compose up --build
+   docker compose up -d
    ```
 
-3. For Python/ML development:
+3. [For backend development](src/backend/README.md)
 
-   ```bash
-   cd src/backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   python -m app.main
-   ```
+4. [For frontend development](src/frontend/README.md)
 
-4. For frontend development:
+5. [For ML notebooks](src/ml-research/README.md):
 
-   ```bash
-   cd src/frontend
-   npm install
-   npm run dev
-   ```
-
-5. For Jupyter notebooks:
-
-   ```bash
-   pip install jupyter notebook
-   jupyter notebook
-   # Navigate to src/ml-research/
-   ```
-
-### Service URLs (when running with docker-compose)
-
-* Frontend: <http://localhost:3000>
-* Backend API: <http://localhost:8000>
-* API Documentation: <http://localhost:8000/docs>
-* MLflow UI: <http://localhost:5000>
-
-## Project Structure (File Struct)
+## Project Structure
 
 ```text
 4dt907/

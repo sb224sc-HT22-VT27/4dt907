@@ -1,61 +1,49 @@
-version: "3.8"
-
 services:
-    # Backend API Service
     backend:
         build:
             context: ./backend
-            dockerfile: Dockerfile
+            args:
+                - BACKEND_PORT=${BACKEND_PORT}
+                - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+                - MODEL_URI_PROD=${MODEL_URI_PROD}
+                - MODEL_URI_DEV=${MODEL_URI_DEV}
+                - MODEL_URI_BACKUP=${MODEL_URI_BACKUP}
         container_name: 4dt907-backend
-        ports:
-            - "8080:8080"
         environment:
-            - MLFLOW_TRACKING_URI=http://mlflow:5050
+            - BACKEND_PORT=${BACKEND_PORT}
+            - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+            - MODEL_URI_PROD=${MODEL_URI_PROD}
+            - MODEL_URI_DEV=${MODEL_URI_DEV}
+            - MODEL_URI_BACKUP=${MODEL_URI_BACKUP}
         volumes:
-            - ./backend:/app
-        depends_on:
-            - mlflow
+            - ./backend:/backend_app
+            - /opt/.venv
         restart: unless-stopped
         networks:
             - app-network
 
-    # Frontend Service
     frontend:
         build:
             context: ./frontend
-            dockerfile: Dockerfile
+            args:
+                - BACKEND_PORT=${BACKEND_PORT}
+                - BACKEND_URL=${BACKEND_URL}
+                - FRONTEND_PORT=${FRONTEND_PORT}
         container_name: 4dt907-frontend
+        environment:
+            - BACKEND_PORT=${BACKEND_PORT}
+            - BACKEND_URL=${BACKEND_URL}
+            - FRONTEND_PORT=${FRONTEND_PORT}
         ports:
-            - "3000:3000"
+            - "${FRONTEND_PORT}:${FRONTEND_PORT}"
         volumes:
-            - ./frontend:/app
-            - /app/node_modules
+            - ./frontend:/frontend_app
+            - /frontend_app/node_modules
         depends_on:
             - backend
         restart: unless-stopped
         networks:
             - app-network
-    # ML-Flow Service
-    mlflow:
-        image: ghcr.io/mlflow/mlflow:v3.5.0
-        container_name: 4dt907-mlflow
-        ports:
-            - "5050:5050"
-        volumes:
-            - mlflow-data:/mlflow
-        command: >
-            mlflow server
-            --host 0.0.0.0
-            --port 5050
-            --backend-store-uri sqlite:///mlflow/mlflow.db
-            --default-artifact-root /mlflow/artifacts
-        restart: unless-stopped
-        networks:
-            - app-network
-
-volumes:
-    mlflow-data:
-        driver: local
 
 networks:
     app-network:

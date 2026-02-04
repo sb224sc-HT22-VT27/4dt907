@@ -4,8 +4,17 @@ React frontend application for 4dt907 ML data-intensive system.
 
 ## Features
 
+- Web client for sending feature vectors to the backend and displaying predicted expert score
+- Supports model variants via backend routes:
+  - `POST /api/v1/predict/champion` (production/champion, typically `@prod`)
+  - `POST /api/v1/predict/latest` (development/latest, typically `@dev`)
+- Input validation guidance for the deployed regression model (expects **41** features)
+
 ## Getting Started
 
+from src/frontend
+npm ci
+npm run dev
 
 ### Prerequisites
 
@@ -16,7 +25,7 @@ React frontend application for 4dt907 ML data-intensive system.
 
 ```bash
 # Install dependencies
-npm install
+npm ci # or npm install
 ```
 
 ### Running the Application
@@ -50,8 +59,6 @@ docker build -t 4dt907-frontend .
 # Run container
 docker run -p 3000:3000 4dt907-frontend
 ```
-
-## Features
 
 ### API Integration
 

@@ -1,16 +1,30 @@
 FROM python:3.12-slim
 
-WORKDIR /app
+ARG BACKEND_PORT
+ARG MLFLOW_TRACKING_URI
+ARG MODEL_URI_PROD
+ARG MODEL_URI_DEV
+ARG MODEL_URI_BACKUP
 
-# Install dependencies
+WORKDIR /backend_app
+
+ENV BACKEND_PORT=${BACKEND_PORT:-8080} \
+    MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI} \
+    MODEL_URI_PROD=${MODEL_URI_PROD} \
+    MODEL_URI_DEV=${MODEL_URI_DEV} \
+    MODEL_URI_BACKUP=${MODEL_URI_BACKUP} \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/.venv/bin:$PATH"
+
+RUN python -m venv /opt/.venv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
 COPY . .
 
-# Expose port
-EXPOSE 8000
+RUN useradd -m appuser && chown -R appuser /backend_app /opt/.venv
+USER appuser
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE ${BACKEND_PORT}
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT}"]
