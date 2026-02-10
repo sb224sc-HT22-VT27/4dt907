@@ -1,5 +1,8 @@
 name: CI/CD Frontend
 
+permissions:
+    contents: read
+
 on:
     push:
         paths:
@@ -8,9 +11,6 @@ on:
         branches: ["develop"]
     pull_request:
         branches: ["develop"]
-
-permissions:
-    contents: read
 
 jobs:
     frontend-ci:
@@ -27,6 +27,7 @@ jobs:
                   node-version: "22"
                   cache: "npm"
                   cache-dependency-path: src/frontend/package-lock.json
+            
             - name: Install dependencies
               run: npm ci
 
@@ -39,7 +40,7 @@ jobs:
 
             - name: Build
               env:
-                  BACKEND_PORT: ${{ secrets.BACKEND_PORT }}
-                  BACKEND_URL: ${{ secrets.BACKEND_URL }}
-                  FRONTEND_PORT: ${{ secrets.FRONTEND_PORT }}
+                  BACKEND_PORT: ${{ vars.BACKEND_PORT || '8080' }}
+                  BACKEND_URL: ${{ vars.BACKEND_URL || 'http://backend:8080' }}
+                  FRONTEND_PORT: ${{ vars.FRONTEND_PORT || '3030' }}
               run: npm run build

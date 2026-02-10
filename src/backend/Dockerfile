@@ -15,11 +15,17 @@ ENV BACKEND_PORT=${BACKEND_PORT:-8080} \
     MODEL_URI_BACKUP=${MODEL_URI_BACKUP} \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/.venv/bin:$PATH"
+    PATH="/opt/.venv/bin:$PATH" \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-RUN python -m venv /opt/.venv
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    python -m venv /opt/.venv
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip~=24.3.0 && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
@@ -27,4 +33,8 @@ RUN useradd -m appuser && chown -R appuser /backend_app /opt/.venv
 USER appuser
 
 EXPOSE ${BACKEND_PORT}
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${BACKEND_PORT}/docs || exit 1
+
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT}"]
