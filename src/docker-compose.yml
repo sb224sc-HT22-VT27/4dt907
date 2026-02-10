@@ -26,24 +26,12 @@ services:
         #     - WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV}
         #     - WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP}
         env_file: .env
-        restart: unless-stopped
-        networks:
-            - app-network
-        healthcheck:
-            test:
-                ["CMD", "curl", "-f", "http://localhost:${BACKEND_PORT}/health"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
-        profiles: ["dev"]
         volumes:
             - ./backend:/backend_app
             - /backend_app/.venv
-
-    backend-prod:
-        extends: backend
-        profiles: ["prod"]
-        volumes: []
+        restart: unless-stopped
+        networks:
+            - app-network
 
     frontend:
         build:
@@ -60,20 +48,14 @@ services:
         env_file: .env
         ports:
             - "${FRONTEND_PORT}:${FRONTEND_PORT}"
-        depends_on:
-            backend:
-                condition: service_healthy
-        restart: unless-stopped
-        networks:
-            - app-network
-        profiles: ["dev"]
         volumes:
             - ./frontend:/app
             - /app/node_modules
-    frontend-prod:
-        extends: frontend
-        profiles: ["prod"]
-        volumes: []
+        depends_on:
+            - backend
+        restart: unless-stopped
+        networks:
+            - app-network
 
 networks:
     app-network:
