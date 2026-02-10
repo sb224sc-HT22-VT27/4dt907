@@ -1,7 +1,6 @@
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 from unittest.mock import patch, MagicMock
-
 from app.api.v1.endpoints.model_info import router as model_info_router
 
 
@@ -51,3 +50,41 @@ def test_model_info_champion():
         "model_uri": "models:/Champion/2",
         "expected_features": 3,
     }
+
+
+def test_model_info_weakest_link_latest():
+    app = create_test_app()
+    client = TestClient(app)
+    with patch(
+        "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
+        return_value=(MagicMock(), "models:/WeakestLink_Latest/3"),
+    ), patch(
+        "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
+        return_value=5,
+    ):
+        response = client.get("/api/v1/model-info/weakest-link/latest")
+        assert response.status_code == 200
+        assert response.json() == {
+            "variant": "latest",
+            "model_uri": "models:/WeakestLink_Latest/3",
+            "expected_features": 5,
+        }
+
+
+def test_model_info_weakest_link_champion():
+    app = create_test_app()
+    client = TestClient(app)
+    with patch(
+        "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
+        return_value=(MagicMock(), "models:/WeakestLink_Champion/4"),
+    ), patch(
+        "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
+        return_value=6,
+    ):
+        response = client.get("/api/v1/model-info/weakest-link/champion")
+        assert response.status_code == 200
+        assert response.json() == {
+            "variant": "champion",
+            "model_uri": "models:/WeakestLink_Champion/4",
+            "expected_features": 6,
+        }
