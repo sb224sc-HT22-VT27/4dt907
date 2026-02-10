@@ -40,12 +40,13 @@ jobs:
                   SLEEP_SECONDS=5
                   
                   for i in $(seq 1 $MAX_ATTEMPTS); do
-                    BACKEND_STATUS=$(docker inspect --format='{{.State.Health.Status}}' 4dt907-backend 2>/dev/null || echo "starting")
-                    FRONTEND_STATUS=$(docker inspect --format='{{.State.Health.Status}}' 4dt907-frontend 2>/dev/null || echo "starting")
+                    # Get health status from docker compose
+                    BACKEND_HEALTH=$(docker compose -f src/docker-compose.yml ps --format json backend 2>/dev/null | jq -r '.[0].Health // "starting"')
+                    FRONTEND_HEALTH=$(docker compose -f src/docker-compose.yml ps --format json frontend 2>/dev/null | jq -r '.[0].Health // "starting"')
                     
-                    echo "Attempt $i/$MAX_ATTEMPTS: Backend=$BACKEND_STATUS, Frontend=$FRONTEND_STATUS"
+                    echo "Attempt $i/$MAX_ATTEMPTS: Backend=$BACKEND_HEALTH, Frontend=$FRONTEND_HEALTH"
                     
-                    if [ "$BACKEND_STATUS" = "healthy" ] && [ "$FRONTEND_STATUS" = "healthy" ]; then
+                    if [ "$BACKEND_HEALTH" = "healthy" ] && [ "$FRONTEND_HEALTH" = "healthy" ]; then
                       echo "All services are healthy!"
                       break
                     fi
@@ -59,7 +60,7 @@ jobs:
                     sleep $SLEEP_SECONDS
                   done
                   
-                  docker ps
+                  docker compose -f src/docker-compose.yml ps
                   
                   # Test endpoints
                   curl -f http://localhost:$BACKEND_PORT/docs || exit 1

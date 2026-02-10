@@ -10,6 +10,8 @@ server {
     # Enables XSS filtering in older browsers
     add_header X-XSS-Protection "1; mode=block" always;
     # Content Security Policy
+    # Note: 'unsafe-inline' and 'unsafe-eval' are required for Vite/React development builds
+    # For production, consider using a stricter CSP with nonces or building without eval
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' http://backend:${BACKEND_PORT};" always;
     # Referrer Policy
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
