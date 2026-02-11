@@ -14,3 +14,5 @@ def test_v1_router_registers_expected_paths():
     assert "/api/v1/model-info/champion" in paths
     assert "/api/v1/model-info/weakest-link/latest" in paths
     assert "/api/v1/model-info/weakest-link/champion" in paths
+    assert "/api/v1/weakest-link/champion" in paths
+    assert "/api/v1/weakest-link/latest" in paths
