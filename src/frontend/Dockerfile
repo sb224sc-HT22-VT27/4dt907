@@ -12,8 +12,8 @@ FROM nginx:alpine
 ARG BACKEND_PORT
 ARG FRONTEND_PORT
 
-ENV BACKEND_PORT=${BACKEND_PORT}
-ENV FRONTEND_PORT=${FRONTEND_PORT}
+ENV BACKEND_PORT=${BACKEND_PORT:-8080}
+ENV FRONTEND_PORT=${FRONTEND_PORT:-3030}
 
 RUN addgroup -g 101 -S nginx || true && \
     adduser -S -D -H -u 101 -h /var/cache/nginx -s /sbin/nologin -G nginx -g nginx nginx || true && \
