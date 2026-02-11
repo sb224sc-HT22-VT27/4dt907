@@ -7,3 +7,4 @@ mlflow
 numpy
 pandas
 python-dotenv
+pytest-mock
