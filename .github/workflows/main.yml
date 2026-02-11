@@ -86,32 +86,7 @@ jobs:
             - name: Docker Compose Build & Test
               run: |
                   docker compose -f src/docker-compose.yml build
-                  docker compose -f src/docker-compose.yml up -d
-
-                  echo "Waiting for services to be healthy..."
-                  MAX_ATTEMPTS=30
-                  SLEEP_SECONDS=5
-
-                  for i in $(seq 1 $MAX_ATTEMPTS); do
-                    # Get health status from docker compose
-                    BACKEND_HEALTH=$(docker compose -f src/docker-compose.yml ps --format json backend 2>/dev/null | jq -r '.[0].Health // "starting"')
-                    FRONTEND_HEALTH=$(docker compose -f src/docker-compose.yml ps --format json frontend 2>/dev/null | jq -r '.[0].Health // "starting"')
-
-                    echo "Attempt $i/$MAX_ATTEMPTS: Backend=$BACKEND_HEALTH, Frontend=$FRONTEND_HEALTH"
-
-                    if [ "$BACKEND_HEALTH" = "healthy" ] && [ "$FRONTEND_HEALTH" = "healthy" ]; then
-                    echo "All services are healthy!"
-                    break
-                    fi
-
-                    if [ "$i" -eq "$MAX_ATTEMPTS" ]; then
-                    echo "Services failed to become healthy within timeout"
-                    docker compose -f src/docker-compose.yml logs
-                    exit 1
-                    fi
-
-                    sleep $SLEEP_SECONDS
-                  done
+                  docker compose -f src/docker-compose.yml up -d --wait
 
                   docker compose -f src/docker-compose.yml ps
 
