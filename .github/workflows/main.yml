@@ -9,6 +9,10 @@ on:
     pull_request:
         branches: ["main"]
 
+env:
+    DOCKER_BUILDKIT: 1
+    COMPOSE_DOCKER_CLI_BUILD: 1
+
 jobs:
     backend-test:
         runs-on: ubuntu-latest
@@ -17,19 +21,29 @@ jobs:
                 working-directory: ./src/backend
         steps:
             - uses: actions/checkout@v4
+
             - name: Set up Python
               uses: actions/setup-python@v5
               with:
                   python-version: "3.12"
                   cache: "pip"
+                  cache-dependency-path: src/backend/requirements.txt
+
             - name: Install dependencies
               run: |
+                  python -m pip install --upgrade pip
                   pip install -r requirements.txt
                   pip install flake8 pytest
+
+            - name: Lint with flake8
+              run: |
+                  flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+                  flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
             - name: Run Tests
               run: |
                   export PYTHONPATH=$PYTHONPATH:$(pwd)
-                  pytest tests/
+                  pytest tests/ -v
 
     frontend-test:
         runs-on: ubuntu-latest
@@ -38,12 +52,14 @@ jobs:
                 working-directory: ./src/frontend
         steps:
             - uses: actions/checkout@v4
+
             - name: Setup Node
               uses: actions/setup-node@v4
               with:
                   node-version: "22"
                   cache: "npm"
                   cache-dependency-path: src/frontend/package-lock.json
+
             - name: Install & Lint
               run: |
                   npm ci
@@ -55,33 +71,49 @@ jobs:
         runs-on: ubuntu-latest
         env:
             BACKEND_PORT: ${{ secrets.BACKEND_PORT || '8080' }}
-            BACKEND_URL: ${{ secrets.BACKEND_URL }}
+            BACKEND_URL: ${{ secrets.BACKEND_URL || 'http://backend:8080' }}
             FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || '3030' }}
-            MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
-            MODEL_URI_PROD: ${{ secrets.MODEL_URI_PROD }}
-            MODEL_URI_DEV: ${{ secrets.MODEL_URI_DEV }}
-            MODEL_URI_BACKUP: ${{ secrets.MODEL_URI_BACKUP }}
+            MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI || '' }}
+            MODEL_URI_PROD: ${{ secrets.MODEL_URI_PROD || '' }}
+            MODEL_URI_DEV: ${{ secrets.MODEL_URI_DEV || '' }}
+            MODEL_URI_BACKUP: ${{ secrets.MODEL_URI_BACKUP || '' }}
         steps:
             - uses: actions/checkout@v4
 
             - name: Docker Compose Build & Test
               run: |
-                  docker compose -f src/docker-compose.yml up -d --build
+                  docker compose -f src/docker-compose.yml build
+                  docker compose -f src/docker-compose.yml up -d
 
-                  echo "Waiting for frontend to be ready..."
+                  echo "Waiting for services to be healthy..."
                   MAX_ATTEMPTS="${FRONTEND_HEALTH_MAX_ATTEMPTS:-30}"
                   SLEEP_SECONDS="${FRONTEND_HEALTH_SLEEP_SECONDS:-5}"
                   for i in $(seq 1 "$MAX_ATTEMPTS"); do
-                    if curl -f http://localhost:$FRONTEND_PORT > /dev/null 2>&1; then
-                      echo "Frontend is ready!"
+                    # Get health status from docker compose
+                    BACKEND_HEALTH=$(docker compose -f src/docker-compose.yml ps --format json backend 2>/dev/null | jq -r '.[0].Health // "starting"')
+                    FRONTEND_HEALTH=$(docker compose -f src/docker-compose.yml ps --format json frontend 2>/dev/null | jq -r '.[0].Health // "starting"')
+
+                    echo "Attempt $i: Backend=$BACKEND_HEALTH, Frontend=$FRONTEND_HEALTH"
+
+                    if [ "$BACKEND_HEALTH" = "healthy" ] && [ "$FRONTEND_HEALTH" = "healthy" ]; then
+                      echo "All services are healthy!"
                       break
                     fi
-                    echo "Attempt $i: Frontend not ready yet..."
+
+                    if [ $i -eq "$MAX_ATTEMPTS" ]; then
+                      echo "Services failed to become healthy"
+                      docker compose -f src/docker-compose.yml logs
+                      exit 1
+                    fi
+
                     sleep "$SLEEP_SECONDS"
                   done
-                  docker ps
 
-                  # curl -f http://localhost:$BACKEND_PORT/docs || exit 1
+                  docker compose -f src/docker-compose.yml ps
+
+                  # Test
                   curl -f http://localhost:$FRONTEND_PORT || exit 1
 
-                  docker compose -f src/docker-compose.yml down --rmi all
+            - name: Cleanup
+              if: always()
+              run: docker compose -f src/docker-compose.yml down -v

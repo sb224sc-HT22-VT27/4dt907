@@ -25,13 +25,29 @@ services:
             - WEAKLINK_MODEL_URI_PROD=${WEAKLINK_MODEL_URI_PROD}
             - WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV}
             - WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP}
-        # env_file: .env
+        ports:
+            - "${BACKEND_PORT}:${BACKEND_PORT}"
         volumes:
             - ./backend:/backend_app
+            - /backend_app/__pycache__
             - /backend_app/.venv
         restart: unless-stopped
         networks:
             - app-network
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:${BACKEND_PORT}/docs"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        deploy:
+            resources:
+                limits:
+                    cpus: "2"
+                    memory: 2G
+                reservations:
+                    cpus: "0.5"
+                    memory: 512M
 
     frontend:
         build:
@@ -51,11 +67,36 @@ services:
         volumes:
             - ./frontend:/app
             - /app/node_modules
+            - /app/dist
         depends_on:
-            - backend
+            backend:
+                condition: service_healthy
         restart: unless-stopped
         networks:
             - app-network
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "wget",
+                    "--no-verbose",
+                    "--tries=1",
+                    "--spider",
+                    "--prefer-family=IPv4",
+                    "http://127.0.0.1:${FRONTEND_PORT}/",
+                ]
+            interval: 30s
+            timeout: 3s
+            retries: 3
+            start_period: 10s
+        deploy:
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 512M
+                reservations:
+                    cpus: "0.25"
+                    memory: 128M
 
 networks:
     app-network:
