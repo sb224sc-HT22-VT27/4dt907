@@ -20,6 +20,13 @@ jobs:
             BACKEND_PORT: ${{ secrets.BACKEND_PORT || '8080' }}
             BACKEND_URL: ${{ secrets.BACKEND_URL || 'http://backend:8080' }}
             FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || '3030' }}
+            MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI || '' }}
+            MODEL_URI_PROD: ${{ secrets.MODEL_URI_PROD || '' }}
+            MODEL_URI_DEV: ${{ secrets.MODEL_URI_DEV || '' }}
+            MODEL_URI_BACKUP: ${{ secrets.MODEL_URI_BACKUP || '' }}
+            WEAKLINK_MODEL_URI_PROD: ${{ secrets.WEAKLINK_MODEL_URI_PROD || '' }}
+            WEAKLINK_MODEL_URI_DEV: ${{ secrets.WEAKLINK_MODEL_URI_DEV || '' }}
+            WEAKLINK_MODEL_URI_BACKUP: ${{ secrets.WEAKLINK_MODEL_URI_BACKUP || '' }}
 
         steps:
             - name: Checkout code
