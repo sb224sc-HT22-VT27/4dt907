@@ -54,16 +54,17 @@ jobs:
                     echo "Attempt $i/$MAX_ATTEMPTS: Backend=$BACKEND_HEALTH, Frontend=$FRONTEND_HEALTH"
 
                     if [ "$BACKEND_HEALTH" = "healthy" ] && [ "$FRONTEND_HEALTH" = "healthy" ]; then
-                      echo "All services are healthy!"
-                      break
+                    echo "All services are healthy!"
+                    break
                     fi
 
-                    if [ $i -eq $MAX_ATTEMPTS ]; then
-                      echo "Services failed to become healthy within timeout"
-                      docker compose -f src/docker-compose.yml logs
-                      exit 1
+                    if [ "$i" -eq "$MAX_ATTEMPTS" ]; then
+                    echo "Services failed to become healthy within timeout"
+                    docker compose -f src/docker-compose.yml logs
+                    exit 1
+                    fi
 
-                      sleep $SLEEP_SECONDS
+                    sleep $SLEEP_SECONDS
                   done
 
                   docker compose -f src/docker-compose.yml ps
