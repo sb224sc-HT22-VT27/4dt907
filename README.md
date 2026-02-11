@@ -37,6 +37,7 @@ All branches should be merged via Pull Requests with code review.
 
    ```bash
    cd src
+   docker compose build
    docker compose up -d
    ```
 
