@@ -33,7 +33,7 @@ USER nginx
 EXPOSE ${FRONTEND_PORT}
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider --prefer-family=IPv4 http://127.0.0.1:${FRONTEND_PORT}/ || exit 1
+    CMD curl -f http://localhost:${FRONTEND_PORT}/ || exit 1
 
 
 CMD ["nginx", "-g", "daemon off;"]

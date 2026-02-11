@@ -44,6 +44,6 @@ COPY --chown=appuser:appuser . .
 EXPOSE ${BACKEND_PORT}
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:${BACKEND_PORT}/docs || exit 1
+    CMD curl -f http://localhost:${BACKEND_PORT}/health || exit 1
 
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT}"]
