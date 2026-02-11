@@ -64,7 +64,7 @@ jobs:
               run: |
                   npm ci
                   npm run lint
-              # npm run test
+              # npm test
 
     docker-build:
         needs: [backend-test, frontend-test]
@@ -89,32 +89,34 @@ jobs:
                   docker compose -f src/docker-compose.yml up -d
 
                   echo "Waiting for services to be healthy..."
-                  MAX_ATTEMPTS="${FRONTEND_HEALTH_MAX_ATTEMPTS:-30}"
-                  SLEEP_SECONDS="${FRONTEND_HEALTH_SLEEP_SECONDS:-5}"
-                  for i in $(seq 1 "$MAX_ATTEMPTS"); do
+                  MAX_ATTEMPTS=30
+                  SLEEP_SECONDS=5
+
+                  for i in $(seq 1 $MAX_ATTEMPTS); do
                     # Get health status from docker compose
                     BACKEND_HEALTH=$(docker compose -f src/docker-compose.yml ps --format json backend 2>/dev/null | jq -r '.[0].Health // "starting"')
                     FRONTEND_HEALTH=$(docker compose -f src/docker-compose.yml ps --format json frontend 2>/dev/null | jq -r '.[0].Health // "starting"')
 
-                    echo "Attempt $i: Backend=$BACKEND_HEALTH, Frontend=$FRONTEND_HEALTH"
+                    echo "Attempt $i/$MAX_ATTEMPTS: Backend=$BACKEND_HEALTH, Frontend=$FRONTEND_HEALTH"
 
                     if [ "$BACKEND_HEALTH" = "healthy" ] && [ "$FRONTEND_HEALTH" = "healthy" ]; then
-                      echo "All services are healthy!"
-                      break
+                    echo "All services are healthy!"
+                    break
                     fi
 
-                    if [ $i -eq "$MAX_ATTEMPTS" ]; then
-                      echo "Services failed to become healthy"
-                      docker compose -f src/docker-compose.yml logs
-                      exit 1
+                    if [ "$i" -eq "$MAX_ATTEMPTS" ]; then
+                    echo "Services failed to become healthy within timeout"
+                    docker compose -f src/docker-compose.yml logs
+                    exit 1
                     fi
 
-                    sleep "$SLEEP_SECONDS"
+                    sleep $SLEEP_SECONDS
                   done
 
                   docker compose -f src/docker-compose.yml ps
 
                   # Test
+                  curl -f http://localhost:$BACKEND_PORT/health || exit 1
                   curl -f http://localhost:$FRONTEND_PORT || exit 1
 
             - name: Cleanup
