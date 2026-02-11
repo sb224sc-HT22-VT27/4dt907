@@ -2,29 +2,39 @@ FROM python:3.12-slim
 
 ARG BACKEND_PORT
 ARG MLFLOW_TRACKING_URI
+
 ARG MODEL_URI_PROD
 ARG MODEL_URI_DEV
 ARG MODEL_URI_BACKUP
 
-WORKDIR /backend_app
+ARG WEAKLINK_MODEL_URI_PROD
+ARG WEAKLINK_MODEL_URI_DEV
+ARG WEAKLINK_MODEL_URI_BACKUP
 
-ENV BACKEND_PORT=${BACKEND_PORT:-8080} \
+ENV BACKEND_PORT=${BACKEND_PORT} \
     MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI} \
     MODEL_URI_PROD=${MODEL_URI_PROD} \
     MODEL_URI_DEV=${MODEL_URI_DEV} \
     MODEL_URI_BACKUP=${MODEL_URI_BACKUP} \
+    WEAKLINK_MODEL_URI_PROD=${WEAKLINK_MODEL_URI_PROD} \
+    WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV} \
+    WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP} \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/.venv/bin:$PATH"
+    PATH="/backend_app/.venv/bin:$PATH"
 
-RUN python -m venv /opt/.venv
+WORKDIR /backend_app
+
+RUN python -m venv /backend_app/.venv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+RUN useradd -m appuser && chown -R appuser /backend_app /backend_app/.venv
 
-RUN useradd -m appuser && chown -R appuser /backend_app /opt/.venv
 USER appuser
 
+COPY --chown=appuser:appuser . .
+
 EXPOSE ${BACKEND_PORT}
+
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT}"]

@@ -11,8 +11,8 @@ jobs:
     test-orchestration:
         runs-on: ubuntu-latest
         env:
-            BACKEND_PORT: ${{ secrets.BACKEND_PORT || '8080' }}
-            FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || '3030' }}
+            BACKEND_PORT: ${{ secrets.BACKEND_PORT || '' }}
+            FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || '' }}
 
         steps:
             - name: Checkout code

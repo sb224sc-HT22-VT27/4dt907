@@ -1,7 +1,6 @@
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 from unittest.mock import patch
-
 from app.api.v1.endpoints.predict import router as predict_router
 
 

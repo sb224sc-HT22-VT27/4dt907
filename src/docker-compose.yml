@@ -5,19 +5,30 @@ services:
             args:
                 - BACKEND_PORT=${BACKEND_PORT}
                 - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+
                 - MODEL_URI_PROD=${MODEL_URI_PROD}
                 - MODEL_URI_DEV=${MODEL_URI_DEV}
                 - MODEL_URI_BACKUP=${MODEL_URI_BACKUP}
+
+                - WEAKLINK_MODEL_URI_PROD=${WEAKLINK_MODEL_URI_PROD}
+                - WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV}
+                - WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP}
         container_name: 4dt907-backend
         environment:
             - BACKEND_PORT=${BACKEND_PORT}
             - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+
             - MODEL_URI_PROD=${MODEL_URI_PROD}
             - MODEL_URI_DEV=${MODEL_URI_DEV}
             - MODEL_URI_BACKUP=${MODEL_URI_BACKUP}
+
+            - WEAKLINK_MODEL_URI_PROD=${WEAKLINK_MODEL_URI_PROD}
+            - WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV}
+            - WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP}
+        # env_file: .env
         volumes:
             - ./backend:/backend_app
-            - /opt/.venv
+            - /backend_app/.venv
         restart: unless-stopped
         networks:
             - app-network
@@ -34,11 +45,12 @@ services:
             - BACKEND_PORT=${BACKEND_PORT}
             - BACKEND_URL=${BACKEND_URL}
             - FRONTEND_PORT=${FRONTEND_PORT}
+        # env_file: .env
         ports:
             - "${FRONTEND_PORT}:${FRONTEND_PORT}"
         volumes:
-            - ./frontend:/frontend_app
-            - /frontend_app/node_modules
+            - ./frontend:/app
+            - /app/node_modules
         depends_on:
             - backend
         restart: unless-stopped

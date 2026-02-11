@@ -49,6 +49,7 @@ function toOrderedArray(valuesObj) {
 }
 
 export default function Predict() {
+  const [task, setTask] = useState("score"); // "score" | "weakest"
   const [variant, setVariant] = useState("latest");
   const [expectedCount, setExpectedCount] = useState(DEFAULT_EXPECTED);
 
@@ -62,15 +63,27 @@ export default function Predict() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
-  const endpoint = useMemo(() => `/api/v1/predict/${variant}`, [variant]);
+  const endpoint = useMemo(() => {
+    return task === "weakest"
+      ? `/api/v1/weakest-link/${variant}`
+      : `/api/v1/predict/${variant}`;
+  }, [task, variant]);
 
-  // Try to load expected feature count 
+  const modelInfoUrl = useMemo(() => {
+    return task === "weakest"
+      ? `/api/v1/model-info/weakest-link/${variant}`
+      : `/api/v1/model-info/${variant}`;
+  }, [task, variant]);
+
+  // Try to load expected feature count
   useEffect(() => {
     let cancelled = false;
+
     async function loadModelInfo() {
       try {
-        const res = await fetch(`/api/v1/model-info/${variant}`);
+        const res = await fetch(modelInfoUrl);
         const data = await res.json().catch(() => ({}));
+
         if (!cancelled && res.ok && typeof data?.expected_features === "number") {
           setExpectedCount(data.expected_features);
         } else if (!cancelled) {
@@ -80,11 +93,12 @@ export default function Predict() {
         if (!cancelled) setExpectedCount(DEFAULT_EXPECTED);
       }
     }
+
     loadModelInfo();
     return () => {
       cancelled = true;
     };
-  }, [variant]);
+  }, [modelInfoUrl]);
 
   const flashHint = (msg) => {
     setHint(msg);
@@ -128,11 +142,13 @@ export default function Predict() {
   async function copyValues() {
     setError("");
     try {
-      const text = toOrderedArray(featureValues).join(", ");
+      const expected = expectedCount ?? DEFAULT_EXPECTED;
+      const text = toOrderedArray(featureValues).slice(0, expected).join(", ");
       await navigator.clipboard.writeText(text);
       flashHint("Copied.");
     } catch {
-      setImportText(toOrderedArray(featureValues).join(", "));
+      const expected = expectedCount ?? DEFAULT_EXPECTED;
+      setImportText(toOrderedArray(featureValues).slice(0, expected).join(", "));
       setImportOpen(true);
       flashHint("Clipboard blocked — copy from the box.");
     }
@@ -162,11 +178,16 @@ export default function Predict() {
     if (!parsed.ok) return setError(parsed.error);
 
     const expected = expectedCount ?? DEFAULT_EXPECTED;
-    if (parsed.value.length !== expected) {
-      return setError(`Expected ${expected} features, but got ${parsed.value.length}.`);
+
+    // Allow pasting 41 into a 40-feature model: we just take the first expected values.
+    let values = parsed.value;
+    if (values.length > expected) values = values.slice(0, expected);
+
+    if (values.length !== expected) {
+      return setError(`Expected ${expected} features, but got ${values.length}.`);
     }
 
-    setFeatureValues(fromArray(parsed.value));
+    setFeatureValues(fromArray(values));
     setResult(null);
     setImportOpen(false);
     flashHint("Imported.");
@@ -176,8 +197,10 @@ export default function Predict() {
     setError("");
     setResult(null);
 
-    const features = toOrderedArray(featureValues);
     const expected = expectedCount ?? DEFAULT_EXPECTED;
+
+    let features = toOrderedArray(featureValues);
+    if (features.length > expected) features = features.slice(0, expected);
 
     if (features.length !== expected) {
       return setError(`Expected ${expected} features, but got ${features.length}.`);
@@ -211,7 +234,9 @@ export default function Predict() {
                 <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
                   Model Prediction
                 </h1>
-                <p className="mt-2 text-slate-600">Adjust values. Predict. Clean and simple.</p>
+                <p className="mt-2 text-slate-600">
+                  Adjust values. Predict. Clean and simple.
+                </p>
               </div>
 
               <div className="text-sm text-slate-600">
@@ -223,15 +248,34 @@ export default function Predict() {
               </div>
             </div>
 
-            {/* Controls (aligned properly) */}
+            {/* Controls */}
             <div className="mt-6 mx-auto max-w-4xl">
-              {/* Row: select + buttons aligned */}
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
+                <div className="w-full md:w-[420px]">
+                  <div className="text-sm text-slate-700 mb-2">Task</div>
+                  <select
+                    value={task}
+                    onChange={(e) => {
+                      setError("");
+                      setResult(null);
+                      setTask(e.target.value);
+                    }}
+                    className="ios-input w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
+                  >
+                    <option value="score">Score prediction (A2)</option>
+                    <option value="weakest">Weakest link classification (A3)</option>
+                  </select>
+                </div>
+
                 <div className="w-full md:w-[420px]">
                   <div className="text-sm text-slate-700 mb-2">Model</div>
                   <select
                     value={variant}
-                    onChange={(e) => setVariant(e.target.value)}
+                    onChange={(e) => {
+                      setError("");
+                      setResult(null);
+                      setVariant(e.target.value);
+                    }}
                     className="ios-input w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
                   >
                     <option value="champion">Champion (prod)</option>
@@ -279,7 +323,6 @@ export default function Predict() {
                 </div>
               </div>
 
-              {/* Hint row  */}
               <div className="mt-2 h-5 text-xs text-slate-500">{hint || ""}</div>
             </div>
 
@@ -358,7 +401,10 @@ export default function Predict() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setImportText(toOrderedArray(featureValues).join(", "))}
+                  onClick={() => {
+                    const expected = expectedCount ?? DEFAULT_EXPECTED;
+                    setImportText(toOrderedArray(featureValues).slice(0, expected).join(", "));
+                  }}
                   className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800"
                 >
                   Fill current
