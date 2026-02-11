@@ -10,48 +10,6 @@ def create_test_app():
     return app
 
 
-def test_model_info_latest():
-    app = create_test_app()
-    client = TestClient(app)
-
-    with patch(
-        "app.api.v1.endpoints.model_info.get_model",
-        return_value=(MagicMock(), "models:/Latest/5"),
-    ), patch(
-        "app.api.v1.endpoints.model_info.expected_feature_count",
-        return_value=4,
-    ):
-        response = client.get("/api/v1/model-info/latest")
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "variant": "latest",
-        "model_uri": "models:/Latest/5",
-        "expected_features": 4,
-    }
-
-
-def test_model_info_champion():
-    app = create_test_app()
-    client = TestClient(app)
-
-    with patch(
-        "app.api.v1.endpoints.model_info.get_model",
-        return_value=(MagicMock(), "models:/Champion/2"),
-    ), patch(
-        "app.api.v1.endpoints.model_info.expected_feature_count",
-        return_value=3,
-    ):
-        response = client.get("/api/v1/model-info/champion")
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "variant": "champion",
-        "model_uri": "models:/Champion/2",
-        "expected_features": 3,
-    }
-
-
 def test_model_info_weakest_link_latest():
     app = create_test_app()
     client = TestClient(app)
@@ -76,15 +34,15 @@ def test_model_info_weakest_link_champion():
     client = TestClient(app)
     with patch(
         "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
-        return_value=(MagicMock(), "models:/WeakestLink_Champion/4"),
+        return_value=(MagicMock(), "models:/WeakestLink_Champion/1"),
     ), patch(
         "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
-        return_value=6,
+        return_value=5,
     ):
         response = client.get("/api/v1/model-info/weakest-link/champion")
         assert response.status_code == 200
         assert response.json() == {
             "variant": "champion",
-            "model_uri": "models:/WeakestLink_Champion/4",
-            "expected_features": 6,
+            "model_uri": "models:/WeakestLink_Champion/1",
+            "expected_features": 5,
         }

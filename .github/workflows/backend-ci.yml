@@ -41,6 +41,9 @@ jobs:
                   MODEL_URI_PROD: ${{ secrets.MODEL_URI_PROD }}
                   MODEL_URI_DEV: ${{ secrets.MODEL_URI_DEV }}
                   MODEL_URI_BACKUP: ${{ secrets.MODEL_URI_BACKUP }}
+                  WEAKLINK_MODEL_URI_PROD: ${{ secrets.WEAKLINK_MODEL_URI_PROD }}
+                  WEAKLINK_MODEL_URI_DEV: ${{ secrets.WEAKLINK_MODEL_URI_DEV }}
+                  WEAKLINK_MODEL_URI_BACKUP: ${{ secrets.WEAKLINK_MODEL_URI_BACKUP }}
               run: |
                   export PYTHONPATH=$PYTHONPATH:$(pwd)
                   pytest tests/ -v --tb=short
