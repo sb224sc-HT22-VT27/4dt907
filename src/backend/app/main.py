@@ -24,21 +24,48 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
 
 app = FastAPI(title="4dt907 Backend API")
 
+# Build allowed origins list
 ALLOWED_ORIGINS = [
     f"http://localhost:{os.getenv('FRONTEND_PORT', '3030')}",
     "http://localhost:3000",
     "http://localhost:5173",
 ]
 
+# Add Vercel deployment URLs if provided
+vercel_url = os.getenv("VERCEL_URL")
+if vercel_url:
+    ALLOWED_ORIGINS.extend([
+        f"https://{vercel_url}",
+        f"http://{vercel_url}",
+    ])
+
+# Allow production domain if configured
+production_url = os.getenv("PRODUCTION_URL")
+if production_url:
+    ALLOWED_ORIGINS.append(production_url)
+
 HOST_PORT = int(os.getenv("BACKEND_PORT", "8080"))
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["*"],
-)
+# For Vercel deployment, we may need to allow all origins
+# or use a wildcard pattern. In production, configure ALLOWED_ORIGINS_PATTERN
+allow_origin_regex = os.getenv("ALLOWED_ORIGINS_PATTERN")
+
+if allow_origin_regex:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=allow_origin_regex,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
 
 @app.get("/")
 def root():

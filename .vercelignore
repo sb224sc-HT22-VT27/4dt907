@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+.venv/
+venv/
+env/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Docker files (not needed for Vercel)
+docker-compose.yml
+Dockerfile
+*.dockerfile
+.dockerignore
+
+# Development
+.vscode/
+.idea/
+*.log
+.DS_Store
+
+# ML artifacts
+mlruns/
+mlartifacts/
+payloads/
+payloads-videos/
+
+# Jupyter notebooks (not needed for deployment)
+src/ml-research/
+
+# Data files
+src/data/
+
+# Scripts (not needed for deployment)
+src/scripts/
+
+# Test files
+tests/
+**/tests/
+*.test.js
+*.test.py
+
+# CI/CD
+.github/
