@@ -1,10 +1,14 @@
+# Production dependencies for Vercel deployment
+# Only runtime dependencies - no test/dev tools
+
+# Core framework
 fastapi==0.129.0
 uvicorn[standard]==0.40.0
-pytest==9.0.2
-httpx==0.28.1
-flake8==7.3.0
+
+# ML dependencies (required for model loading)
 mlflow==3.9.0
 numpy==2.4.2
 pandas==2.3.3
+
+# Configuration
 python-dotenv==1.2.1
-pytest-mock==3.15.1

@@ -91,14 +91,44 @@ All branches should be merged via Pull Requests with code review.
 
 ### Vercel Deployment
 
-This project is configured for deployment on Vercel, supporting both frontend and backend:
+This project is configured for deployment on Vercel, supporting both frontend and backend.
 
-#### Prerequisites
+#### ⚠️ Important: Backend Size Considerations
 
-* Vercel account ([sign up](https://vercel.com/signup))
-* Vercel CLI installed (optional): `npm install -g vercel`
+The backend includes ML dependencies (mlflow, numpy, pandas) that approach **50-70MB compressed**, which may exceed Vercel's free tier serverless function limit (50MB).
 
-#### Deployment Steps
+**Recommended Deployment Strategies:**
+
+1. **Vercel Pro** ($20/month) - 250MB function limit, suitable for full-stack ML apps
+2. **Frontend on Vercel + Backend elsewhere** (Recommended for free tier)
+   - Deploy frontend to Vercel (free)
+   - Host backend on Railway, Render, or Docker hosting
+   - Set `BACKEND_URL` environment variable in Vercel
+3. **Full Docker Deployment** - Use Docker Compose for both (see below)
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions on all options.
+
+#### Quick Start (Frontend Only on Vercel)
+
+1. **Import Project to Vercel:**
+   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
+   - Click "Add New" → "Project"
+   - Import your GitHub repository
+
+2. **Configure:**
+   - Build Command: `cd src/frontend && npm install && npm run build`
+   - Output Directory: `src/frontend/dist`
+   - Environment Variable: `BACKEND_URL=<your-backend-url>`
+
+3. **Deploy Backend Separately:**
+   - Use Railway, Render, or Docker hosting
+   - Or upgrade to Vercel Pro for full-stack deployment
+
+For full deployment guide including backend options, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+#### Old: Full Stack on Vercel (Requires Pro Plan)
+
+If you have Vercel Pro (or want to attempt with free tier):
 
 1. **Import Project to Vercel:**
    - Go to [Vercel Dashboard](https://vercel.com/dashboard)

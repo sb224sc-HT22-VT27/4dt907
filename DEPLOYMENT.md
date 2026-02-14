@@ -2,6 +2,32 @@
 
 This guide explains how to deploy the 4dt907 project to Vercel.
 
+## Important: Deployment Size Considerations
+
+⚠️ **The backend includes ML dependencies (mlflow, numpy, pandas) that can approach or exceed Vercel's free tier serverless function limit (50MB compressed).**
+
+**Deployment Options:**
+
+1. **Vercel Pro Plan** (Recommended for full-stack)
+   - 250MB function size limit
+   - Suitable for ML applications
+   - ~$20/month per team member
+
+2. **Frontend-Only on Vercel + External Backend** (Recommended for Free Tier)
+   - Deploy frontend to Vercel (always free)
+   - Host backend separately on Railway, Render, Fly.io, or Docker hosting
+   - Configure `BACKEND_URL` in Vercel environment variables
+   - Most cost-effective for production
+
+3. **Full Stack on Vercel Free** (May fail)
+   - Only if you optimize dependencies significantly
+   - Risk of deployment failures
+   - Not recommended for ML applications
+
+**This guide covers all three options.**
+
+---
+
 ## Overview
 
 The project is configured as a monorepo with:
@@ -17,14 +43,14 @@ The project is configured as a monorepo with:
    - Static files are served from `src/frontend/dist/`
    - Configuration in `vercel.json` specifies build commands
 
-2. **Backend Deployment**
+2. **Backend Deployment** (If deploying to Vercel)
    - FastAPI app is wrapped in `api/index.py` as a serverless function
    - All `/api/*` routes are forwarded to this function
    - Python dependencies from `api/requirements.txt` are installed
 
 3. **Routing**
    - `/` → Frontend static files
-   - `/api/*` → Backend serverless function
+   - `/api/*` → Backend serverless function (or external URL)
 
 ## Prerequisites
 
@@ -35,7 +61,74 @@ The project is configured as a monorepo with:
 2. **Repository Access**
    - Ensure Vercel has access to your GitHub repository
 
-## Deployment Steps
+---
+
+## Deployment Option 1: Frontend-Only on Vercel (Recommended)
+
+This is the recommended approach for the free tier, as the ML backend is too large for Vercel's serverless function limits.
+
+### Step 1: Deploy Backend Elsewhere
+
+Deploy the backend using one of these services:
+
+**Option A: Railway** (Recommended)
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Login and deploy
+railway login
+railway init
+railway up
+
+# Note the deployment URL (e.g., https://your-app.railway.app)
+```
+
+**Option B: Render**
+1. Go to [render.com](https://render.com)
+2. Create new "Web Service"
+3. Connect GitHub repository
+4. Set:
+   - Root Directory: `src/backend`
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+**Option C: Docker Hosting** (Any provider)
+```bash
+# Build and push Docker image
+cd src/backend
+docker build -t your-registry/4dt907-backend .
+docker push your-registry/4dt907-backend
+
+# Deploy to your hosting provider
+```
+
+### Step 2: Deploy Frontend to Vercel
+
+1. Import project to Vercel
+2. Configure Project:
+   - Framework: Other
+   - Build Command: `cd src/frontend && npm install && npm run build`
+   - Output Directory: `src/frontend/dist`
+   
+3. Set Environment Variable:
+   ```
+   BACKEND_URL=https://your-backend.railway.app
+   ```
+
+4. Deploy
+
+This approach gives you:
+- ✅ Free frontend hosting on Vercel
+- ✅ No size limits on backend
+- ✅ Better separation of concerns
+- ✅ Independent scaling
+
+---
+
+## Deployment Option 2: Full Stack on Vercel Pro
+
+For Vercel Pro users (250MB function limit).
 
 ### Method 1: Deploy via Vercel Dashboard (Recommended)
 
@@ -255,6 +348,37 @@ This starts a local server that mimics the Vercel production environment:
 1. Verify all Python dependencies are in `api/requirements.txt`
 2. Check that `api/index.py` correctly adds `src/backend` to Python path
 3. Ensure file structure matches expected paths
+
+### Issue: Deployment Size Too Large
+
+**Problem**: Vercel deployment fails with "Function size exceeds limit" error.
+
+**Background**: Vercel serverless functions have a 50MB size limit (compressed). With ML dependencies (mlflow, numpy, pandas), the deployment can approach or exceed this limit.
+
+**Solutions**:
+
+1. **Use Vercel Pro Plan** (Recommended for ML applications)
+   - Pro plan increases function size limit to 250MB
+   - Suitable for ML models with heavy dependencies
+   - [Upgrade here](https://vercel.com/pricing)
+
+2. **Optimize Dependencies** (If staying on Free plan)
+   - Remove unused dependencies from `api/requirements.txt`
+   - Use lighter alternatives where possible
+   - Consider pre-compiled models or model serving services
+
+3. **Alternative Architecture** (For very large deployments)
+   - Host backend separately (e.g., Railway, Render, or Docker)
+   - Deploy only frontend to Vercel
+   - Update `BACKEND_URL` environment variable to point to external backend
+   - This maintains the same user experience with no frontend changes
+
+**Current Deployment Size**:
+- Core dependencies (FastAPI, uvicorn, python-dotenv): ~5-10MB
+- ML dependencies (mlflow, numpy, pandas): ~40-60MB compressed
+- Total: ~50-70MB (may exceed free tier limit)
+
+**Recommendation**: For production ML applications, use Vercel Pro or host backend separately.
 
 ## Custom Domain
 
