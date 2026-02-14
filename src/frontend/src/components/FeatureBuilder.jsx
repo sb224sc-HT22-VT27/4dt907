@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useId } from "react";
+import { useEffect, useMemo, useRef, useState, useId } from "react";
 import { FEATURE_GROUPS } from "../featuresSchema";
 
 function clamp(x, lo, hi) {
@@ -14,9 +14,12 @@ function groupKeyFromSchema(g) {
 }
 
 function shortLabel(name) {
-  if (name.includes("_Angle_Deviation")) return `A${name.match(/No_(\d+)_/)?.[1] ?? ""}`;
-  if (name.includes("_NASM_Deviation")) return `N${name.match(/No_(\d+)_/)?.[1] ?? ""}`;
-  if (name.includes("_Time_Deviation")) return `T${name.match(/No_(\d+)_/)?.[1] ?? ""}`;
+  if (name.includes("_Angle_Deviation"))
+    return `A${name.match(/No_(\d+)_/)?.[1] ?? ""}`;
+  if (name.includes("_NASM_Deviation"))
+    return `N${name.match(/No_(\d+)_/)?.[1] ?? ""}`;
+  if (name.includes("_Time_Deviation"))
+    return `T${name.match(/No_(\d+)_/)?.[1] ?? ""}`;
   if (name === "EstimatedScore") return "E";
   return name;
 }
@@ -160,23 +163,32 @@ function Knob({ name, value, onChange, min = 0, max = 1, step = 0.001 }) {
   );
 }
 
-export default function FeatureBuilder({ values, setValues }) {
+export default function FeatureBuilder({ values, setValues, maxFeatures }) {
   const groups = useMemo(() => {
     const map = new Map();
+    const limit = typeof maxFeatures === "number" ? maxFeatures : Infinity;
+    let used = 0;
 
     for (const g of FEATURE_GROUPS) {
+      if (used >= limit) break;
+
       const key = groupKeyFromSchema(g);
       if (!map.has(key)) map.set(key, []);
 
       if (g.single) {
-        map.get(key).push(g.single);
+        if (used < limit) {
+          map.get(key).push(g.single);
+          used += 1;
+        }
         continue;
       }
 
       const start = g.startIndex ?? 1;
       for (let i = 0; i < g.count; i++) {
+        if (used >= limit) break;
         const idx = start + i;
         map.get(key).push(`${g.prefix}${idx}${g.suffix}`);
+        used += 1;
       }
     }
 
@@ -186,10 +198,21 @@ export default function FeatureBuilder({ values, setValues }) {
       if (!orderedKeys.includes(k)) orderedKeys.push(k);
     }
 
-    return orderedKeys.map((k) => ({ key: k, names: map.get(k) || [] }));
-  }, []);
+    // Drop empty groups so tabs don’t show when maxFeatures cuts them off
+    return orderedKeys
+      .map((k) => ({ key: k, names: map.get(k) || [] }))
+      .filter((g) => g.names.length > 0);
+  }, [maxFeatures]);
 
   const [active, setActive] = useState(groups[0]?.key || "Angle");
+
+  // If the active tab disappears after maxFeatures changes, move to first valid tab
+  useEffect(() => {
+    if (!groups.some((g) => g.key === active)) {
+      setActive(groups[0]?.key || "Angle");
+    }
+  }, [groups, active]);
+
   const activeGroup = groups.find((g) => g.key === active) || groups[0];
 
   const setOne = (name, v) => setValues((prev) => ({ ...prev, [name]: v }));
