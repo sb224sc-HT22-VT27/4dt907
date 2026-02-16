@@ -7,7 +7,7 @@ app.include_router(v1_router, prefix="/api/v1")
 paths = {route.path for route in app.routes}
 
 
-def test_v1_router_registers_expected_paths_predict_champoin():
+def test_v1_router_registers_expected_paths_predict_champion():
     assert "/api/v1/predict/champion" in paths
 
 
