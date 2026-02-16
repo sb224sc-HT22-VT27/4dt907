@@ -13,61 +13,43 @@ from app.api.health import router as health_router
 from app.api.v1.router import router as v1_router
 from app.api.v2.router import router as v2_router  # keep v2 scaffold
 
-# Load env from:
-# - current working dir .env (common when running from src/backend)
-# - backend/.env
+# Load env from the project root (where vercel.json lives)
+# This path goes up from src/backend/app/main.py to the root
+root_path = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(dotenv_path=root_path)
 
+# Also load from current directory as fallback
 load_dotenv()
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
-# - src/.env (common when running docker-compose from src/)
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
 
 app = FastAPI(title="4dt907 Backend API")
 
-# Build allowed origins list
+# Simplified CORS for Vercel
+# Since frontend and backend share the same port (3000) via Vercel proxy,
+# we include localhost ports for development
 ALLOWED_ORIGINS = [
-    f"http://localhost:{os.getenv('FRONTEND_PORT', '3030')}",
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://127.0.0.1:3000",
 ]
 
-# Add Vercel deployment URLs if provided
+# Vercel automatically sets VERCEL_URL in production
 vercel_url = os.getenv("VERCEL_URL")
 if vercel_url:
-    ALLOWED_ORIGINS.extend(
-        [
-            f"https://{vercel_url}",
-            f"http://{vercel_url}",
-        ]
-    )
+    ALLOWED_ORIGINS.append(f"https://{vercel_url}")
 
-# Allow production domain if configured
-production_url = os.getenv("PRODUCTION_URL")
-if production_url:
-    ALLOWED_ORIGINS.append(production_url)
+# Ensure we include any custom production URL
+if os.getenv("PRODUCTION_URL"):
+    ALLOWED_ORIGINS.append(os.getenv("PRODUCTION_URL"))
 
 HOST_PORT = int(os.getenv("BACKEND_PORT", "8080"))
 
-# For Vercel deployment, we may need to allow all origins
-# or use a wildcard pattern. In production, configure ALLOWED_ORIGINS_PATTERN
-allow_origin_regex = os.getenv("ALLOWED_ORIGINS_PATTERN")
-
-if allow_origin_regex:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=allow_origin_regex,
-        allow_credentials=False,
-        allow_methods=["GET", "POST"],
-        allow_headers=["*"],
-    )
-else:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=ALLOWED_ORIGINS,
-        allow_credentials=False,
-        allow_methods=["GET", "POST"],
-        allow_headers=["*"],
-    )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,  # Change to True if you use cookies/auth
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
