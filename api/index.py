@@ -19,7 +19,8 @@ backend_path = os.path.join(root_path, "src", "backend")
 if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
-# Now import the app
+# Now import and export the app
+# Vercel's Python runtime will automatically detect the 'app' variable
 try:
     from app.main import app
 except ImportError as e:
@@ -27,7 +28,3 @@ except ImportError as e:
     print(f"Import Error: {e}")
     print(f"Current sys.path: {sys.path}")
     raise e
-
-# Export for Vercel
-# Vercel's Python runtime expects 'app' or 'handler'
-handler = app
