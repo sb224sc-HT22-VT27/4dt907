@@ -343,7 +343,7 @@ def test_get_model_uses_cache_load_one_model(monkeypatch):
 
     weaklink_model_service._cache.clear()
 
-    model1, uri1 = weaklink_model_service.get_model("champion")
+    _, _ = weaklink_model_service.get_model("champion")
     assert load_count[0] == 1
 
 
@@ -366,7 +366,7 @@ def test_get_model_uses_cache_load_second_model(monkeypatch):
 
     weaklink_model_service._cache.clear()
 
-    model2, uri2 = weaklink_model_service.get_model("champion")
+    _, _ = weaklink_model_service.get_model("champion")
     assert load_count[0] == 1
 
 

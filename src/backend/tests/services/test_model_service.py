@@ -20,6 +20,9 @@ def test_model_clean_uri_variants_remove_apostrophe():
     assert model_service._clean_uri(" 'def' ") == "def"
 
 
+"""_direct_uri_for_variant tests"""
+
+
 def test_model_direct_uri_for_variant_uri_prod_champion(monkeypatch):
     monkeypatch.setenv("MODEL_URI_PROD", " prod_uri ")
     assert model_service._direct_uri_for_variant("champion") == "prod_uri"
