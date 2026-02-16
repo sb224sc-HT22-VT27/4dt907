@@ -46,7 +46,7 @@ HOST_PORT = int(os.getenv("BACKEND_PORT", "8080"))
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,  # Change to True if you use cookies/auth
+    allow_credentials=True,  # Enabled for cookies/auth support
     allow_methods=["*"],
     allow_headers=["*"],
 )
