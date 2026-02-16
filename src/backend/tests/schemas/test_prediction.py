@@ -22,8 +22,24 @@ def test_predict_request_features_not_floats():
         PredictRequest(features=["a", "b", "c"])
 
 
-def test_predict_response_valid():
-    pass
+def test_predict_response_valid_prediction():
+    data = {
+        "prediction": 0.5,
+        "model_uri": "models/model_v1@test"
+    }
+
+    request = PredictResponse(**data)
+    assert request.prediction == 0.5
+
+
+def test_predict_response_valid_model():
+    data = {
+        "prediction": 0.5,
+        "model_uri": "models/model_v1@test"
+    }
+
+    request = PredictResponse(**data)
+    assert request.model_uri == "models/model_v1@test"
 
 
 def test_predict_response_missing_model_uri():
