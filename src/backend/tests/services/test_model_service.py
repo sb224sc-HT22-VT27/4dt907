@@ -8,22 +8,59 @@ from unittest.mock import MagicMock
 """_clean_uri tests"""
 
 
-def test_clean_uri_variants():
+def test_model_clean_uri_variants_None():
     assert model_service._clean_uri(None) is None
+
+
+def test_model_clean_uri_variants_remove_quotation():
     assert model_service._clean_uri('  "abc" ') == 'abc'
+
+
+def test_model_clean_uri_variants_remove_apostrophe():
     assert model_service._clean_uri(" 'def' ") == "def"
 
 
-def test_direct_uri_for_variant(monkeypatch):
+def test_model_direct_uri_for_variant_uri_prod_champion(monkeypatch):
     monkeypatch.setenv("MODEL_URI_PROD", " prod_uri ")
-    monkeypatch.setenv("MODEL_URI_DEV", " dev_uri ")
-    monkeypatch.setenv("MODEL_URI_BACKUP", " backup_uri ")
-
     assert model_service._direct_uri_for_variant("champion") == "prod_uri"
+
+
+def test_model_direct_uri_for_variant_uri_prod_best(monkeypatch):
+    monkeypatch.setenv("MODEL_URI_PROD", " prod_uri ")
     assert model_service._direct_uri_for_variant("best") == "prod_uri"
-    assert model_service._direct_uri_for_variant("latest") == "dev_uri"
+
+
+def test_model_direct_uri_for_variant_uri_prod_prod(monkeypatch):
+    monkeypatch.setenv("MODEL_URI_PROD", " prod_uri ")
+    assert model_service._direct_uri_for_variant("prod") == "prod_uri"
+
+
+def test_model_direct_uri_for_variant_uri_prod_production(monkeypatch):
+    monkeypatch.setenv("MODEL_URI_PROD", " prod_uri ")
+    assert model_service._direct_uri_for_variant("production") == "prod_uri"
+
+
+def test_model_direct_uri_for_variant_uri_dev(monkeypatch):
+    monkeypatch.setenv("MODEL_URI_DEV", " dev_uri ")
+    assert model_service._direct_uri_for_variant("dev") == "dev_uri"
+
+
+def test_model_direct_uri_for_variant_uri_development(monkeypatch):
+    monkeypatch.setenv("MODEL_URI_DEV", " dev_uri ")
     assert model_service._direct_uri_for_variant("development") == "dev_uri"
+
+
+def test_model_direct_uri_for_variant_uri_latest(monkeypatch):
+    monkeypatch.setenv("MODEL_URI_DEV", " dev_uri ")
+    assert model_service._direct_uri_for_variant("latest") == "dev_uri"
+
+
+def test_model_direct_uri_for_variant_uri_backup(monkeypatch):
+    monkeypatch.setenv("MODEL_URI_BACKUP", " backup_uri ")
     assert model_service._direct_uri_for_variant("backup") == "backup_uri"
+
+
+def test_model_direct_uri_for_variant_uri_unknown(monkeypatch):
     assert model_service._direct_uri_for_variant("unknown") is None
 
 
@@ -51,24 +88,27 @@ def test_init_mlflow_sets_uri(monkeypatch):
 
 def test_model_name_for_variant_champion(monkeypatch):
     monkeypatch.setenv("MLFLOW_BEST_MODEL_NAME", "best_model")
-
     assert model_service._model_name_for_variant("champion") == "best_model"
+
+
+def test_model_name_for_variant_best(monkeypatch):
+    monkeypatch.setenv("MLFLOW_BEST_MODEL_NAME", "best_model")
     assert model_service._model_name_for_variant("best") == "best_model"
 
 
 def test_model_name_for_variant_latest(monkeypatch):
     monkeypatch.setenv("MLFLOW_LATEST_MODEL_NAME", "latest_model")
-
     assert model_service._model_name_for_variant("latest") == "latest_model"
 
 
-def test_model_name_for_variant_missing_env(monkeypatch):
+def test_model_name_for_variant_missing_env_best(monkeypatch):
     monkeypatch.delenv("MLFLOW_BEST_MODEL_NAME", raising=False)
-    monkeypatch.delenv("MLFLOW_LATEST_MODEL_NAME", raising=False)
-
     with pytest.raises(RuntimeError):
         model_service._model_name_for_variant("champion")
 
+
+def test_model_name_for_variant_missing_env_latest(monkeypatch):
+    monkeypatch.delenv("MLFLOW_LATEST_MODEL_NAME", raising=False)
     with pytest.raises(RuntimeError):
         model_service._model_name_for_variant("latest")
 
@@ -102,35 +142,57 @@ def test_latest_source_uri(monkeypatch):
 """_is_models_alias_uri tests"""
 
 
-def test_is_models_alias_uri():
+def test_is_models_alias_uri_valid():
     assert model_service._is_models_alias_uri("models:/MyModel@dev")
+
+
+def test_is_models_alias_uri_invalid_alias():
     assert not model_service._is_models_alias_uri("models:/MyModel/1")
+
+
+def test_is_models_alias_uri_invalid_path():
     assert not model_service._is_models_alias_uri("http://example.com/model")
 
 
 """_parse_models_alias_uri tests"""
 
 
-def test_parse_models_alias_uri_valid():
-    name, alias = model_service._parse_models_alias_uri("models:/Project_Model@dev")
+def test_parse_models_alias_uri_valid_prod_name():
+    name, _ = model_service._parse_models_alias_uri("models:/Project_Model@dev")
     assert name == "Project_Model"
+
+
+def test_parse_models_alias_uri_valid_prod_alias():
+    _, alias = model_service._parse_models_alias_uri("models:/Project_Model@dev")
     assert alias == "dev"
 
-    name, alias = model_service._parse_models_alias_uri("models:/MyModel@prod")
+
+def test_parse_models_alias_uri_valid_dev_name():
+    name, _ = model_service._parse_models_alias_uri("models:/MyModel@prod")
     assert name == "MyModel"
+
+
+def test_parse_models_alias_uri_valid_dev_alias():
+    _, alias = model_service._parse_models_alias_uri("models:/MyModel@prod")
     assert alias == "prod"
 
 
-def test_parse_models_alias_uri_with_whitespace():
-    name, alias = model_service._parse_models_alias_uri("models:/ MyModel @ dev ")
+def test_parse_models_alias_uri_with_whitespace_name():
+    name, _ = model_service._parse_models_alias_uri("models:/ MyModel @ dev ")
     assert name == "MyModel"
+
+
+def test_parse_models_alias_uri_with_whitespace_alas():
+    _, alias = model_service._parse_models_alias_uri("models:/ MyModel @ dev ")
     assert alias == "dev"
 
 
-def test_parse_models_alias_uri_invalid():
+def test_parse_models_alias_uri_invalid_empty_alias():
     with pytest.raises(ValueError):
         model_service._parse_models_alias_uri("models:/MyModel@")
 
+
+def test_parse_models_alias_uri_invalid_empty_name():
     with pytest.raises(ValueError):
         model_service._parse_models_alias_uri("models:/@alias")
 
@@ -138,7 +200,7 @@ def test_parse_models_alias_uri_invalid():
 """get_model tests."""
 
 
-def test_get_model_with_direct_uri(monkeypatch):
+def test_get_model_with_direct_uri_correct_model(monkeypatch):
     monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://mlflow:5050")
     monkeypatch.setenv("MODEL_URI_PROD", "models:/Champion/1")
 
@@ -151,16 +213,33 @@ def test_get_model_with_direct_uri(monkeypatch):
     )
 
     model_service.clear_model_cache()
-    model, uri = model_service.get_model("champion")
+    model, _ = model_service.get_model("champion")
 
     assert model == fake_model
+
+
+def test_get_model_with_direct_uri_check(monkeypatch):
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://mlflow:5050")
+    monkeypatch.setenv("MODEL_URI_PROD", "models:/Champion/1")
+
+    fake_model = MagicMock()
+
+    monkeypatch.setattr(
+        model_service,
+        "_load_model_with_alias_fallback",
+        lambda uri: (fake_model, uri),
+    )
+
+    model_service.clear_model_cache()
+    _, uri = model_service.get_model("champion")
+
     assert uri == "models:/Champion/1"
 
 
 """predict_one tests."""
 
 
-def test_predict_one_success(monkeypatch):
+def test_predict_one_success_pred(monkeypatch):
     fake_model = MagicMock()
     fake_model.predict.return_value = [0.75]
 
@@ -176,9 +255,27 @@ def test_predict_one_success(monkeypatch):
         lambda model: 3,
     )
 
-    pred, uri = model_service.predict_one([1.0, 2.0, 3.0], "champion")
-
+    pred, _ = model_service.predict_one([1.0, 2.0, 3.0], "champion")
     assert pred == 0.75
+
+
+def test_predict_one_success_uri(monkeypatch):
+    fake_model = MagicMock()
+    fake_model.predict.return_value = [0.75]
+
+    monkeypatch.setattr(
+        model_service,
+        "get_model",
+        lambda variant: (fake_model, "model-uri"),
+    )
+
+    monkeypatch.setattr(
+        model_service,
+        "_expected_feature_count_from_model",
+        lambda model: 3,
+    )
+
+    _, uri = model_service.predict_one([1.0, 2.0, 3.0], "champion")
     assert uri == "model-uri"
 
 
