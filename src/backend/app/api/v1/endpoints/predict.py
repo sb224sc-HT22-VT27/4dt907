@@ -10,8 +10,8 @@ router = APIRouter()
 @router.post("/predict/champion", response_model=PredictResponse)
 def predict_champion(req: PredictRequest):
     try:
-        pred, uri = predict_one(req.features, "champion")
-        return PredictResponse(prediction=pred, model_uri=uri)
+        pred, uri, run_id = predict_one(req.features, "champion")
+        return PredictResponse(prediction=pred, model_uri=uri, run_id=run_id)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
@@ -21,8 +21,8 @@ def predict_champion(req: PredictRequest):
 @router.post("/predict/latest", response_model=PredictResponse)
 def predict_latest(req: PredictRequest):
     try:
-        pred, uri = predict_one(req.features, "latest")
-        return PredictResponse(prediction=pred, model_uri=uri)
+        pred, uri, run_id = predict_one(req.features, "latest")
+        return PredictResponse(prediction=pred, model_uri=uri, run_id=run_id)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
