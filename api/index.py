@@ -27,3 +27,7 @@ except ImportError as e:
     print(f"Import Error: {e}")
     print(f"Current sys.path: {sys.path}")
     raise e
+
+# Export for Vercel
+# Vercel's Python runtime expects 'app' or 'handler'
+handler = app
