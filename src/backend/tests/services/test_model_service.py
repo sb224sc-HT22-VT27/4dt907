@@ -160,22 +160,22 @@ def test_is_models_alias_uri_invalid_path():
 """_parse_models_alias_uri tests"""
 
 
-def test_parse_models_alias_uri_valid_prod_name():
+def test_parse_models_alias_uri_valid_dev_name():
     name, _ = model_service._parse_models_alias_uri("models:/Project_Model@dev")
     assert name == "Project_Model"
 
 
-def test_parse_models_alias_uri_valid_prod_alias():
+def test_parse_models_alias_uri_valid_dev_alias():
     _, alias = model_service._parse_models_alias_uri("models:/Project_Model@dev")
     assert alias == "dev"
 
 
-def test_parse_models_alias_uri_valid_dev_name():
+def test_parse_models_alias_uri_valid_prod_name():
     name, _ = model_service._parse_models_alias_uri("models:/MyModel@prod")
     assert name == "MyModel"
 
 
-def test_parse_models_alias_uri_valid_dev_alias():
+def test_parse_models_alias_uri_valid_prod_alias():
     _, alias = model_service._parse_models_alias_uri("models:/MyModel@prod")
     assert alias == "prod"
 
