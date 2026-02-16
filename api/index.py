@@ -4,14 +4,26 @@ This wraps the FastAPI app for Vercel deployment.
 """
 
 import sys
-from pathlib import Path
+import os
 
-# Add the backend app directory to the Python path
-backend_path = Path(__file__).resolve().parents[1] / "src" / "backend"
-sys.path.insert(0, str(backend_path))
+# Get the absolute path to the project root
+# In Vercel, the current directory is usually the root
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-from app.main import app
+# Add project root and backend source to path
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
 
-# Vercel expects a variable named `app` or a function named `handler`
-# FastAPI app can be used directly
-handler = app
+# Add the specific backend app directory
+backend_path = os.path.join(root_path, "src", "backend")
+if backend_path not in sys.path:
+    sys.path.insert(0, backend_path)
+
+# Now import the app
+try:
+    from app.main import app
+except ImportError as e:
+    # This helps debug if the path is still wrong
+    print(f"Import Error: {e}")
+    print(f"Current sys.path: {sys.path}")
+    raise e

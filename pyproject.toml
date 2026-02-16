@@ -6,7 +6,11 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "python-dotenv",
+    "mlflow-skinny",
+    "pandas",
+    "scikit-learn",
+    "pydantic",
+    "pydantic-core",
 ]
 
 [tool.uv]
-python-version = "3.12"
