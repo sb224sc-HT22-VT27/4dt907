@@ -1,10 +1,6 @@
 fastapi
-uvicorn[standard]
-pytest
-httpx
-flake8
-mlflow
-numpy
+uvicorn
+mlflow-skinny
 pandas
+scikit-learn
 python-dotenv
-pytest-mock

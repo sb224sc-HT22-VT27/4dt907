@@ -1,0 +1,12 @@
+[project]
+name = "4dt907-app"
+version = "0.1.0"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+]
+
+[tool.uv]
+python-version = "3.12"

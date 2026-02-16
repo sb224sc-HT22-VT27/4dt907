@@ -34,10 +34,12 @@ ALLOWED_ORIGINS = [
 # Add Vercel deployment URLs if provided
 vercel_url = os.getenv("VERCEL_URL")
 if vercel_url:
-    ALLOWED_ORIGINS.extend([
-        f"https://{vercel_url}",
-        f"http://{vercel_url}",
-    ])
+    ALLOWED_ORIGINS.extend(
+        [
+            f"https://{vercel_url}",
+            f"http://{vercel_url}",
+        ]
+    )
 
 # Allow production domain if configured
 production_url = os.getenv("PRODUCTION_URL")
@@ -67,7 +69,8 @@ else:
         allow_headers=["*"],
     )
 
-@app.get("/")
+
+@app.get("/status")
 def root():
     return {
         "message": "Backend is running",
@@ -78,6 +81,7 @@ def root():
         "v2_status": "/api/v2/status",
     }
 
+
 app.include_router(health_router)
 app.include_router(v1_router, prefix="/api/v1")
 
@@ -86,4 +90,5 @@ app.include_router(v2_router, prefix="/api/v2")
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("app.main:app", host="0.0.0.0", port=HOST_PORT, reload=True)

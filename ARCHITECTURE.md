@@ -70,6 +70,7 @@
 ## File Structure Mapping
 
 ### Production (Vercel)
+
 ```
 Request → Vercel
     ├── / → src/frontend/dist/index.html
@@ -78,6 +79,7 @@ Request → Vercel
 ```
 
 ### Development (Docker)
+
 ```
 Request → Docker Compose
     ├── localhost:3030 → Frontend Container → src/frontend/
@@ -87,15 +89,17 @@ Request → Docker Compose
 ## Environment-Based Configuration
 
 ### Vercel Environment
+
 - **Build Time**: Runs in `src/frontend/` for frontend build
-- **Runtime**: 
+- **Runtime**:
   - Static files served from CDN
   - API runs as serverless functions
 - **CORS**: Uses `VERCEL_URL` and `PRODUCTION_URL`
 
-### Docker Environment  
+### Docker Environment
+
 - **Build Time**: Docker builds containers from Dockerfiles
-- **Runtime**: 
+- **Runtime**:
   - Frontend: Nginx serving Vite build
   - Backend: Uvicorn running FastAPI
 - **CORS**: Uses `localhost:3030` and configured ports
@@ -103,6 +107,7 @@ Request → Docker Compose
 ## Request Flow Examples
 
 ### Frontend Request (Production)
+
 ```
 User → https://app.vercel.app/
     → Vercel CDN
@@ -111,6 +116,7 @@ User → https://app.vercel.app/
 ```
 
 ### API Request (Production)
+
 ```
 User → https://app.vercel.app/api/health
     → Vercel Edge
@@ -120,6 +126,7 @@ User → https://app.vercel.app/api/health
 ```
 
 ### Full Stack Request (Production)
+
 ```
 Browser → https://app.vercel.app/
     → Load React App (Static)
@@ -209,26 +216,31 @@ GitHub
 ## Key Design Decisions
 
 ### 1. **Monorepo Structure**
+
 - **Why**: Keeps all code in one repository
 - **Benefit**: Easier to maintain, single source of truth
 - **Trade-off**: Larger repo size
 
 ### 2. **Separate API Directory**
+
 - **Why**: Vercel expects API functions in /api
 - **Benefit**: Clean separation for deployment
 - **Trade-off**: Small duplication (requirements.txt)
 
 ### 3. **Wrapper Pattern (api/index.py)**
+
 - **Why**: Avoid restructuring existing code
 - **Benefit**: 100% backward compatible
 - **Trade-off**: Extra indirection layer
 
 ### 4. **Environment-Based CORS**
+
 - **Why**: Support multiple deployment targets
 - **Benefit**: Works in dev and prod
 - **Trade-off**: Slightly more complex configuration
 
 ### 5. **Dual Documentation**
+
 - **Why**: Support both Docker and Vercel users
 - **Benefit**: Clear guidance for both approaches
 - **Trade-off**: More documentation to maintain

@@ -2,13 +2,13 @@
 # Only runtime dependencies - no test/dev tools
 
 # Core framework
-fastapi==0.129.0
-uvicorn[standard]==0.40.0
+fastapi
+uvicorn
 
 # ML dependencies (required for model loading)
-mlflow==3.9.0
-numpy==2.4.2
-pandas==2.3.3
+mlflow-skinny
+pandas
+scikit-learn
 
 # Configuration
-python-dotenv==1.2.1
+python-dotenv
