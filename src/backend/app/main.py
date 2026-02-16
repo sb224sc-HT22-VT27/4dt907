@@ -70,7 +70,7 @@ else:
     )
 
 
-@app.get("/status")
+@app.get("/")
 def root():
     return {
         "message": "Backend is running",
