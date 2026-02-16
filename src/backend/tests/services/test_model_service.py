@@ -185,7 +185,7 @@ def test_parse_models_alias_uri_with_whitespace_name():
     assert name == "MyModel"
 
 
-def test_parse_models_alias_uri_with_whitespace_alas():
+def test_parse_models_alias_uri_with_whitespace_alias():
     _, alias = model_service._parse_models_alias_uri("models:/ MyModel @ dev ")
     assert alias == "dev"
 
