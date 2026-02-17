@@ -203,7 +203,7 @@ class MLUtils:
                 )
 
                 plt.title(
-                    f"corrected Resampled t-Test (Challenger - Prod)\np-value: {p_val:.4f}"
+                    f"Corrected Resampled t-Test (Challenger - Prod)\np-value: {p_val:.4f}"
                 )
                 plt.xlabel("Difference (x)")
                 plt.ylabel("P(x)")
