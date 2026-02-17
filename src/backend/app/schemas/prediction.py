@@ -7,3 +7,4 @@ class PredictRequest(BaseModel):
 class PredictResponse(BaseModel):
     prediction: float
     model_uri: str
+    run_id: str | None = None

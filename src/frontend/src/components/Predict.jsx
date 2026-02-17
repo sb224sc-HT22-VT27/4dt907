@@ -1,6 +1,6 @@
 // src/frontend/src/components/Predict.jsx
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import FeatureBuilder from "./FeatureBuilder";
 import { FEATURE_GROUPS, EXAMPLE_41 } from "../featuresSchema";
 
@@ -10,7 +10,8 @@ function parseFeatures(input) {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  if (parts.length === 0) return { ok: false, error: "Paste comma-separated numbers." };
+  if (parts.length === 0)
+    return { ok: false, error: "Paste comma-separated numbers." };
 
   const nums = parts.map(Number);
   if (nums.some((n) => Number.isNaN(n))) {
@@ -36,7 +37,7 @@ function buildOrderedFeatureNames() {
 }
 
 const ORDERED_NAMES = buildOrderedFeatureNames();
-const DEFAULT_EXPECTED = ORDERED_NAMES.length;
+const TOTAL_FEATURES = ORDERED_NAMES.length;
 
 function fromArray(arr) {
   const obj = {};
@@ -49,9 +50,17 @@ function toOrderedArray(valuesObj) {
 }
 
 export default function Predict() {
-  const [task, setTask] = useState("score"); // "score" | "weakest"
-  const [variant, setVariant] = useState("latest");
-  const [expectedCount, setExpectedCount] = useState(DEFAULT_EXPECTED);
+  const [task, setTask] = useState("score");
+  // Default to prod
+  const [variant, setVariant] = useState("champion");
+
+  // IMPORTANT: no hard-coded “expected” fallback — rely purely on backend
+  const [expectedCount, setExpectedCount] = useState(null); // number | null
+  const [expectedLoading, setExpectedLoading] = useState(true);
+  const [modelInfoError, setModelInfoError] = useState("");
+
+  const hasExpected = Number.isFinite(expectedCount);
+  const activeExpected = hasExpected ? expectedCount : null;
 
   const [featureValues, setFeatureValues] = useState(() => fromArray(EXAMPLE_41));
 
@@ -75,28 +84,57 @@ export default function Predict() {
       : `/api/v1/model-info/${variant}`;
   }, [task, variant]);
 
-  // Try to load expected feature count
+  // Load expected feature count from backend ONLY (no cache, no fallback)
   useEffect(() => {
+    const ctrl = new AbortController();
     let cancelled = false;
+
+    setExpectedLoading(true);
+    setExpectedCount(null);
+    setModelInfoError("");
 
     async function loadModelInfo() {
       try {
-        const res = await fetch(modelInfoUrl);
+        const res = await fetch(modelInfoUrl, {
+          signal: ctrl.signal,
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
+
         const data = await res.json().catch(() => ({}));
 
-        if (!cancelled && res.ok && typeof data?.expected_features === "number") {
-          setExpectedCount(data.expected_features);
-        } else if (!cancelled) {
-          setExpectedCount(DEFAULT_EXPECTED);
+        const count =
+          res.ok && typeof data?.expected_features === "number"
+            ? data.expected_features
+            : null;
+
+        if (!cancelled) {
+          setExpectedCount(count);
+          if (!res.ok || typeof count !== "number") {
+            setModelInfoError(
+              data?.detail ||
+                "Could not load model info (expected_features missing)."
+            );
+          }
         }
-      } catch {
-        if (!cancelled) setExpectedCount(DEFAULT_EXPECTED);
+      } catch (e) {
+        if (!cancelled) {
+          setExpectedCount(null);
+          setModelInfoError(String(e));
+        }
+      } finally {
+        if (!cancelled) setExpectedLoading(false);
       }
     }
 
     loadModelInfo();
+
     return () => {
       cancelled = true;
+      ctrl.abort();
     };
   }, [modelInfoUrl]);
 
@@ -124,31 +162,52 @@ export default function Predict() {
     };
   }, [importOpen]);
 
+  const controlsDisabled = loading || expectedLoading || !hasExpected;
+
   function loadExample() {
     setError("");
     setResult(null);
-    setFeatureValues(fromArray(EXAMPLE_41));
+
+    if (!hasExpected) {
+      setError("Model info is still loading — try again in a moment.");
+      return;
+    }
+
+    // Keep internal state size stable (TOTAL_FEATURES) but only “use” activeExpected when sending
+    const slice = EXAMPLE_41.slice(0, activeExpected);
+    const padded = slice.concat(new Array(TOTAL_FEATURES - slice.length).fill(0));
+    setFeatureValues(fromArray(padded));
+
     flashHint("Example loaded.");
   }
 
   function zeroAll() {
     setError("");
     setResult(null);
-    const zeros = new Array(ORDERED_NAMES.length).fill(0);
+
+    // Zeroing doesn't need expectedCount; it just sets all known UI fields to 0
+    const zeros = new Array(TOTAL_FEATURES).fill(0);
     setFeatureValues(fromArray(zeros));
     flashHint("All values set to 0.");
   }
 
   async function copyValues() {
     setError("");
+    if (!hasExpected) {
+      setError("Model info is still loading — try again in a moment.");
+      return;
+    }
+
     try {
-      const expected = expectedCount ?? DEFAULT_EXPECTED;
-      const text = toOrderedArray(featureValues).slice(0, expected).join(", ");
+      const text = toOrderedArray(featureValues)
+        .slice(0, activeExpected)
+        .join(", ");
       await navigator.clipboard.writeText(text);
       flashHint("Copied.");
     } catch {
-      const expected = expectedCount ?? DEFAULT_EXPECTED;
-      setImportText(toOrderedArray(featureValues).slice(0, expected).join(", "));
+      setImportText(
+        toOrderedArray(featureValues).slice(0, activeExpected).join(", ")
+      );
       setImportOpen(true);
       flashHint("Clipboard blocked — copy from the box.");
     }
@@ -156,6 +215,11 @@ export default function Predict() {
 
   async function pasteValues() {
     setError("");
+    if (!hasExpected) {
+      setError("Model info is still loading — try again in a moment.");
+      return;
+    }
+
     setImportOpen(true);
     try {
       const text = await navigator.clipboard.readText();
@@ -168,26 +232,38 @@ export default function Predict() {
 
   function openImport() {
     setError("");
+    if (!hasExpected) {
+      setError("Model info is still loading — try again in a moment.");
+      return;
+    }
     setImportOpen(true);
     flashHint("Paste values and click Apply.");
   }
 
   function applyImport() {
     setError("");
+    if (!hasExpected) {
+      setError("Model info is still loading — try again in a moment.");
+      return;
+    }
+
     const parsed = parseFeatures(importText);
     if (!parsed.ok) return setError(parsed.error);
 
-    const expected = expectedCount ?? DEFAULT_EXPECTED;
-
-    // Allow pasting 41 into a 40-feature model: we just take the first expected values.
+    // Allow pasting more than expected: take the first activeExpected values.
     let values = parsed.value;
-    if (values.length > expected) values = values.slice(0, expected);
+    if (values.length > activeExpected) values = values.slice(0, activeExpected);
 
-    if (values.length !== expected) {
-      return setError(`Expected ${expected} features, but got ${values.length}.`);
+    if (values.length !== activeExpected) {
+      return setError(
+        `Expected ${activeExpected} features, but got ${values.length}.`
+      );
     }
 
-    setFeatureValues(fromArray(values));
+    // Store in TOTAL_FEATURES-sized structure for UI
+    const padded = values.concat(new Array(TOTAL_FEATURES - values.length).fill(0));
+    setFeatureValues(fromArray(padded));
+
     setResult(null);
     setImportOpen(false);
     flashHint("Imported.");
@@ -197,13 +273,17 @@ export default function Predict() {
     setError("");
     setResult(null);
 
-    const expected = expectedCount ?? DEFAULT_EXPECTED;
+    if (!hasExpected) {
+      setError("Model info is still loading — try again in a moment.");
+      return;
+    }
 
-    let features = toOrderedArray(featureValues);
-    if (features.length > expected) features = features.slice(0, expected);
+    const features = toOrderedArray(featureValues).slice(0, activeExpected);
 
-    if (features.length !== expected) {
-      return setError(`Expected ${expected} features, but got ${features.length}.`);
+    if (features.length !== activeExpected) {
+      return setError(
+        `Expected ${activeExpected} features, but got ${features.length}.`
+      );
     }
 
     setLoading(true);
@@ -215,7 +295,9 @@ export default function Predict() {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) return setError(data?.detail || `Request failed (${res.status})`);
+      if (!res.ok)
+        return setError(data?.detail || `Request failed (${res.status})`);
+
       setResult(data);
     } catch (e) {
       setError(String(e));
@@ -242,9 +324,12 @@ export default function Predict() {
               <div className="text-sm text-slate-600">
                 Expects{" "}
                 <span className="font-semibold text-slate-900">
-                  {expectedCount ?? DEFAULT_EXPECTED}
+                  {hasExpected ? activeExpected : "…"}
                 </span>{" "}
                 features
+                {expectedLoading ? (
+                  <span className="ml-2 text-slate-400">(loading)</span>
+                ) : null}
               </div>
             </div>
 
@@ -263,7 +348,9 @@ export default function Predict() {
                     className="ios-input w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
                   >
                     <option value="score">Score prediction (A2)</option>
-                    <option value="weakest">Weakest link classification (A3)</option>
+                    <option value="weakest">
+                      Weakest link classification (A3)
+                    </option>
                   </select>
                 </div>
 
@@ -287,7 +374,8 @@ export default function Predict() {
                   <button
                     type="button"
                     onClick={loadExample}
-                    className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800"
+                    disabled={controlsDisabled}
+                    className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800 disabled:opacity-50"
                   >
                     Example
                   </button>
@@ -301,24 +389,30 @@ export default function Predict() {
                   <button
                     type="button"
                     onClick={copyValues}
-                    className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800"
+                    disabled={controlsDisabled}
+                    className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800 disabled:opacity-50"
                   >
                     Copy
                   </button>
                   <button
                     type="button"
                     onClick={openImport}
-                    className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800"
+                    disabled={controlsDisabled}
+                    className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800 disabled:opacity-50"
                   >
                     Import
                   </button>
 
                   <button
                     onClick={onPredict}
-                    disabled={loading}
-                    className="ios-btn ios-btn-primary rounded-full px-5 py-3 text-sm font-semibold"
+                    disabled={controlsDisabled}
+                    className="ios-btn ios-btn-primary rounded-full px-5 py-3 text-sm font-semibold disabled:opacity-50"
                   >
-                    {loading ? "Predicting…" : "Predict"}
+                    {loading
+                      ? "Predicting…"
+                      : expectedLoading
+                      ? "Loading model…"
+                      : "Predict"}
                   </button>
                 </div>
               </div>
@@ -326,9 +420,26 @@ export default function Predict() {
               <div className="mt-2 h-5 text-xs text-slate-500">{hint || ""}</div>
             </div>
 
+            {/* Model-info error (separate from prediction errors) */}
+            {modelInfoError ? (
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <b>Model info warning:</b> {modelInfoError}
+              </div>
+            ) : null}
+
             {/* Builder */}
             <div className="mt-6">
-              <FeatureBuilder values={featureValues} setValues={setFeatureValues} />
+              {hasExpected ? (
+                <FeatureBuilder
+                  values={featureValues}
+                  setValues={setFeatureValues}
+                  maxFeatures={activeExpected}
+                />
+              ) : (
+                <div className="ios-card rounded-[28px] p-5 text-sm text-slate-600">
+                  Loading model info…
+                </div>
+              )}
             </div>
 
             <div className="mt-4 text-xs text-slate-500">
@@ -345,11 +456,17 @@ export default function Predict() {
               <div className="mt-4 ios-pill rounded-[28px] p-4 text-sm text-slate-800">
                 <div>
                   <span className="text-slate-500">Prediction:</span>{" "}
-                  <code className="font-semibold">{String(result.prediction)}</code>
+                  <code className="font-semibold">
+                    {String(result?.prediction ?? "—")}
+                  </code>
                 </div>
                 <div className="mt-2">
                   <span className="text-slate-500">Model URI:</span>{" "}
-                  <code className="break-all">{result.model_uri}</code>
+                  <code className="break-all">{result?.model_uri ?? "—"}</code>
+                </div>
+                <div className="mt-2">
+                  <span className="text-slate-500">Run ID:</span>{" "}
+                  <code className="break-all">{result?.run_id ?? "—"}</code>
                 </div>
               </div>
             ) : null}
@@ -368,9 +485,13 @@ export default function Predict() {
             <div className="ios-card rounded-[28px] p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-lg font-semibold text-slate-900">Import values</div>
+                  <div className="text-lg font-semibold text-slate-900">
+                    Import values
+                  </div>
                   <div className="text-sm text-slate-600">
-                    Paste {expectedCount ?? DEFAULT_EXPECTED} comma-separated numbers.
+                    {hasExpected
+                      ? `Paste ${activeExpected} comma-separated numbers.`
+                      : "Loading model info…"}
                   </div>
                 </div>
 
@@ -395,24 +516,31 @@ export default function Predict() {
                 <button
                   type="button"
                   onClick={applyImport}
-                  className="ios-btn ios-btn-primary rounded-full px-5 py-2 text-sm font-semibold"
+                  disabled={!hasExpected}
+                  className="ios-btn ios-btn-primary rounded-full px-5 py-2 text-sm font-semibold disabled:opacity-50"
                 >
                   Apply
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    const expected = expectedCount ?? DEFAULT_EXPECTED;
-                    setImportText(toOrderedArray(featureValues).slice(0, expected).join(", "));
+                    if (!hasExpected) return;
+                    setImportText(
+                      toOrderedArray(featureValues)
+                        .slice(0, activeExpected)
+                        .join(", ")
+                    );
                   }}
-                  className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800"
+                  disabled={!hasExpected}
+                  className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50"
                 >
                   Fill current
                 </button>
                 <button
                   type="button"
                   onClick={pasteValues}
-                  className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800"
+                  disabled={!hasExpected}
+                  className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50"
                 >
                   Paste
                 </button>
