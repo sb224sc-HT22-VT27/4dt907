@@ -5,9 +5,7 @@ from app.schemas.prediction import PredictRequest, PredictResponse
 
 
 def test_prediction_request():
-    data = {
-        "features": [0.5, 1.2, 3.4]
-    }
+    data = {"features": [0.5, 1.2, 3.4]}
     request = PredictRequest(**data)
     assert request.features == [0.5, 1.2, 3.4]
 
@@ -26,7 +24,7 @@ def test_predict_response_valid_prediction():
     data = {
         "prediction": 0.5,
         "model_uri": "models/model_v1@test",
-        "run_id": "run_12345"
+        "run_id": "run_12345",
     }
 
     request = PredictResponse(**data)
@@ -37,7 +35,7 @@ def test_predict_response_valid_model():
     data = {
         "prediction": 0.5,
         "model_uri": "models/model_v1@test",
-        "run_id": "run_12345"
+        "run_id": "run_12345",
     }
 
     request = PredictResponse(**data)
@@ -48,7 +46,7 @@ def test_predict_response_valid_run_id():
     data = {
         "prediction": 0.5,
         "model_uri": "models/model_v1@test",
-        "run_id": "run_12345"
+        "run_id": "run_12345",
     }
 
     request = PredictResponse(**data)
