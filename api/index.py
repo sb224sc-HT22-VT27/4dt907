@@ -16,7 +16,7 @@ if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
 try:
-    from app.main import app
+    from app.main import app  # noqa: F401
 except ImportError as e:
     print(f"Import Error: {e}")
     print(f"Current sys.path: {sys.path}")
