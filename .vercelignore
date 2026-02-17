@@ -1,10 +1,6 @@
 # Dependencies
 
-<<<<<<< HEAD
 scripts/
-=======
->>>>>>>
->>>>>>> cee114b (feat: Added & implementeed basic vercel implementation, trying to figure out how to test deploy before merging to main i possible)
 node_modules/
 __pycache__/
 *.pyc
@@ -12,11 +8,7 @@ __pycache__/
 
 # Environment
 
-<<<<<<< HEAD
 .env.example
-=======
->>>>>>>
->>>>>>> cee114b (feat: Added & implementeed basic vercel implementation, trying to figure out how to test deploy before merging to main i possible)
 .env
 .env.local
 .venv/
@@ -27,11 +19,7 @@ env/
 
 build/
 *.egg-info/
-<<<<<<< HEAD
 __pycache__/
-=======
->>>>>>>
->>>>>>> cee114b (feat: Added & implementeed basic vercel implementation, trying to figure out how to test deploy before merging to main i possible)
 
 # Docker files (not needed for Vercel)
 
@@ -60,8 +48,7 @@ payloads-videos/
 ml-research/
 =======
 
-src/ml-research/
->>>>>>> cee114b (feat: Added & implementeed basic vercel implementation, trying to figure out how to test deploy before merging to main i possible)
+ml-research/
 
 # Data files
 
@@ -88,4 +75,10 @@ SECURITY.md
 =======
 
 .github/
->>>>>>> cee114b (feat: Added & implementeed basic vercel implementation, trying to figure out how to test deploy before merging to main i possible)
+
+# Markdown files
+
+CHANGELOG.md
+CONTRIBUTING.md
+README.md
+SECURITY.md
