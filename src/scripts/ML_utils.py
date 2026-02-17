@@ -144,7 +144,6 @@ class MLUtils:
                 except Exception:
                     pass 
 
-            # --- PLOT 1: Statistical Confidence Comparison (Like image_22cde9.png) ---
             plt.figure(figsize=(10, 5))
             colors = {"Challenger": "blue", "Prod": "green", "Dev": "red"}
             all_vals = np.concatenate(list(results.values()))
@@ -156,16 +155,14 @@ class MLUtils:
                 plt.plot(x_axis, pdf, label=f"{label} $\mu$={mu:.4f}", color=colors.get(label, "black"), lw=2)
                 plt.fill_between(x_axis, pdf, alpha=0.1, color=colors.get(label, "black"))
 
-            print("Comparing PDFs")
 
             plt.title("Statistical Confidence Comparison (PDFs)")
             plt.xlabel(f"{metric.upper()} Score")
             plt.ylabel("Probability Density")
             plt.legend()
             plt.savefig("model_confidence_comparison.png")
-            plt.show() # Shows first plot
+            plt.show()
 
-            # --- PLOT 2: Corrected Resampled t-Test (Like image_7b27a6.png) ---
             if "Prod" in results:
                 prod_scores = results["Prod"]
                 new_scores = results["Challenger"]
@@ -176,7 +173,6 @@ class MLUtils:
                 d_bar = np.mean(diffs)
                 s_sq = np.var(diffs, ddof=1)
 
-                # Corrected Variance formula
                 var_corrected = ((1/k) + (n_test / n_train)) * s_sq
                 t_stat = d_bar / np.sqrt(var_corrected) #
                 p_val = stats.t.sf(np.abs(t_stat), k - 1) * 2 #
@@ -196,11 +192,11 @@ class MLUtils:
                 plt.ylabel("P(x)")
                 plt.legend()
                 plt.savefig("challenger_vs_prod_ttest.png")
-                plt.show() # Shows second plot
+                plt.show()
 
                 return (d_bar > 0 and p_val < 0.05), p_val
 
-            return True, 1.0 # Default if no Prod exists
+            return True, 1.0
 
         except Exception as e:
             print(f"Error: {e}")
