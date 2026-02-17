@@ -14,6 +14,8 @@ services:
                 - WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV}
                 - WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP}
         container_name: 4dt907-backend
+        env_file:
+            - ../.env
         environment:
             - BACKEND_PORT=${BACKEND_PORT}
             - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
@@ -58,6 +60,8 @@ services:
                 - BACKEND_URL=${BACKEND_URL}
                 - FRONTEND_PORT=${FRONTEND_PORT}
         container_name: 4dt907-frontend
+        env_file:
+            - ../.env
         environment:
             - BACKEND_PORT=${BACKEND_PORT}
             - BACKEND_URL=${BACKEND_URL}

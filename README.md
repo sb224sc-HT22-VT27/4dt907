@@ -34,7 +34,14 @@ All branches should be merged via Pull Requests with code review.
    cd 4dt907
    ```
 
-2. For full stack development with Docker:
+2. Set up environment variables:
+
+   ```bash
+   cp .env.example .env
+   # Edit .env and fill in your values
+   ```
+
+3. For full stack development with Docker:
 
    ```bash
    cd src
@@ -42,11 +49,11 @@ All branches should be merged via Pull Requests with code review.
    docker compose up -d
    ```
 
-3. [For backend development](src/backend/README.md)
+4. [For backend development](src/backend/README.md)
 
-4. [For frontend development](src/frontend/README.md)
+5. [For frontend development](src/frontend/README.md)
 
-5. [For ML notebooks](src/ml-research/README.md):
+6. [For ML notebooks](src/ml-research/README.md):
 
 ## Project Structure
 
