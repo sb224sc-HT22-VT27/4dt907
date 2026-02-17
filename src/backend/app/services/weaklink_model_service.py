@@ -10,7 +10,9 @@ from mlflow.exceptions import RestException
 from mlflow.tracking import MlflowClient
 
 _lock = threading.Lock()
-_cache: Dict[str, Tuple[object, str, str | None]] = {}  # cache_key -> (model, uri_used, run_id)
+_cache: Dict[str, Tuple[object, str, str | None]] = (
+    {}
+)  # cache_key -> (model, uri_used, run_id)
 
 
 def _clean_uri(value: str | None) -> str | None:
@@ -103,7 +105,7 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
         raise
 
 
-def _run_id_from_uri(uri: str) -> str | None:
+def _fetch_run_id(uri: str) -> str | None:
     if not uri:
         return None
 
@@ -123,7 +125,7 @@ def _run_id_from_uri(uri: str) -> str | None:
         except Exception:
             # Fall back to your manual resolver
             resolved = _resolve_alias_to_version_uri(name, alias)
-            return _run_id_from_uri(resolved)
+            return _fetch_run_id(resolved)
 
     # models:/Name/<version>[/...]
     if uri.startswith("models:/"):
@@ -159,7 +161,7 @@ def get_model(variant: str = "champion") -> Tuple[object, str, str | None]:
             return _cache[cache_key]
 
         model, uri_used = _load_model_with_alias_fallback(direct_uri)
-        run_id = _run_id_from_uri(uri_used)
+        run_id = _fetch_run_id(uri_used)
 
         _cache[cache_key] = (model, uri_used, run_id)
         return model, uri_used, run_id
@@ -193,7 +195,9 @@ def expected_feature_count(variant: str = "champion") -> int | None:
     return _expected_feature_count_from_model(model)
 
 
-def predict_one(features: list[float], variant: str = "champion") -> Tuple[str, str, str | None]:
+def predict_one(
+    features: list[float], variant: str = "champion"
+) -> Tuple[str, str, str | None]:
     model, uri, run_id = get_model(variant)
 
     expected = _expected_feature_count_from_model(model)

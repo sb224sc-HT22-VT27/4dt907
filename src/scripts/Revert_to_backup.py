@@ -1,6 +1,6 @@
 import dagshub
 import mlflow
-from ML_utils import MLUtils
+from ml_utils import MLUtils
 
 # Setup dagshub and MLFlow
 dagshub.init(repo_owner="SamuelFredricBerg", repo_name="4dt907", mlflow=True)

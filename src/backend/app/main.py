@@ -54,7 +54,6 @@ HOST_PORT = int(os.getenv("BACKEND_PORT", "8080"))
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-<<<<<<< HEAD
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

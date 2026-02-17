@@ -13,7 +13,7 @@ def test_clean_uri_variants_None():
 
 
 def test_clean_uri_variants_remove_quotation():
-    assert weaklink_model_service._clean_uri('  "abc" ') == 'abc'
+    assert weaklink_model_service._clean_uri('  "abc" ') == "abc"
 
 
 def test_clean_uri_variants_remove_apostrophe():
@@ -89,7 +89,9 @@ def test_is_models_alias_uri_valid_prod():
 
 
 def test_is_models_alias_uri_valid_dev():
-    assert weaklink_model_service._is_models_alias_uri("models:/Project_Model@dev") is True
+    assert (
+        weaklink_model_service._is_models_alias_uri("models:/Project_Model@dev") is True
+    )
 
 
 def test_is_models_alias_uri_valid_latest():
@@ -116,12 +118,16 @@ def test_is_models_alias_uri_invalid_path():
 
 
 def test_parse_models_alias_uri_valid_name_dev():
-    name, _ = weaklink_model_service._parse_models_alias_uri("models:/Project_Model@dev")
+    name, _ = weaklink_model_service._parse_models_alias_uri(
+        "models:/Project_Model@dev"
+    )
     assert name == "Project_Model"
 
 
 def test_parse_models_alias_uri_valid_alias_dev():
-    _, alias = weaklink_model_service._parse_models_alias_uri("models:/Project_Model@dev")
+    _, alias = weaklink_model_service._parse_models_alias_uri(
+        "models:/Project_Model@dev"
+    )
     assert alias == "dev"
 
 
@@ -271,7 +277,9 @@ def test_resolve_alias_unknown(monkeypatch):
 
     monkeypatch.setattr(weaklink_model_service, "MlflowClient", lambda: fake_client)
 
-    uri = weaklink_model_service._resolve_alias_to_version_uri("MyModel", "unknown_alias")
+    uri = weaklink_model_service._resolve_alias_to_version_uri(
+        "MyModel", "unknown_alias"
+    )
     assert uri == "models:/MyModel/1"
 
 
@@ -297,12 +305,12 @@ def test_get_model_success_model(monkeypatch):
     monkeypatch.setattr(
         weaklink_model_service,
         "_load_model_with_alias_fallback",
-        lambda uri: (fake_model, uri)
+        lambda uri: (fake_model, uri),
     )
 
     monkeypatch.setattr(
         weaklink_model_service,
-        "_run_id_from_uri",
+        "_fetch_run_id",
         lambda uri: "run_123",
     )
 
@@ -321,12 +329,12 @@ def test_get_model_success_uri(monkeypatch):
     monkeypatch.setattr(
         weaklink_model_service,
         "_load_model_with_alias_fallback",
-        lambda uri: (fake_model, uri)
+        lambda uri: (fake_model, uri),
     )
 
     monkeypatch.setattr(
         weaklink_model_service,
-        "_run_id_from_uri",
+        "_fetch_run_id",
         lambda uri: "run_123",
     )
 
@@ -348,14 +356,12 @@ def test_get_model_uses_cache_load_one_model(monkeypatch):
         return fake_model, uri
 
     monkeypatch.setattr(
-        weaklink_model_service,
-        "_load_model_with_alias_fallback",
-        mock_load
+        weaklink_model_service, "_load_model_with_alias_fallback", mock_load
     )
 
     monkeypatch.setattr(
         weaklink_model_service,
-        "_run_id_from_uri",
+        "_fetch_run_id",
         lambda uri: "run_123",
     )
 
@@ -377,14 +383,12 @@ def test_get_model_uses_cache_load_second_model(monkeypatch):
         return fake_model, uri
 
     monkeypatch.setattr(
-        weaklink_model_service,
-        "_load_model_with_alias_fallback",
-        mock_load
+        weaklink_model_service, "_load_model_with_alias_fallback", mock_load
     )
 
     monkeypatch.setattr(
         weaklink_model_service,
-        "_run_id_from_uri",
+        "_fetch_run_id",
         lambda uri: "run_123",
     )
 
@@ -406,14 +410,12 @@ def test_get_model_uses_cache_load_same_models(monkeypatch):
         return fake_model, uri
 
     monkeypatch.setattr(
-        weaklink_model_service,
-        "_load_model_with_alias_fallback",
-        mock_load
+        weaklink_model_service, "_load_model_with_alias_fallback", mock_load
     )
 
     monkeypatch.setattr(
         weaklink_model_service,
-        "_run_id_from_uri",
+        "_fetch_run_id",
         lambda uri: "run_123",
     )
 

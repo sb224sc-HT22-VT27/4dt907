@@ -13,12 +13,15 @@ def create_test_app():
 def test_model_info_weakest_link_latest_status_code():
     app = create_test_app()
     client = TestClient(app)
-    with patch(
-        "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
-        return_value=(MagicMock(), "models:/WeakestLink_Latest/3", "run_123"),
-    ), patch(
-        "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
-        return_value=5,
+    with (
+        patch(
+            "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
+            return_value=(MagicMock(), "models:/WeakestLink_Latest/3", "run_123"),
+        ),
+        patch(
+            "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
+            return_value=5,
+        ),
     ):
         response = client.get("/api/v1/model-info/weakest-link/latest")
         assert response.status_code == 200
@@ -27,12 +30,15 @@ def test_model_info_weakest_link_latest_status_code():
 def test_model_info_weakest_link_latest_response():
     app = create_test_app()
     client = TestClient(app)
-    with patch(
-        "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
-        return_value=(MagicMock(), "models:/WeakestLink_Latest/3", "run_123"),
-    ), patch(
-        "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
-        return_value=5,
+    with (
+        patch(
+            "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
+            return_value=(MagicMock(), "models:/WeakestLink_Latest/3", "run_123"),
+        ),
+        patch(
+            "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
+            return_value=5,
+        ),
     ):
         response = client.get("/api/v1/model-info/weakest-link/latest")
         assert response.json() == {
@@ -46,12 +52,15 @@ def test_model_info_weakest_link_latest_response():
 def test_model_info_weakest_link_champion_status_code():
     app = create_test_app()
     client = TestClient(app)
-    with patch(
-        "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
-        return_value=(MagicMock(), "models:/WeakestLink_Champion/1", "run_456"),
-    ), patch(
-        "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
-        return_value=5,
+    with (
+        patch(
+            "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
+            return_value=(MagicMock(), "models:/WeakestLink_Champion/1", "run_456"),
+        ),
+        patch(
+            "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
+            return_value=5,
+        ),
     ):
         response = client.get("/api/v1/model-info/weakest-link/champion")
         assert response.status_code == 200
@@ -60,12 +69,15 @@ def test_model_info_weakest_link_champion_status_code():
 def test_model_info_weakest_link_champion_response():
     app = create_test_app()
     client = TestClient(app)
-    with patch(
-        "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
-        return_value=(MagicMock(), "models:/WeakestLink_Champion/1", "run_456"),
-    ), patch(
-        "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
-        return_value=5,
+    with (
+        patch(
+            "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
+            return_value=(MagicMock(), "models:/WeakestLink_Champion/1", "run_456"),
+        ),
+        patch(
+            "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
+            return_value=5,
+        ),
     ):
         response = client.get("/api/v1/model-info/weakest-link/champion")
         assert response.json() == {

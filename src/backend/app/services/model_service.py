@@ -8,63 +8,62 @@ from mlflow.tracking import MlflowClient
 from mlflow.exceptions import RestException
 
 _lock = threading.Lock()
-_cache: Dict[str, Tuple[object, str, str | None]] = {}  
+_cache: Dict[str, Tuple[object, str, str | None]] = {}
 
-def _run_id_from_uri(uri: str) -> str | None:
+
+def _fetch_run_id(uri: str) -> str | None:
     if not uri:
         return None
 
-    # runs:/<run_id>/...
     if uri.startswith("runs:/"):
-        tail = uri[len("runs:/") :]
-        return tail.split("/", 1)[0] if tail else None
+        return _parse_runs_uri(uri)
 
-    # models:/<name>/<version>/...  OR  models:/<name>@<alias>/...
     if uri.startswith("models:/"):
-        client = MlflowClient()
-        tail = uri[len("models:/") :]
-        head = tail.split("/", 1)[0]  # "<name>/<...>" OR "<name>@<alias>"
-
-        # Alias form: models:/Name@alias (may also be followed by /path)
-        if "@" in head:
-            name, alias = head.split("@", 1)
-            name, alias = name.strip(), alias.strip()
-            if not name or not alias:
-                return None
-            try:
-                mv = client.get_model_version_by_alias(name, alias)
-                return getattr(mv, "run_id", None)
-            except Exception:
-                # fall back to your existing alias->version resolver
-                resolved = _resolve_alias_to_version_uri(name, alias)
-                return _run_id_from_uri(resolved)
-
-        # Version / stage form: models:/Name/<version>[/...]
-        parts = tail.split("/", 2)
-        if len(parts) < 2:
-            return None
-
-        name = parts[0].strip()
-        selector = parts[1].strip()  # version number or stage
-
-        if selector.isdigit():
-            mv = client.get_model_version(name, selector)
-            return getattr(mv, "run_id", None)
-
-        # Stage name (if you ever use it): models:/Name/Production
-        latest = client.get_latest_versions(name, stages=[selector])
-        if latest:
-            chosen = max(latest, key=lambda mv: int(mv.version))
-            return getattr(chosen, "run_id", None)
-
-        # Fallback: latest overall
-        versions = client.search_model_versions(f"name='{name}'")
-        if not versions:
-            return None
-        chosen = max(versions, key=lambda mv: int(mv.version))
-        return getattr(chosen, "run_id", None)
+        return _parse_models_uri(uri)
 
     return None
+
+
+def _parse_runs_uri(uri: str) -> str | None:
+    tail = uri[len("runs:/") :]
+    return tail.split("/", 1)[0] if tail else None
+
+
+def _parse_models_uri(uri: str) -> str | None:
+    client = MlflowClient()
+    tail = uri[len("models:/") :]
+    head = tail.split("/", 1)[0]
+
+    if "@" in head:
+        name, alias = [part.strip() for part in head.split("@", 1)]
+        if not name or not alias:
+            return None
+        try:
+            mv = client.get_model_version_by_alias(name, alias)
+            return getattr(mv, "run_id", None)
+        except Exception:
+            return _fetch_run_id(_resolve_alias_to_version_uri(name, alias))
+
+    parts = [p.strip() for p in tail.split("/", 2)]
+    if len(parts) < 2:
+        return None
+
+    name, selector = parts[0], parts[1]
+
+    if selector.isdigit():
+        mv = client.get_model_version(name, selector)
+        return getattr(mv, "run_id", None)
+
+    versions = client.get_latest_versions(
+        name, stages=[selector]
+    ) or client.search_model_versions(f"name='{name}'")
+
+    if not versions:
+        return None
+
+    chosen = max(versions, key=lambda mv: int(mv.version))
+    return getattr(chosen, "run_id", None)
+
 
 def _clean_uri(value: str | None) -> str | None:
     if not value:
@@ -219,9 +218,9 @@ def get_model(variant: str = "champion") -> Tuple[object, str] | None:
                 if cache_key in _cache:
                     model, uri_used, _run_id = _cache[cache_key]
                     return model, uri_used, _run_id
-                
+
                 model, uri_used = _load_model_with_alias_fallback(direct_uri)
-                run_id = _run_id_from_uri(uri_used)
+                run_id = _fetch_run_id(uri_used)
                 _cache[cache_key] = (model, uri_used, run_id)
                 return model, uri_used, run_id
     except RestException:
@@ -240,7 +239,9 @@ def expected_feature_count(variant: str = "champion") -> int | None:
     return _expected_feature_count_from_model(model)
 
 
-def predict_one(features: list[float], variant: str = "champion") -> Tuple[float, str, str | None]:
+def predict_one(
+    features: list[float], variant: str = "champion"
+) -> Tuple[float, str, str | None]:
     model, uri, run_id = get_model(variant)
 
     expected = _expected_feature_count_from_model(model)
