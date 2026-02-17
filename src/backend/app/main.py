@@ -42,10 +42,11 @@ HOST_PORT = int(os.getenv("BACKEND_PORT", "8080"))
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.get("/")
 def root():
@@ -58,6 +59,7 @@ def root():
         "v2_status": "/api/v2/status",
     }
 
+
 app.include_router(health_router)
 app.include_router(v1_router, prefix="/api/v1")
 
@@ -66,4 +68,5 @@ app.include_router(v2_router, prefix="/api/v2")
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("app.main:app", host="0.0.0.0", port=HOST_PORT, reload=True)
