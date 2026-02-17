@@ -34,19 +34,33 @@ All branches should be merged via Pull Requests with code review.
    cd 4dt907
    ```
 
-2. For full stack development with Docker:
+2. Create your environment configuration:
+
+   ```bash
+   cp .env.example .env
+   # Edit .env and fill in the required values (BACKEND_PORT, FRONTEND_PORT, etc.)
+   ```
+
+3. For full stack development with Docker:
+
+   ```bash
+   docker compose -f src/docker-compose.yml --env-file .env build
+   docker compose -f src/docker-compose.yml --env-file .env up -d
+   ```
+
+   Or alternatively, run from the src directory:
 
    ```bash
    cd src
-   docker compose build
-   docker compose up -d
+   docker compose --env-file ../.env build
+   docker compose --env-file ../.env up -d
    ```
 
-3. [For backend development](src/backend/README.md)
+4. [For backend development](src/backend/README.md)
 
-4. [For frontend development](src/frontend/README.md)
+5. [For frontend development](src/frontend/README.md)
 
-5. [For ML notebooks](src/ml-research/README.md):
+6. [For ML notebooks](src/ml-research/README.md):
 
 ## Project Structure
 

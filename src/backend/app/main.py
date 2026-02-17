@@ -24,8 +24,8 @@ for env_path in env_path_candidates:
     if env_path.is_file():
         load_dotenv(dotenv_path=env_path)
         break
-    else:
-        load_dotenv()
+else:
+    load_dotenv()
 
 app = FastAPI(title="4dt907 Backend API")
 
