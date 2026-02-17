@@ -16,7 +16,7 @@ def test_model_info_latest_status_code():
 
     with patch(
         "app.api.v1.endpoints.model_info.get_model",
-        return_value=(MagicMock(), "models:/Latest/5"),
+        return_value=(MagicMock(), "models:/Latest/5", "run_123"),
     ), patch(
         "app.api.v1.endpoints.model_info.expected_feature_count",
         return_value=4,
@@ -32,7 +32,7 @@ def test_model_info_latest_response():
 
     with patch(
         "app.api.v1.endpoints.model_info.get_model",
-        return_value=(MagicMock(), "models:/Latest/5"),
+        return_value=(MagicMock(), "models:/Latest/5", "run_123"),
     ), patch(
         "app.api.v1.endpoints.model_info.expected_feature_count",
         return_value=4,
@@ -43,6 +43,7 @@ def test_model_info_latest_response():
         "variant": "latest",
         "model_uri": "models:/Latest/5",
         "expected_features": 4,
+        "run_id": "run_123",
     }
 
 
@@ -52,7 +53,7 @@ def test_model_info_champion_status_code():
 
     with patch(
         "app.api.v1.endpoints.model_info.get_model",
-        return_value=(MagicMock(), "models:/Champion/2"),
+        return_value=(MagicMock(), "models:/Champion/2", "run_456"),
     ), patch(
         "app.api.v1.endpoints.model_info.expected_feature_count",
         return_value=3,
@@ -68,7 +69,7 @@ def test_model_info_champion_response():
 
     with patch(
         "app.api.v1.endpoints.model_info.get_model",
-        return_value=(MagicMock(), "models:/Champion/2"),
+        return_value=(MagicMock(), "models:/Champion/2", "run_456"),
     ), patch(
         "app.api.v1.endpoints.model_info.expected_feature_count",
         return_value=3,
@@ -79,6 +80,7 @@ def test_model_info_champion_response():
         "variant": "champion",
         "model_uri": "models:/Champion/2",
         "expected_features": 3,
+        "run_id": "run_456",
     }
 
 
@@ -87,7 +89,7 @@ def test_model_info_weakest_link_latest_status_code():
     client = TestClient(app)
     with patch(
         "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
-        return_value=(MagicMock(), "models:/WeakestLink_Latest/3"),
+        return_value=(MagicMock(), "models:/WeakestLink_Latest/3", "run_789"),
     ), patch(
         "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
         return_value=5,
@@ -101,7 +103,7 @@ def test_model_info_weakest_link_latest_response():
     client = TestClient(app)
     with patch(
         "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
-        return_value=(MagicMock(), "models:/WeakestLink_Latest/3"),
+        return_value=(MagicMock(), "models:/WeakestLink_Latest/3", "run_789"),
     ), patch(
         "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
         return_value=5,
@@ -111,6 +113,7 @@ def test_model_info_weakest_link_latest_response():
             "variant": "latest",
             "model_uri": "models:/WeakestLink_Latest/3",
             "expected_features": 5,
+            "run_id": "run_789",
         }
 
 
@@ -119,7 +122,7 @@ def test_model_info_weakest_link_champion_status_code():
     client = TestClient(app)
     with patch(
         "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
-        return_value=(MagicMock(), "models:/WeakestLink_Champion/4"),
+        return_value=(MagicMock(), "models:/WeakestLink_Champion/4", "run_987"),
     ), patch(
         "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
         return_value=6,
@@ -133,7 +136,7 @@ def test_model_info_weakest_link_champion_response():
     client = TestClient(app)
     with patch(
         "app.api.v1.endpoints.model_info.weaklink_model_service.get_model",
-        return_value=(MagicMock(), "models:/WeakestLink_Champion/4"),
+        return_value=(MagicMock(), "models:/WeakestLink_Champion/4", "run_987"),
     ), patch(
         "app.api.v1.endpoints.model_info.weaklink_model_service.expected_feature_count",
         return_value=6,
@@ -143,4 +146,5 @@ def test_model_info_weakest_link_champion_response():
             "variant": "champion",
             "model_uri": "models:/WeakestLink_Champion/4",
             "expected_features": 6,
+            "run_id": "run_987",
         }
