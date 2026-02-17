@@ -1,7 +1,5 @@
 services:
     backend:
-        env_file:
-            - ../.env
         build:
             context: ./backend
             args:
@@ -53,8 +51,6 @@ services:
                     memory: 512M
 
     frontend:
-        env_file:
-            - ../.env
         build:
             context: ./frontend
             args:
