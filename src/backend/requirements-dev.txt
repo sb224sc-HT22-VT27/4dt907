@@ -1,10 +1,11 @@
 fastapi
-mlflow-skinny
+mlflow
 pandas
 scikit-learn
 python-dotenv
-uvicorn
+uvicorn[standard]
 
+# Testing
 pytest
 flake8
 httpx
