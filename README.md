@@ -19,10 +19,10 @@ All branches should be merged via Pull Requests with code review.
 
 * Docker and Docker Compose installed for local deployment only
 * Python 3.12.10 installed
-* Node.js 22.22. (LTS) installed
+* Node.js 22.22.0 (LTS) installed
 * uv installed for vercel deployment (curl -LsSf <https://astral.sh/uv/install.sh> | sh)
 * UNIX host or WSL for Windows users
-* Vercel npm package
+* Vercel CLI (`vercel`) installed
 * Git configured
 
 ### Setup Steps
