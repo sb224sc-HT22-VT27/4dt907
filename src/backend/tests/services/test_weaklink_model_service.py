@@ -300,9 +300,15 @@ def test_get_model_success_model(monkeypatch):
         lambda uri: (fake_model, uri)
     )
 
+    monkeypatch.setattr(
+        weaklink_model_service,
+        "_run_id_from_uri",
+        lambda uri: "run_123",
+    )
+
     weaklink_model_service._cache.clear()
 
-    model, _ = weaklink_model_service.get_model("champion")
+    model, _, _ = weaklink_model_service.get_model("champion")
     assert model == fake_model
 
 
@@ -318,9 +324,15 @@ def test_get_model_success_uri(monkeypatch):
         lambda uri: (fake_model, uri)
     )
 
+    monkeypatch.setattr(
+        weaklink_model_service,
+        "_run_id_from_uri",
+        lambda uri: "run_123",
+    )
+
     weaklink_model_service._cache.clear()
 
-    _, uri = weaklink_model_service.get_model("champion")
+    _, uri, _ = weaklink_model_service.get_model("champion")
     assert uri == "models:/WeakLink/1"
 
 
@@ -341,9 +353,15 @@ def test_get_model_uses_cache_load_one_model(monkeypatch):
         mock_load
     )
 
+    monkeypatch.setattr(
+        weaklink_model_service,
+        "_run_id_from_uri",
+        lambda uri: "run_123",
+    )
+
     weaklink_model_service._cache.clear()
 
-    _, _ = weaklink_model_service.get_model("champion")
+    _, _, _ = weaklink_model_service.get_model("champion")
     assert load_count[0] == 1
 
 
@@ -364,9 +382,15 @@ def test_get_model_uses_cache_load_second_model(monkeypatch):
         mock_load
     )
 
+    monkeypatch.setattr(
+        weaklink_model_service,
+        "_run_id_from_uri",
+        lambda uri: "run_123",
+    )
+
     weaklink_model_service._cache.clear()
 
-    _, _ = weaklink_model_service.get_model("champion")
+    _, _, _ = weaklink_model_service.get_model("champion")
     assert load_count[0] == 1
 
 
@@ -387,11 +411,17 @@ def test_get_model_uses_cache_load_same_models(monkeypatch):
         mock_load
     )
 
+    monkeypatch.setattr(
+        weaklink_model_service,
+        "_run_id_from_uri",
+        lambda uri: "run_123",
+    )
+
     weaklink_model_service._cache.clear()
 
-    model1, _ = weaklink_model_service.get_model("champion")
+    model1, _, _ = weaklink_model_service.get_model("champion")
 
-    model2, _ = weaklink_model_service.get_model("champion")
+    model2, _, _ = weaklink_model_service.get_model("champion")
     assert model1 == model2
 
 
