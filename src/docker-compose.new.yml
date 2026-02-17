@@ -1,0 +1,94 @@
+services:
+    backend:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile.new
+            args:
+                - BACKEND_PORT=${BACKEND_PORT}
+                - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+
+                - MODEL_URI_PROD=${MODEL_URI_PROD}
+                - MODEL_URI_DEV=${MODEL_URI_DEV}
+                - MODEL_URI_BACKUP=${MODEL_URI_BACKUP}
+
+                - WEAKLINK_MODEL_URI_PROD=${WEAKLINK_MODEL_URI_PROD}
+                - WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV}
+                - WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP}
+        container_name: 4dt907-backend
+        environment:
+            - BACKEND_PORT=${BACKEND_PORT}
+            - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+
+            - MODEL_URI_PROD=${MODEL_URI_PROD}
+            - MODEL_URI_DEV=${MODEL_URI_DEV}
+            - MODEL_URI_BACKUP=${MODEL_URI_BACKUP}
+
+            - WEAKLINK_MODEL_URI_PROD=${WEAKLINK_MODEL_URI_PROD}
+            - WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV}
+            - WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP}
+        ports:
+            - "${BACKEND_PORT}:${BACKEND_PORT}"
+        volumes:
+            - ./backend/src:/backend_app/src
+            - /backend_app/node_modules
+        restart: unless-stopped
+        networks:
+            - app-network
+        healthcheck:
+            test:
+                ["CMD", "curl", "-f", "http://localhost:${BACKEND_PORT}/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        deploy:
+            resources:
+                limits:
+                    cpus: "2"
+                    memory: 2G
+                reservations:
+                    cpus: "0.5"
+                    memory: 512M
+
+    frontend:
+        build:
+            context: ./frontend
+            args:
+                - BACKEND_PORT=${BACKEND_PORT}
+                - BACKEND_URL=${BACKEND_URL}
+                - FRONTEND_PORT=${FRONTEND_PORT}
+        container_name: 4dt907-frontend
+        environment:
+            - BACKEND_PORT=${BACKEND_PORT}
+            - BACKEND_URL=${BACKEND_URL}
+            - FRONTEND_PORT=${FRONTEND_PORT}
+        ports:
+            - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+        volumes:
+            - ./frontend:/app
+            - /app/node_modules
+            - /app/dist
+        depends_on:
+            backend:
+                condition: service_healthy
+        restart: unless-stopped
+        networks:
+            - app-network
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:${FRONTEND_PORT}/"]
+            interval: 30s
+            timeout: 3s
+            retries: 3
+            start_period: 10s
+        deploy:
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 512M
+                reservations:
+                    cpus: "0.25"
+                    memory: 128M
+
+networks:
+    app-network:
+        driver: bridge
