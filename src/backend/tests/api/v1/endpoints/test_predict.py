@@ -16,7 +16,7 @@ def test_predict_champion_success_status_code():
 
     with patch(
         "app.api.v1.endpoints.predict.predict_one",
-        return_value=(0.88, "models:/Champion/3"),
+        return_value=(0.88, "models:/Champion/3", "run_123"),
     ):
         response = client.post(
             "/api/v1/predict/champion",
@@ -32,7 +32,7 @@ def test_predict_champion_success_response():
 
     with patch(
         "app.api.v1.endpoints.predict.predict_one",
-        return_value=(0.88, "models:/Champion/3"),
+        return_value=(0.88, "models:/Champion/3", "run_123"),
     ):
         response = client.post(
             "/api/v1/predict/champion",
@@ -42,6 +42,7 @@ def test_predict_champion_success_response():
     assert response.json() == {
         "prediction": 0.88,
         "model_uri": "models:/Champion/3",
+        "run_id": "run_123",
     }
 
 
