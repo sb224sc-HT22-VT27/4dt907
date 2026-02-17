@@ -13,18 +13,24 @@ from app.api.health import router as health_router
 from app.api.v1.router import router as v1_router
 from app.api.v2.router import router as v2_router
 
-env_path_candidates = [
-    Path(__file__).resolve().parents[4] / ".env",
-    Path(__file__).resolve().parents[3] / ".env",
-    Path(__file__).resolve().parents[2] / ".env",
-    Path(__file__).resolve().parents[1] / ".env",
-]
+# Try to load .env file from various possible locations
+# In Docker, env vars are set via docker-compose, so this is mainly for local dev
+current_path = Path(__file__).resolve()
+env_loaded = False
 
-for env_path in env_path_candidates:
-    if env_path.is_file():
-        load_dotenv(dotenv_path=env_path)
+for i in range(5):  # Try up to 5 parent levels
+    try:
+        env_path = current_path.parents[i] / ".env"
+        if env_path.is_file():
+            load_dotenv(dotenv_path=env_path)
+            env_loaded = True
+            break
+    except IndexError:
+        # Reached filesystem root, no more parents
         break
-else:
+
+# Fallback to default load_dotenv() if no .env file was found
+if not env_loaded:
     load_dotenv()
 
 app = FastAPI(title="4dt907 Backend API")
