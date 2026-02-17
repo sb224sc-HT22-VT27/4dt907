@@ -253,4 +253,7 @@ __marimo__/
 
 # Vercel
 .vercel/
+<<<<<<< HEAD
 .vercel
+=======
+>>>>>>> cee114b (feat: Added & implementeed basic vercel implementation, trying to figure out how to test deploy before merging to main i possible)
