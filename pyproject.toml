@@ -1,0 +1,16 @@
+[project]
+name = "4dt907-app"
+version = "0.1.0"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "mlflow-skinny",
+    "pandas",
+    "scikit-learn",
+    "pydantic",
+    "pydantic-core",
+]
+
+[tool.uv]
