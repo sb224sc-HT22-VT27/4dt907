@@ -11,32 +11,39 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
 from app.api.v1.router import router as v1_router
-from app.api.v2.router import router as v2_router  # keep v2 scaffold
+from app.api.v2.router import router as v2_router
 
-# Load env from:
-# - current working dir .env (common when running from src/backend)
-# - backend/.env
+root_path = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(dotenv_path=root_path)
 
 load_dotenv()
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
-# - src/.env (common when running docker-compose from src/)
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
 
 app = FastAPI(title="4dt907 Backend API")
 
 ALLOWED_ORIGINS = [
-    f"http://localhost:{os.getenv('FRONTEND_PORT', '3030')}",
     "http://localhost:3000",
+    "http://localhost:3030",
     "http://localhost:5173",
+    "http://127.0.0.1:3000",
 ]
+
+# Vercel automatically sets VERCEL_URL in production
+vercel_url = os.getenv("VERCEL_URL")
+if vercel_url:
+    ALLOWED_ORIGINS.append(f"https://{vercel_url}")
+
+# Ensure we include any custom production URL
+if os.getenv("PRODUCTION_URL"):
+    ALLOWED_ORIGINS.append(os.getenv("PRODUCTION_URL"))
+
 
 HOST_PORT = int(os.getenv("BACKEND_PORT", "8080"))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
