@@ -13,6 +13,7 @@ from app.api.health import router as health_router
 from app.api.v1.router import router as v1_router
 from app.api.v2.router import router as v2_router
 
+<<<<<<< HEAD
 current_path = Path(__file__).resolve()
 env_loaded = False
 
@@ -30,6 +31,12 @@ for i in range(MAX_PARENT_LEVELS):
 
 if not env_loaded:
     load_dotenv()
+=======
+root_path = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(dotenv_path=root_path)
+
+load_dotenv()
+>>>>>>> cee114b (feat: Added & implementeed basic vercel implementation, trying to figure out how to test deploy before merging to main i possible)
 
 app = FastAPI(title="4dt907 Backend API")
 
@@ -41,8 +48,14 @@ ALLOWED_ORIGINS = [
 ]
 
 # Vercel automatically sets VERCEL_URL in production
+<<<<<<< HEAD
 if os.getenv("VERCEL_URL"):
     ALLOWED_ORIGINS.append(f"https://{os.getenv("VERCEL_URL")}")
+=======
+vercel_url = os.getenv("VERCEL_URL")
+if vercel_url:
+    ALLOWED_ORIGINS.append(f"https://{vercel_url}")
+>>>>>>> cee114b (feat: Added & implementeed basic vercel implementation, trying to figure out how to test deploy before merging to main i possible)
 
 # Ensure we include any custom production URL
 if os.getenv("PRODUCTION_URL"):
@@ -54,7 +67,11 @@ HOST_PORT = int(os.getenv("BACKEND_PORT", "8080"))
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+<<<<<<< HEAD
     allow_credentials=False,
+=======
+    allow_credentials=True,
+>>>>>>> cee114b (feat: Added & implementeed basic vercel implementation, trying to figure out how to test deploy before merging to main i possible)
     allow_methods=["*"],
     allow_headers=["*"],
 )
