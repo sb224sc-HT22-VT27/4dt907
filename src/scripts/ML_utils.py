@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import stats
 
+
 class MLUtils:
     def __init__(self, model_name="Project_Model"):
         self.client = MlflowClient()
@@ -130,7 +131,6 @@ class MLUtils:
                 f"An unexpected error occurred during revert (Probably missing some alias): {e}"
             )
 
-
     def is_challenger_statistically_better(self, new_scores_df, metric="r2"):
         try:
             results = {"Challenger": new_scores_df[metric].values}
@@ -139,10 +139,12 @@ class MLUtils:
             for label, alias in aliases:
                 try:
                     ver = self.client.get_model_version_by_alias(self.model_name, alias)
-                    path = self.client.download_artifacts(ver.run_id, "cv_fold_scores.csv", ".")
+                    path = self.client.download_artifacts(
+                        ver.run_id, "cv_fold_scores.csv", "."
+                    )
                     results[label] = pd.read_csv(path)[metric].values
                 except Exception:
-                    pass 
+                    pass
 
             plt.figure(figsize=(10, 5))
             colors = {"Challenger": "blue", "Prod": "green", "Dev": "red"}
@@ -151,10 +153,17 @@ class MLUtils:
 
             for label, scores in results.items():
                 mu, se = np.mean(scores), stats.sem(scores)
-                pdf = stats.t.pdf(x_axis, len(scores)-1, loc=mu, scale=se) # v = k-1
-                plt.plot(x_axis, pdf, label=f"{label} $\mu$={mu:.4f}", color=colors.get(label, "black"), lw=2)
-                plt.fill_between(x_axis, pdf, alpha=0.1, color=colors.get(label, "black"))
-
+                pdf = stats.t.pdf(x_axis, len(scores) - 1, loc=mu, scale=se)  # v = k-1
+                plt.plot(
+                    x_axis,
+                    pdf,
+                    label=f"{label} $\mu$={mu:.4f}",
+                    color=colors.get(label, "black"),
+                    lw=2,
+                )
+                plt.fill_between(
+                    x_axis, pdf, alpha=0.1, color=colors.get(label, "black")
+                )
 
             plt.title("Statistical Confidence Comparison (PDFs)")
             plt.xlabel(f"{metric.upper()} Score")
@@ -167,27 +176,35 @@ class MLUtils:
                 prod_scores = results["Prod"]
                 new_scores = results["Challenger"]
                 k = len(new_scores)
-                n_test, n_train = 0.2, 0.8 #
+                n_test, n_train = 0.2, 0.8  #
 
                 diffs = new_scores - prod_scores
                 d_bar = np.mean(diffs)
                 s_sq = np.var(diffs, ddof=1)
 
-                var_corrected = ((1/k) + (n_test / n_train)) * s_sq
-                t_stat = d_bar / np.sqrt(var_corrected) #
-                p_val = stats.t.sf(np.abs(t_stat), k - 1) * 2 #
+                var_corrected = ((1 / k) + (n_test / n_train)) * s_sq
+                t_stat = d_bar / np.sqrt(var_corrected)  #
+                p_val = stats.t.sf(np.abs(t_stat), k - 1) * 2  #
 
                 se_corr = np.sqrt(var_corrected)
-                x_diff = np.linspace(d_bar - 4*se_corr, d_bar + 4*se_corr, 500)
+                x_diff = np.linspace(d_bar - 4 * se_corr, d_bar + 4 * se_corr, 500)
                 p_x = stats.t.pdf(x_diff, k - 1, loc=d_bar, scale=se_corr)
 
                 plt.figure(figsize=(10, 5))
-                plt.plot(x_diff, p_x, label='Difference Distribution', color='purple', lw=2)
-                plt.fill_between(x_diff, 0, p_x, alpha=0.1, color='purple')
-                plt.axvline(0, color='red', linestyle='--', label='Null Hypothesis ($x=0$)')
-                plt.axvline(d_bar, color='green', linestyle=':', label=f'Mean Diff: {d_bar:.4f}')
+                plt.plot(
+                    x_diff, p_x, label="Difference Distribution", color="purple", lw=2
+                )
+                plt.fill_between(x_diff, 0, p_x, alpha=0.1, color="purple")
+                plt.axvline(
+                    0, color="red", linestyle="--", label="Null Hypothesis ($x=0$)"
+                )
+                plt.axvline(
+                    d_bar, color="green", linestyle=":", label=f"Mean Diff: {d_bar:.4f}"
+                )
 
-                plt.title(f"corrected Resampled t-Test (Challenger - Prod)\np-value: {p_val:.4f}")
+                plt.title(
+                    f"corrected Resampled t-Test (Challenger - Prod)\np-value: {p_val:.4f}"
+                )
                 plt.xlabel("Difference (x)")
                 plt.ylabel("P(x)")
                 plt.legend()

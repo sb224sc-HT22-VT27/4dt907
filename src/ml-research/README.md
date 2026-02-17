@@ -15,7 +15,7 @@ Each assignment has its own subdirectory:
 
 ### Prerequisites
 
-- Python 3.12.x
+- Python 3.12.10
 - Jupyter Notebook or JupyterLab
 
 ### Installation
@@ -61,7 +61,7 @@ config = {
 }
 ```
 
-2. Main cell should look like this.
+1. Main cell should look like this.
 
 ```python
 with mlflow.start_run(run_name="ADD_RUN_NAME_HERE") as run:
@@ -99,7 +99,7 @@ with mlflow.start_run(run_name="ADD_RUN_NAME_HERE") as run:
         print("Did not beat current @dev, model not uploaded to Dagshub")
 ```
 
-3. Get training data
+1. Get training data
 The training data is located at ...
 
 ## Production Model Update

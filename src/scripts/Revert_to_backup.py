@@ -1,5 +1,4 @@
 import dagshub
-import mlflow
 from ml_utils import MLUtils
 
 # Setup dagshub and MLFlow
