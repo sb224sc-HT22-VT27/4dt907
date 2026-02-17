@@ -215,8 +215,14 @@ def test_get_model_with_direct_uri_correct_model(monkeypatch):
         lambda uri: (fake_model, uri),
     )
 
+    monkeypatch.setattr(
+        model_service,
+        "_run_id_from_uri",
+        lambda uri: "run_123",
+    )
+
     model_service.clear_model_cache()
-    model, _ = model_service.get_model("champion")
+    model, _, _ = model_service.get_model("champion")
 
     assert model == fake_model
 
@@ -233,8 +239,14 @@ def test_get_model_with_direct_uri_check(monkeypatch):
         lambda uri: (fake_model, uri),
     )
 
+    monkeypatch.setattr(
+        model_service,
+        "_run_id_from_uri",
+        lambda uri: "run_123",
+    )
+
     model_service.clear_model_cache()
-    _, uri = model_service.get_model("champion")
+    _, uri, _ = model_service.get_model("champion")
 
     assert uri == "models:/Champion/1"
 
@@ -249,7 +261,7 @@ def test_predict_one_success_pred(monkeypatch):
     monkeypatch.setattr(
         model_service,
         "get_model",
-        lambda variant: (fake_model, "model-uri"),
+        lambda variant: (fake_model, "model-uri", "run_id"),
     )
 
     monkeypatch.setattr(
@@ -258,7 +270,7 @@ def test_predict_one_success_pred(monkeypatch):
         lambda model: 3,
     )
 
-    pred, _ = model_service.predict_one([1.0, 2.0, 3.0], "champion")
+    pred, _, _ = model_service.predict_one([1.0, 2.0, 3.0], "champion")
     assert pred == 0.75
 
 
@@ -269,7 +281,7 @@ def test_predict_one_success_uri(monkeypatch):
     monkeypatch.setattr(
         model_service,
         "get_model",
-        lambda variant: (fake_model, "model-uri"),
+        lambda variant: (fake_model, "model-uri", "run_id"),
     )
 
     monkeypatch.setattr(
@@ -278,8 +290,28 @@ def test_predict_one_success_uri(monkeypatch):
         lambda model: 3,
     )
 
-    _, uri = model_service.predict_one([1.0, 2.0, 3.0], "champion")
+    _, uri, _ = model_service.predict_one([1.0, 2.0, 3.0], "champion")
     assert uri == "model-uri"
+
+
+def test_predict_one_success_run_id(monkeypatch):
+    fake_model = MagicMock()
+    fake_model.predict.return_value = [0.75]
+
+    monkeypatch.setattr(
+        model_service,
+        "get_model",
+        lambda variant: (fake_model, "model-uri", "run_id"),
+    )
+
+    monkeypatch.setattr(
+        model_service,
+        "_expected_feature_count_from_model",
+        lambda model: 3,
+    )
+
+    _, _, run_id = model_service.predict_one([1.0, 2.0, 3.0], "champion")
+    assert run_id == "run_id"
 
 
 def test_predict_one_wrong_feature_count(monkeypatch):
@@ -288,7 +320,7 @@ def test_predict_one_wrong_feature_count(monkeypatch):
     monkeypatch.setattr(
         model_service,
         "get_model",
-        lambda variant: (fake_model, "model-uri"),
+        lambda variant: (fake_model, "model-uri", "run_id"),
     )
 
     monkeypatch.setattr(
@@ -328,7 +360,7 @@ def test_expected_feature_count(monkeypatch):
     monkeypatch.setattr(
         model_service,
         "get_model",
-        lambda variant: (fake_model, "uri"),
+        lambda variant: (fake_model, "uri", "run_id"),
     )
 
     n = model_service.expected_feature_count("latest")
