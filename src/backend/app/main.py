@@ -18,7 +18,11 @@ from app.api.v2.router import router as v2_router
 current_path = Path(__file__).resolve()
 env_loaded = False
 
-for i in range(5):  # Try up to 5 parent levels
+# Try up to 5 parent levels (should cover most project structures)
+# e.g., from src/backend/app/main.py up to project root
+MAX_PARENT_LEVELS = 5
+
+for i in range(MAX_PARENT_LEVELS):
     try:
         env_path = current_path.parents[i] / ".env"
         if env_path.is_file():
