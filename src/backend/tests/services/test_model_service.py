@@ -13,7 +13,7 @@ def test_model_clean_uri_variants_None():
 
 
 def test_model_clean_uri_variants_remove_quotation():
-    assert model_service._clean_uri('  "abc" ') == 'abc'
+    assert model_service._clean_uri('  "abc" ') == "abc"
 
 
 def test_model_clean_uri_variants_remove_apostrophe():
@@ -217,7 +217,7 @@ def test_get_model_with_direct_uri_correct_model(monkeypatch):
 
     monkeypatch.setattr(
         model_service,
-        "_run_id_from_uri",
+        "_fetch_run_id",
         lambda uri: "run_123",
     )
 
@@ -241,7 +241,7 @@ def test_get_model_with_direct_uri_check(monkeypatch):
 
     monkeypatch.setattr(
         model_service,
-        "_run_id_from_uri",
+        "_fetch_run_id",
         lambda uri: "run_123",
     )
 

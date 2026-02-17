@@ -11,7 +11,7 @@ class TestWeakestLinkResponse:
         response = WeakestLinkResponse(
             prediction="test_prediction",
             model_uri="https://example.com/model",
-            run_id="run_12345"
+            run_id="run_12345",
         )
         assert response.prediction == "test_prediction"
 
@@ -20,7 +20,7 @@ class TestWeakestLinkResponse:
         response = WeakestLinkResponse(
             prediction="test_prediction",
             model_uri="https://example.com/model",
-            run_id="run_12345"
+            run_id="run_12345",
         )
         assert response.model_uri == "https://example.com/model"
 
@@ -29,34 +29,28 @@ class TestWeakestLinkResponse:
         response = WeakestLinkResponse(
             prediction="test_prediction",
             model_uri="https://example.com/model",
-            run_id="run_12345"
+            run_id="run_12345",
         )
         assert response.run_id == "run_12345"
 
     def test_model_with_empty_strings_prediction(self):
         """Test that empty strings are accepted."""
         response = WeakestLinkResponse(
-            prediction="",
-            model_uri="model_uri",
-            run_id="run_12345"
+            prediction="", model_uri="model_uri", run_id="run_12345"
         )
         assert response.prediction == ""
 
     def test_model_with_empty_strings_model_uri(self):
         """Test that empty strings are accepted."""
         response = WeakestLinkResponse(
-            prediction="0.1",
-            model_uri="",
-            run_id="run_12345"
+            prediction="0.1", model_uri="", run_id="run_12345"
         )
         assert response.model_uri == ""
 
     def test_model_with_empty_strings_run_id(self):
         """Test that empty strings are accepted."""
         response = WeakestLinkResponse(
-            prediction="0.1",
-            model_uri="model_uri",
-            run_id=""
+            prediction="0.1", model_uri="model_uri", run_id=""
         )
         assert response.run_id == ""
 
@@ -73,8 +67,7 @@ class TestWeakestLinkResponse:
     def test_missing_run_id_field(self):
         """Test that missing run_id field does not raise ValidationError."""
         response = WeakestLinkResponse(
-            prediction="test",
-            model_uri="https://example.com/model"
+            prediction="test", model_uri="https://example.com/model"
         )
         assert response.run_id is None
 
@@ -89,7 +82,7 @@ class TestWeakestLinkResponse:
             prediction="test",
             model_uri="https://example.com/model",
             run_id="run_12345",
-            extra_field="ignored"
+            extra_field="ignored",
         )
         assert response.prediction == "test"
 
@@ -99,7 +92,7 @@ class TestWeakestLinkResponse:
             prediction="test",
             model_uri="https://example.com/model",
             run_id="run_12345",
-            extra_field="ignored"
+            extra_field="ignored",
         )
         assert response.model_uri == "https://example.com/model"
 
@@ -109,7 +102,7 @@ class TestWeakestLinkResponse:
             prediction="test",
             model_uri="https://example.com/model",
             run_id="run_12345",
-            extra_field="ignored"
+            extra_field="ignored",
         )
         assert response.run_id == "run_12345"
 
@@ -119,6 +112,6 @@ class TestWeakestLinkResponse:
             prediction="test",
             model_uri="https://example.com/model",
             run_id="run_12345",
-            extra_field="ignored"
+            extra_field="ignored",
         )
-        assert not hasattr(response, 'extra_field')
+        assert not hasattr(response, "extra_field")

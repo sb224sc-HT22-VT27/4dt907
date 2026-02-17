@@ -36,6 +36,7 @@ jobs:
 
             - name: Lint with flake8
               run: |
+                  black .
                   flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
                   flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
@@ -73,7 +74,7 @@ jobs:
         runs-on: ubuntu-latest
         env:
             BACKEND_PORT: ${{ secrets.BACKEND_PORT || '8080' }}
-            BACKEND_URL: ${{ secrets.BACKEND_URL || 'http://backend:8080' }}
+            BACKEND_URL: ${{ secrets.BACKEND_URL || '' }}
             FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || '3030' }}
             MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI || '' }}
             MODEL_URI_PROD: ${{ secrets.MODEL_URI_PROD || '' }}
@@ -105,4 +106,4 @@ jobs:
 
             - name: Cleanup
               if: always()
-              run: docker compose -f src/docker-compose.yml down -v
+              run: docker compose -f src/docker-compose.yml down -v --rmi all
