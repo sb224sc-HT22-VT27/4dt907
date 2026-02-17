@@ -1,5 +1,6 @@
 # Dependencies
 
+scripts/
 node_modules/
 __pycache__/
 *.pyc
@@ -7,6 +8,7 @@ __pycache__/
 
 # Environment
 
+.env.example
 .env
 .env.local
 .venv/
@@ -17,6 +19,7 @@ env/
 
 build/
 *.egg-info/
+__pycache__/
 
 # Docker files (not needed for Vercel)
 
@@ -41,7 +44,7 @@ payloads-videos/
 
 # Jupyter notebooks (not needed for deployment)
 
-src/ml-research/
+ml-research/
 
 # Data files
 
@@ -57,3 +60,10 @@ tests/
 # CI/CD
 
 .github/
+
+# Markdown files
+
+CHANGELOG.md
+CONTRIBUTING.md
+README.md
+SECURITY.md

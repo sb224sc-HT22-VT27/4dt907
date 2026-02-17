@@ -4,8 +4,10 @@ permissions:
     contents: read
 
 on:
+    push:
+        branches: ["main", "develop"]
     pull_request:
-        branches: ["main"]
+        branches: ["main", "develop"]
 
 env:
     DOCKER_BUILDKIT: 1
@@ -30,8 +32,7 @@ jobs:
             - name: Install dependencies
               run: |
                   python -m pip install --upgrade pip
-                  pip install -r requirements.txt
-                  pip install flake8 pytest
+                  pip install -r requirements-dev.txt
 
             - name: Lint with flake8
               run: |
@@ -41,7 +42,7 @@ jobs:
             - name: Run Tests
               run: |
                   export PYTHONPATH=$PYTHONPATH:$(pwd)
-                  pytest tests/ -v
+                  pytest tests/ -v --tb=short
 
     frontend-test:
         runs-on: ubuntu-latest
@@ -51,18 +52,21 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
-            - name: Setup Node
+            - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
                   node-version: "22"
                   cache: "npm"
                   cache-dependency-path: src/frontend/package-lock.json
 
-            - name: Install & Lint
-              run: |
-                  npm ci
-                  npm run lint
-              # npm test
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Lint
+              run: npm run lint
+
+            # - name: Test
+            #   run: npm run test
 
     docker-build:
         needs: [backend-test, frontend-test]
@@ -78,8 +82,15 @@ jobs:
             WEAKLINK_MODEL_URI_PROD: ${{ secrets.WEAKLINK_MODEL_URI_PROD || '' }}
             WEAKLINK_MODEL_URI_DEV: ${{ secrets.WEAKLINK_MODEL_URI_DEV || '' }}
             WEAKLINK_MODEL_URI_BACKUP: ${{ secrets.WEAKLINK_MODEL_URI_BACKUP || '' }}
+
         steps:
-            - uses: actions/checkout@v4
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+              with:
+                  driver-opts: image=moby/buildkit:latest
 
             - name: Docker Compose Build & Test
               run: |
