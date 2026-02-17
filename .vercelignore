@@ -19,7 +19,6 @@ env/
 
 build/
 *.egg-info/
-__pycache__/
 
 # Docker files (not needed for Vercel)
 
