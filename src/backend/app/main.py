@@ -13,19 +13,23 @@ from app.api.health import router as health_router
 from app.api.v1.router import router as v1_router
 from app.api.v2.router import router as v2_router
 
-env_path_candidates = [
-    Path(__file__).resolve().parents[4] / ".env",
-    Path(__file__).resolve().parents[3] / ".env",
-    Path(__file__).resolve().parents[2] / ".env",
-    Path(__file__).resolve().parents[1] / ".env",
-]
+current_path = Path(__file__).resolve()
+env_loaded = False
 
-for env_path in env_path_candidates:
-    if env_path.is_file():
-        load_dotenv(dotenv_path=env_path)
+MAX_PARENT_LEVELS = 4
+
+for i in range(MAX_PARENT_LEVELS):
+    try:
+        env_path = current_path.parents[i] / ".env"
+        if env_path.is_file():
+            load_dotenv(dotenv_path=env_path)
+            env_loaded = True
+            break
+    except IndexError:
         break
-    else:
-        load_dotenv()
+
+if not env_loaded:
+    load_dotenv()
 
 app = FastAPI(title="4dt907 Backend API")
 
