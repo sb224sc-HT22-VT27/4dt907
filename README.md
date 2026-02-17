@@ -15,13 +15,14 @@
 
 All branches should be merged via Pull Requests with code review.
 
-## Local execution for development
+## Prerequisites
 
-### Prerequisites
-
-* Docker and Docker Compose installed
-* Python 3.12.x installed
-* Node.js 22.x (LTS) installed (for frontend development)
+* Docker and Docker Compose installed for local deployment only
+* Python 3.12.10 installed
+* Node.js 22.22. (LTS) installed
+* uv installed for vercel deployment
+* UNIX host or WSL for Windows users
+* Vercel npm package
 * Git configured
 
 ### Setup Steps
