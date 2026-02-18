@@ -46,7 +46,15 @@ All branches should be merged via Pull Requests with code review.
 
 4. [For frontend development](src/frontend/README.md)
 
-5. [For ML notebooks](src/ml-research/README.md):
+5. [For ML notebooks](src/ml-research/README.md)
+
+## Deployment
+
+For Vercel deployment instructions, see [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md).
+
+The project is split into two separate Vercel projects:
+- **Backend**: `src/backend/` - FastAPI serverless functions
+- **Frontend**: `src/frontend/` - React static site
 
 ## Project Structure
 
@@ -59,6 +67,8 @@ All branches should be merged via Pull Requests with code review.
 │   └── CODEOWNERS
 ├── src/                        # Source code
 │   ├── backend/                # FastAPI backend service
+│   │   ├── api/                # Vercel serverless entry point
+│   │   │   └── index.py        # FastAPI wrapper for Vercel
 │   │   ├── app/                # Application code
 │   │   │   ├── api/            # API routes
 │   │   │   ├── models/         # Data models
@@ -66,12 +76,16 @@ All branches should be merged via Pull Requests with code review.
 │   │   │   └── main.py         # Application entry point
 │   │   ├── tests/              # Backend tests
 │   │   ├── Dockerfile
-│   │   └── requirements.txt
+│   │   ├── requirements.txt
+│   │   ├── vercel.json         # Vercel backend configuration
+│   │   └── .vercelignore       # Vercel ignore patterns
 │   ├── frontend/               # React frontend application
 │   │   ├── src/                # Frontend source code
 │   │   ├── public/             # Static assets
 │   │   ├── Dockerfile
-│   │   └── package.json
+│   │   ├── package.json
+│   │   ├── vercel.json         # Vercel frontend configuration
+│   │   └── .vercelignore       # Vercel ignore patterns
 │   ├── ml-research/            # Jupyter notebooks for assignments
 │   │   ├── a1/                 # Assignment 1
 │   │   ├── a2/                 # Assignment 2

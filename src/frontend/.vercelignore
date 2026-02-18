@@ -1,0 +1,19 @@
+# Development
+.vscode/
+.idea/
+*.log
+.DS_Store
+node_modules/
+
+# Testing
+*.test.js
+*.test.jsx
+
+# Docker files
+Dockerfile
+*.dockerfile
+.dockerignore
+nginx.conf.template
+
+# Documentation
+README.md
