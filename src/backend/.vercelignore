@@ -1,0 +1,25 @@
+# Development
+.vscode/
+.idea/
+*.log
+.DS_Store
+
+# Testing
+tests/
+*.test.py
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Docker files
+Dockerfile
+*.dockerfile
+.dockerignore
+
+# Documentation
+README.md

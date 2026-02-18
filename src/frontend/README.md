@@ -87,6 +87,13 @@ frontend/
 
 ## Configuration
 
+### Environment Variables
+
+For Vercel deployment, the frontend requires:
+- `BACKEND_URL` - The URL of the deployed backend API
+
+See [VERCEL_DEPLOYMENT.md](../../VERCEL_DEPLOYMENT.md) for full deployment instructions.
+
 ### Vite Proxy
 
 The Vite dev server is configured to proxy API requests:

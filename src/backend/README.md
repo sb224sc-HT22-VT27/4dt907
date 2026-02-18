@@ -26,8 +26,10 @@ pip install -r requirements.txt
 
 This backend loads MLflow models from DagsHub. Create a `.env` file for local development:
 
-`src/.env` (For docker)
-`.env` (in root for `vercel dev`)
+- `src/.env` (For docker)
+- `.env` (in root for `vercel dev`)
+
+For Vercel deployment, see [VERCEL_DEPLOYMENT.md](../../VERCEL_DEPLOYMENT.md).
 
 ### Running the Application
 
