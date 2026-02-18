@@ -1,5 +1,6 @@
 # src/backend/app/services/weaklink_model_service.py
 import os
+import re
 import threading
 from typing import Dict, Tuple
 
@@ -9,7 +10,9 @@ from mlflow.exceptions import RestException
 from mlflow.tracking import MlflowClient
 
 _lock = threading.Lock()
-_cache: Dict[str, Tuple[object, str]] = {}  # cache_key -> (model, uri_used)
+_cache: Dict[str, Tuple[object, str, str | None]] = (
+    {}
+)  # cache_key -> (model, uri_used, run_id)
 
 
 def _clean_uri(value: str | None) -> str | None:
@@ -93,6 +96,7 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
         model = mlflow.pyfunc.load_model(uri)
         return model, uri
     except RestException as e:
+        # Some registries don’t support @alias. If so, resolve manually.
         if _is_models_alias_uri(uri) and "INVALID_PARAMETER_VALUE" in str(e):
             model_name, alias = _parse_models_alias_uri(uri)
             resolved_uri = _resolve_alias_to_version_uri(model_name, alias)
@@ -101,7 +105,51 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
         raise
 
 
-def get_model(variant: str = "champion") -> Tuple[object, str]:
+def _fetch_run_id(uri: str) -> str | None:
+    if not uri:
+        return None
+
+    # runs:/<run_id>/...
+    if uri.startswith("runs:/"):
+        tail = uri[len("runs:/") :]
+        return tail.split("/", 1)[0] if tail else None
+
+    client = MlflowClient()
+
+    # models:/Name@alias
+    if _is_models_alias_uri(uri):
+        name, alias = _parse_models_alias_uri(uri)
+        try:
+            mv = client.get_model_version_by_alias(name, alias)
+            return getattr(mv, "run_id", None)
+        except Exception:
+            # Fall back to your manual resolver
+            resolved = _resolve_alias_to_version_uri(name, alias)
+            return _fetch_run_id(resolved)
+
+    # models:/Name/<version>[/...]
+    if uri.startswith("models:/"):
+        tail = uri[len("models:/") :]
+        parts = tail.split("/", 2)
+        if len(parts) < 2:
+            return None
+        name = parts[0].strip()
+        selector = parts[1].strip()
+
+        if selector.isdigit():
+            mv = client.get_model_version(name, selector)
+            return getattr(mv, "run_id", None)
+
+        # stage name case (optional)
+        latest = client.get_latest_versions(name, stages=[selector])
+        if latest:
+            chosen = max(latest, key=lambda mv: int(mv.version))
+            return getattr(chosen, "run_id", None)
+
+    return None
+
+
+def get_model(variant: str = "champion") -> Tuple[object, str, str | None]:
     _init_mlflow()
     direct_uri = _direct_uri_for_variant(variant)
     if not direct_uri:
@@ -111,25 +159,46 @@ def get_model(variant: str = "champion") -> Tuple[object, str]:
     with _lock:
         if cache_key in _cache:
             return _cache[cache_key]
+
         model, uri_used = _load_model_with_alias_fallback(direct_uri)
-        _cache[cache_key] = (model, uri_used)
-        return model, uri_used
+        run_id = _fetch_run_id(uri_used)
+
+        _cache[cache_key] = (model, uri_used, run_id)
+        return model, uri_used, run_id
 
 
 def _expected_feature_count_from_model(model: object) -> int | None:
+    # Primary: sklearn n_features_in_ if exposed
     impl = getattr(model, "_model_impl", None)
     sk_model = getattr(impl, "sklearn_model", None) if impl else None
     n = getattr(sk_model, "n_features_in_", None) if sk_model else None
-    return int(n) if n is not None else None
+    if n is not None:
+        return int(n)
+
+    # Fallback: infer from predict error message (no hardcoding)
+    try:
+        model.predict(np.zeros((1, 1), dtype=float))
+        return None
+    except Exception as e:
+        msg = str(e)
+        m = re.search(r"expecting\s+(\d+)\s+features", msg, flags=re.IGNORECASE)
+        if m:
+            return int(m.group(1))
+        m = re.search(r"expects\s+(\d+)\s+features", msg, flags=re.IGNORECASE)
+        if m:
+            return int(m.group(1))
+        return None
 
 
 def expected_feature_count(variant: str = "champion") -> int | None:
-    model, _ = get_model(variant)
+    model, _uri, _run_id = get_model(variant)
     return _expected_feature_count_from_model(model)
 
 
-def predict_one(features: list[float], variant: str = "champion") -> Tuple[str, str]:
-    model, uri = get_model(variant)
+def predict_one(
+    features: list[float], variant: str = "champion"
+) -> Tuple[str, str, str | None]:
+    model, uri, run_id = get_model(variant)
 
     expected = _expected_feature_count_from_model(model)
     if expected is not None and len(features) != expected:
@@ -138,6 +207,5 @@ def predict_one(features: list[float], variant: str = "champion") -> Tuple[str, 
     X = np.array([features], dtype=float)
     y = model.predict(X)
 
-    # y[0] should be the class label (string)
     pred = y[0] if hasattr(y, "__len__") else y
-    return str(pred), uri
+    return str(pred), uri, run_id

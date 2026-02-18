@@ -1,9 +1,8 @@
 import dagshub
-import mlflow
-from ML_utils import MLUtils
+from ml_utils import mlutils
 
 # Setup dagshub and MLFlow
 dagshub.init(repo_owner="SamuelFredricBerg", repo_name="4dt907", mlflow=True)
-utils = MLUtils("Project_Model")
+utils = mlutils("Project_Model")
 
-utils.promote_dev_to_prod()
+utils.revert_backup_to_prod()

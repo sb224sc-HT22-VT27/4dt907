@@ -15,7 +15,7 @@ Each assignment has its own subdirectory:
 
 ### Prerequisites
 
-- Python 3.12.x
+- Python 3.12.10
 - Jupyter Notebook or JupyterLab
 
 ### Installation
@@ -38,15 +38,17 @@ jupyter lab
 3. Run the cells sequentially
 
 ## Creating New Notebooks
+
 1. Create a notebook cell containing following information:
+
 ```python
 import dagshub
 import mlflow
-import scripts.ML_utils as MLUtils
+import scripts.ml_utils as mlutils
 
 # Setup dagshub and MLFlow
 dagshub.init(repo_owner="SamuelFredricBerg", repo_name="4dt907", mlflow=True)
-utils = MLUtils("Project_Model")
+utils = mlutils("Project_Model")
 
 
 # Add all configs used in the training (EXAMPLE BELOW)
@@ -58,7 +60,9 @@ config = {
     "data_split_seed": 42
 }
 ```
-2. Main cell should look like this.
+
+1. Main cell should look like this.
+
 ```python
 with mlflow.start_run(run_name="ADD_RUN_NAME_HERE") as run:
     mlflow.log_params(config)
@@ -94,40 +98,46 @@ with mlflow.start_run(run_name="ADD_RUN_NAME_HERE") as run:
     else:
         print("Did not beat current @dev, model not uploaded to Dagshub")
 ```
-3. Get training data
+
+1. Get training data
 The training data is located at ...
 
 ## Production Model Update
+
 Prerequisites of doing a manual update is that all three aliases need to exist inside the model on DagsHub. If a new model name is used ensure to have @prod, @dev and @backup on three different models. If there are only two models additional setup has to be made inside DagsHub.
 Ways to fix:
+
 1. Manually force a model to be uploaded to the model and set that to missing alias.
 2. Check if there exist another model that can be manually promoted to the current one and set the missing alias.
 
 ### Manual Update
+
 Run the following code to change @dev model to @prod as well as @backup to @dev.
+
 ```python
 import dagshub
 import mlflow
-from ML_utils import MLUtils
+from ml_utils import mlutils
 
 # Setup dagshub and MLFlow
 dagshub.init(repo_owner="SamuelFredricBerg", repo_name="4dt907", mlflow=True)
-utils = MLUtils("Project_Model")
+utils = mlutils("Project_Model")
 
 utils.promote_dev_to_prod()
 ```
 
 ### Incase of @prod problems
+
 Incase the new @prod model does not work we can change place of @backup and @prod reverting to the previous @prod model.
 
 ```python
 import dagshub
 import mlflow
-from ML_utils import MLUtils
+from ml_utils import mlutils
 
 # Setup dagshub and MLFlow
 dagshub.init(repo_owner="SamuelFredricBerg", repo_name="4dt907", mlflow=True)
-utils = MLUtils("Project_Model")
+utils = mlutils("Project_Model")
 
 utils.revert_backup_to_prod()
 ```

@@ -8,7 +8,61 @@ from mlflow.tracking import MlflowClient
 from mlflow.exceptions import RestException
 
 _lock = threading.Lock()
-_cache: Dict[str, Tuple[object, str]] = {}  # cache_key -> (model, uri_used)
+_cache: Dict[str, Tuple[object, str, str | None]] = {}
+
+
+def _fetch_run_id(uri: str) -> str | None:
+    if not uri:
+        return None
+
+    if uri.startswith("runs:/"):
+        return _parse_runs_uri(uri)
+
+    if uri.startswith("models:/"):
+        return _parse_models_uri(uri)
+
+    return None
+
+
+def _parse_runs_uri(uri: str) -> str | None:
+    tail = uri[len("runs:/") :]
+    return tail.split("/", 1)[0] if tail else None
+
+
+def _parse_models_uri(uri: str) -> str | None:
+    client = MlflowClient()
+    tail = uri[len("models:/") :]
+    head = tail.split("/", 1)[0]
+
+    if "@" in head:
+        name, alias = [part.strip() for part in head.split("@", 1)]
+        if not name or not alias:
+            return None
+        try:
+            mv = client.get_model_version_by_alias(name, alias)
+            return getattr(mv, "run_id", None)
+        except Exception:
+            return _fetch_run_id(_resolve_alias_to_version_uri(name, alias))
+
+    parts = [p.strip() for p in tail.split("/", 2)]
+    if len(parts) < 2:
+        return None
+
+    name, selector = parts[0], parts[1]
+
+    if selector.isdigit():
+        mv = client.get_model_version(name, selector)
+        return getattr(mv, "run_id", None)
+
+    versions = client.get_latest_versions(
+        name, stages=[selector]
+    ) or client.search_model_versions(f"name='{name}'")
+
+    if not versions:
+        return None
+
+    chosen = max(versions, key=lambda mv: int(mv.version))
+    return getattr(chosen, "run_id", None)
 
 
 def _clean_uri(value: str | None) -> str | None:
@@ -162,11 +216,13 @@ def get_model(variant: str = "champion") -> Tuple[object, str] | None:
             cache_key = direct_uri
             with _lock:
                 if cache_key in _cache:
-                    return _cache[cache_key]
+                    model, uri_used, _run_id = _cache[cache_key]
+                    return model, uri_used, _run_id
 
                 model, uri_used = _load_model_with_alias_fallback(direct_uri)
-                _cache[cache_key] = (model, uri_used)
-                return model, uri_used
+                run_id = _fetch_run_id(uri_used)
+                _cache[cache_key] = (model, uri_used, run_id)
+                return model, uri_used, run_id
     except RestException:
         return None
 
@@ -179,12 +235,14 @@ def _expected_feature_count_from_model(model: object) -> int | None:
 
 
 def expected_feature_count(variant: str = "champion") -> int | None:
-    model, _uri = get_model(variant)
+    model, _uri, _run_id = get_model(variant)
     return _expected_feature_count_from_model(model)
 
 
-def predict_one(features: list[float], variant: str = "champion") -> Tuple[float, str]:
-    model, uri = get_model(variant)
+def predict_one(
+    features: list[float], variant: str = "champion"
+) -> Tuple[float, str, str | None]:
+    model, uri, run_id = get_model(variant)
 
     expected = _expected_feature_count_from_model(model)
     if expected is not None and len(features) != expected:
@@ -192,7 +250,7 @@ def predict_one(features: list[float], variant: str = "champion") -> Tuple[float
 
     X = np.array([features], dtype=float)
     y = model.predict(X)
-    return (float(y[0]) if hasattr(y, "__len__") else float(y)), uri
+    return (float(y[0]) if hasattr(y, "__len__") else float(y)), uri, run_id
 
 
 def clear_model_cache() -> None:

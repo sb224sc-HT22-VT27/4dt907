@@ -1,0 +1,75 @@
+version: 2
+updates:
+    # Backend Python dependencies (using pip ecosystem for pyproject.toml)
+    - package-ecosystem: "pip"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+          day: "monday"
+      open-pull-requests-limit: 5
+      target-branch: "develop"
+      labels:
+          - "dependencies"
+          - "backend"
+      commit-message:
+          prefix: "chore(deps)"
+          include: "scope"
+
+    # Frontend npm dependencies
+    - package-ecosystem: "npm"
+      directory: "/src/frontend"
+      schedule:
+          interval: "weekly"
+          day: "monday"
+      open-pull-requests-limit: 5
+      target-branch: "develop"
+      labels:
+          - "dependencies"
+          - "frontend"
+      commit-message:
+          prefix: "chore(deps)"
+          include: "scope"
+
+    # Docker dependencies
+    - package-ecosystem: "docker"
+      directory: "/src/backend"
+      schedule:
+          interval: "weekly"
+          day: "monday"
+      open-pull-requests-limit: 3
+      target-branch: "develop"
+      labels:
+          - "dependencies"
+          - "docker"
+      commit-message:
+          prefix: "chore(deps)"
+          include: "scope"
+
+    - package-ecosystem: "docker"
+      directory: "/src/frontend"
+      schedule:
+          interval: "weekly"
+          day: "monday"
+      open-pull-requests-limit: 3
+      target-branch: "develop"
+      labels:
+          - "dependencies"
+          - "docker"
+      commit-message:
+          prefix: "chore(deps)"
+          include: "scope"
+
+    # GitHub Actions dependencies
+    - package-ecosystem: "github-actions"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+          day: "monday"
+      open-pull-requests-limit: 3
+      target-branch: "develop"
+      labels:
+          - "dependencies"
+          - "github-actions"
+      commit-message:
+          prefix: "chore(deps)"
+          include: "scope"

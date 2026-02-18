@@ -1,6 +1,12 @@
 fastapi
-uvicorn
 mlflow-skinny
 pandas
 scikit-learn
 python-dotenv
+uvicorn
+
+# Testing
+pytest
+black
+flake8
+httpx
