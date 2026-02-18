@@ -143,17 +143,21 @@ docker compose up
 
 To automate deployments, you can:
 
-1. Add Vercel tokens to GitHub Secrets
-2. Update GitHub Actions workflows to deploy on merge to main
-3. Use separate workflows for frontend and backend deployments
+1. Add Vercel tokens and project IDs to GitHub Secrets:
+   - `VERCEL_TOKEN` - Vercel authentication token
+   - `VERCEL_ORG_ID` - Vercel organization ID
+   - `VERCEL_BACKEND_PROJECT_ID` - Backend project ID
+   - `VERCEL_FRONTEND_PROJECT_ID` - Frontend project ID
+   - `BACKEND_URL` - Backend deployment URL for frontend to use
 
-Example workflow snippet:
-```yaml
-- name: Deploy Backend to Vercel
-  run: |
-    cd src/backend
-    vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
-```
+2. The GitHub Actions workflow (`.github/workflows/vercel-cd.yml`) will automatically deploy both projects on push to main
+
+The workflow:
+- Deploys backend first
+- Then deploys frontend with backend URL configured
+- Provides deployment summary with both URLs
+
+Example workflow is already configured in `.github/workflows/vercel-cd.yml`.
 
 ## Troubleshooting
 

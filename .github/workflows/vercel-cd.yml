@@ -11,59 +11,104 @@ on:
 
 env:
     VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-    VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     VERCEL_BUILDER_DEBUG: 1
 
 jobs:
-    deploy:
+    deploy-backend:
         runs-on: ubuntu-latest
+        outputs:
+            url: ${{ steps.deploy-backend.outputs.url }}
         environment:
-            name: production
-            url: ${{ steps.deploy.outputs.url }}
+            name: production-backend
+            url: ${{ steps.deploy-backend.outputs.url }}
 
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
+            
+            - name: Install Vercel CLI
+              run: npm install --global vercel@latest
+            
+            - name: Pull Vercel Environment Information (Backend)
+              run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+              working-directory: src/backend
+              env:
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
+            
+            - name: Build Backend Artifacts
+              run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+              working-directory: src/backend
+              env:
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
+                  BACKEND_PORT: ${{ secrets.BACKEND_PORT || '8080' }}
+                  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+                  MODEL_URI_PROD: ${{ secrets.MODEL_URI_PROD }}
+                  MODEL_URI_DEV: ${{ secrets.MODEL_URI_DEV }}
+                  MODEL_URI_BACKUP: ${{ secrets.MODEL_URI_BACKUP }}
+                  WEAKLINK_MODEL_URI_PROD: ${{ secrets.WEAKLINK_MODEL_URI_PROD }}
+                  WEAKLINK_MODEL_URI_DEV: ${{ secrets.WEAKLINK_MODEL_URI_DEV }}
+                  WEAKLINK_MODEL_URI_BACKUP: ${{ secrets.WEAKLINK_MODEL_URI_BACKUP }}
+            
+            - name: Deploy Backend to Vercel
+              id: deploy-backend
+              run: |
+                  DEPLOY_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} --yes)
+                  echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+                  echo "Deployed backend to: $DEPLOY_URL"
+              working-directory: src/backend
+              env:
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
+
+    deploy-frontend:
+        runs-on: ubuntu-latest
+        needs: deploy-backend
+        environment:
+            name: production-frontend
+            url: ${{ steps.deploy-frontend.outputs.url }}
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+            
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
                   node-version: "22"
                   cache: "npm"
                   cache-dependency-path: src/frontend/package-lock.json
+            
             - name: Install Vercel CLI
               run: npm install --global vercel@latest
-            - name: Pull Vercel Environment Information
+            
+            - name: Pull Vercel Environment Information (Frontend)
               run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-            - name: Build Project Artifacts
-              run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+              working-directory: src/frontend
               env:
-                  # Backend Configuration
-                  BACKEND_PORT: ${{ secrets.BACKEND_PORT || '8080' }}
-                  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
-
-                  # Model URIs - Assignment 2
-                  MODEL_URI_PROD: ${{ secrets.MODEL_URI_PROD }}
-                  MODEL_URI_DEV: ${{ secrets.MODEL_URI_DEV }}
-                  MODEL_URI_BACKUP: ${{ secrets.MODEL_URI_BACKUP }}
-
-                  # Model URIs - Assignment 3 (Weakest Link)
-                  WEAKLINK_MODEL_URI_PROD: ${{ secrets.WEAKLINK_MODEL_URI_PROD }}
-                  WEAKLINK_MODEL_URI_DEV: ${{ secrets.WEAKLINK_MODEL_URI_DEV }}
-                  WEAKLINK_MODEL_URI_BACKUP: ${{ secrets.WEAKLINK_MODEL_URI_BACKUP }}
-
-                  # CORS Configuration (optional)
-                  PRODUCTION_URL: ${{ secrets.PRODUCTION_URL }}
-            - name: Deploy Project Artifacts to Vercel
-              id: deploy
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
+            
+            - name: Build Frontend Artifacts
+              run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+              working-directory: src/frontend
+              env:
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
+                  BACKEND_URL: ${{ secrets.BACKEND_URL }}
+            
+            - name: Deploy Frontend to Vercel
+              id: deploy-frontend
               run: |
                   DEPLOY_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} --yes)
                   echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
-                  echo "Deployed to: $DEPLOY_URL"
+                  echo "Deployed frontend to: $DEPLOY_URL"
+              working-directory: src/frontend
+              env:
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
+            
             - name: Deployment Summary
               run: |
                   echo "### 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
                   echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "**Deployment URL:** ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+                  echo "**Frontend URL:** ${{ steps.deploy-frontend.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+                  echo "**Backend URL:** ${{ needs.deploy-backend.outputs.url }}" >> $GITHUB_STEP_SUMMARY
                   echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
                   echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
                   echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
