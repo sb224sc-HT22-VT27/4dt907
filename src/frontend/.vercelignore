@@ -17,11 +17,3 @@ nginx.conf.template
 
 # Documentation
 README.md
-
-# Source files (only dist is needed)
-src/
-public/
-index.html
-vite.config.js
-eslint.config.js
-.eslintrc.cjs

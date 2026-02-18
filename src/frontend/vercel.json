@@ -15,8 +15,5 @@
             "dest": "/$1"
         }
     ],
-    "env": {
-        "BACKEND_URL": "@backend_url"
-    },
     "buildCommand": "npm run build"
 }

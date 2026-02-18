@@ -80,9 +80,17 @@ The `src/backend/vercel.json` configures:
 
 3. Set the backend URL environment variable:
    ```bash
-   vercel env add BACKEND_URL
+   # For production environment
+   vercel env add BACKEND_URL production
+   
+   # For preview environment
+   vercel env add BACKEND_URL preview
+   
+   # For development environment  
+   vercel env add BACKEND_URL development
    ```
    - Set this to your backend deployment URL (e.g., `https://your-backend-project.vercel.app`)
+   - The frontend build process will use this URL for API calls
 
 ### Deploy Frontend
 
@@ -102,7 +110,8 @@ The frontend will be available at: `https://your-frontend-project.vercel.app`
 The `src/frontend/vercel.json` configures:
 - Static build using Vite
 - Output directory set to `dist`
-- Backend URL from environment variable
+
+The frontend uses the `BACKEND_URL` environment variable during build time. This should be set in the Vercel project settings or via the CLI. The Vite configuration (`vite.config.js`) already supports this variable for proxy configuration during development and build.
 
 ## Environment Variables
 
