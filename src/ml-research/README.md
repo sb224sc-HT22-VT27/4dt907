@@ -44,11 +44,11 @@ jupyter lab
 ```python
 import dagshub
 import mlflow
-import scripts.ml_utils as MLUtils
+import scripts.ml_utils as mlutils
 
 # Setup dagshub and MLFlow
 dagshub.init(repo_owner="SamuelFredricBerg", repo_name="4dt907", mlflow=True)
-utils = MLUtils("Project_Model")
+utils = mlutils("Project_Model")
 
 
 # Add all configs used in the training (EXAMPLE BELOW)
@@ -117,11 +117,11 @@ Run the following code to change @dev model to @prod as well as @backup to @dev.
 ```python
 import dagshub
 import mlflow
-from ml_utils import MLUtils
+from ml_utils import mlutils
 
 # Setup dagshub and MLFlow
 dagshub.init(repo_owner="SamuelFredricBerg", repo_name="4dt907", mlflow=True)
-utils = MLUtils("Project_Model")
+utils = mlutils("Project_Model")
 
 utils.promote_dev_to_prod()
 ```
@@ -133,11 +133,11 @@ Incase the new @prod model does not work we can change place of @backup and @pro
 ```python
 import dagshub
 import mlflow
-from ml_utils import MLUtils
+from ml_utils import mlutils
 
 # Setup dagshub and MLFlow
 dagshub.init(repo_owner="SamuelFredricBerg", repo_name="4dt907", mlflow=True)
-utils = MLUtils("Project_Model")
+utils = mlutils("Project_Model")
 
 utils.revert_backup_to_prod()
 ```
