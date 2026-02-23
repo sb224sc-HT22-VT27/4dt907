@@ -156,7 +156,7 @@ class mlutils:
 
             for label, scores in results.items():
                 mu, se = np.mean(scores), stats.sem(scores)
-                pdf = stats.t.pdf(x_axis, len(scores) - 1, loc=mu, scale=se)  # v = k-1
+                pdf = stats.t.pdf(x_axis, len(scores) - 1, loc=mu, scale=se)
                 plt.plot(
                     x_axis,
                     pdf,
