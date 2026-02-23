@@ -1,113 +1,111 @@
 # Backend API
 
-FastAPI backend service for 4dt907 ML data-intensive system.
-
-## Features
+FastAPI backend for the 4dt907 ML data-intensive system. Serves ML model predictions via REST API.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.12.10
-- pip
+- Python 3.12.x
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
 ### Installation
 
 ```bash
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate # On Windows: .venv\Scripts\activate
+cd src/backend
 
-# Install dependencies
+# Using uv (recommended)
+uv sync
+
+# Or using pip
 pip install -r requirements.txt
 ```
 
-### Environment variables (.env)
+### Environment Variables
 
-This backend loads MLflow models from DagsHub. Create a `.env` file for local development:
-
-`src/.env` (For docker)
-`.env` (in root for `vercel dev`)
-
-### Running the Application
+Create a `.env` file at the project root (copy from `.env.example`):
 
 ```bash
-# Development server with hot reload
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Or using Python directly
-python -m app.main
+cp .env.example .env
 ```
 
-The API will be available at:
+Key variables:
 
-- API: <http://localhost:8000>
-- Interactive docs: <http://localhost:8000/docs>
+| Variable | Description |
+|----------|-------------|
+| `BACKEND_PORT` | Port for the backend (default: `8080`) |
+| `MLFLOW_TRACKING_URI` | MLflow tracking server URI |
+| `MODEL_URI_PROD` | Champion model URI (e.g. `models:/YourModel@prod`) |
+| `MODEL_URI_DEV` | Dev/latest model URI |
+| `WEAKLINK_MODEL_URI_PROD` | Weakest-link champion model URI |
+| `WEAKLINK_MODEL_URI_DEV` | Weakest-link dev model URI |
 
-### Running Tests
+### Running
 
 ```bash
-# Run all tests
+# From src/backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+```
+
+API available at:
+
+- API: <http://localhost:8080>
+- Interactive docs: <http://localhost:8080/docs>
+
+### Tests
+
+```bash
 pytest
-
-# Run with verbose output
-pytest -v
-
-# Run with coverage
-pytest --cov=app tests/
+pytest -v          # verbose
+pytest --cov=app   # with coverage
 ```
 
 ### Linting
 
 ```bash
-# Check code style
 flake8 .
-
-# Format code with black
 black .
 ```
 
 ## API Endpoints
 
-### Root Endpoints
-
-### API v1
-
-#### Prediction
-
-- `POST /api/v1/predict/champion`
-- `POST /api/v1/predict/latest`
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/` | Root – lists available routes |
+| `GET` | `/health` | Health check |
+| `POST` | `/api/v1/predict/champion` | Predict with champion model |
+| `POST` | `/api/v1/predict/latest` | Predict with latest model |
+| `POST` | `/api/v1/weakest-link/champion` | Weakest-link champion prediction |
+| `POST` | `/api/v1/weakest-link/latest` | Weakest-link latest prediction |
+| `GET` | `/api/v1/model-info/champion` | Champion model metadata |
+| `GET` | `/api/v1/model-info/latest` | Latest model metadata |
 
 ## Docker
 
 ```bash
-# Build image
+# From src/backend
 docker build -t 4dt907-backend .
-
-# Run container
-docker run -p 8000:8000 4dt907-backend
+docker run -p 8080:8080 4dt907-backend
 ```
 
-## MLflow Integration
+Or use docker compose from `src/`:
 
-## Project Structure (Update as needed)
+```bash
+docker compose up -d backend
+```
+
+## Project Structure
 
 ```text
 backend/
 ├── app/
-│   ├── __init__.py
 │   ├── main.py          # Application entry point
-│   ├── api/             # API route handlers
-│   ├── models/          # Data models
-│   └── services/        # Business logic
+│   ├── api/             # Route handlers (v1, v2, health)
+│   ├── schemas/         # Pydantic request/response models
+│   └── services/        # ML model loading and prediction logic
 ├── tests/
-│   ├── __init__.py
-│   └── test_main.py     # Test cases
 ├── Dockerfile
 ├── requirements.txt
 └── README.md
 ```
 
-## Contributing
-
-Follow the [contribution guidelines](../../CONTRIBUTING.md) in the root repository.

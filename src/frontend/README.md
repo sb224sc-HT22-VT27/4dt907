@@ -1,96 +1,68 @@
 # Frontend Application
 
-React frontend application for 4dt907 ML data-intensive system.
-
-## Features
-
-- Web client for sending feature vectors to the backend and displaying predicted expert score
-- Supports model variants via backend routes:
-  - `POST /api/v1/predict/champion` (production/champion, typically `@prod`)
-  - `POST /api/v1/predict/latest` (development/latest, typically `@dev`)
-- Input validation guidance for the deployed regression model (expects **41** features)
+React + Vite frontend for the 4dt907 ML data-intensive system.  
+Sends feature vectors to the backend and displays predicted expert scores.
 
 ## Getting Started
-
-from src/frontend
-npm ci
-npm run dev
 
 ### Prerequisites
 
 - Node.js 22.x (LTS)
 - npm
 
-### Installation
+### Installation & Running
 
 ```bash
-# Install dependencies
-npm ci # or npm install
-```
-
-### Running the Application
-
-```bash
-# Development server with hot reload
+cd src/frontend
+npm ci
 npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
 ```
 
-The application will be available at <http://localhost:3000>
+The app will be available at <http://localhost:3030>
 
-### Linting
+### Other Commands
 
 ```bash
-# Check code quality
-npm run lint
+npm run build    # Production build
+npm run preview  # Preview production build
+npm run lint     # Lint code
 ```
+
+## Configuration
+
+The Vite dev server proxies `/api/*` requests to the backend (default `http://localhost:8080`).  
+Override by setting `BACKEND_URL` or `BACKEND_PORT` in your `.env` file at the project root.
 
 ## Docker
 
 ```bash
-# Build image
+# From src/frontend
 docker build -t 4dt907-frontend .
-
-# Run container
-docker run -p 3000:3000 4dt907-frontend
+docker run -p 3030:3030 4dt907-frontend
 ```
 
-### API Integration
+Or use docker compose from `src/`:
 
-The frontend communicates with the backend API at <http://localhost:8000>
+```bash
+docker compose up -d frontend
+```
 
-Key features:
-
-### Components
-
-## Project Structure (Update as needed)
+## Project Structure
 
 ```text
 frontend/
 ├── src/
-│   ├── App.jsx          # Main component
-│   ├── App.css          # Component styles
-│   ├── main.jsx         # Entry point
-│   └── index.css        # Global styles
-├── public/              # Static assets
-├── index.html           # HTML template
-├── vite.config.js       # Vite configuration
+│   ├── App.jsx              # Root component
+│   ├── main.jsx             # Entry point
+│   ├── featuresSchema.js    # Feature definitions for the prediction form
+│   └── components/
+│       ├── Predict.jsx      # Main prediction UI
+│       └── FeatureBuilder.jsx # Dynamic feature input form
+├── public/
+├── index.html
+├── vite.config.js
 ├── package.json
 ├── Dockerfile
 └── README.md
 ```
 
-## Configuration
-
-### Vite Proxy
-
-The Vite dev server is configured to proxy API requests:
-
-## Contributing
-
-Follow the [contribution guidelines](../../CONTRIBUTING.md) in the root repository.
