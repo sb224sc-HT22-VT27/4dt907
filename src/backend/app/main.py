@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.health import router as health_router
 from app.api.v1.router import router as v1_router
 from app.api.v2.router import router as v2_router
+
 # ---------------------------------------------------------------------------
 # Environment loading
 # ---------------------------------------------------------------------------
@@ -64,7 +65,7 @@ ALLOWED_ORIGINS = [
 if os.getenv("VERCEL_URL"):
     ALLOWED_ORIGINS.append(f"https://{os.getenv("VERCEL_URL")}")
 
-# Ensure we include any custom production URL
+# Ensure (if set) include any custom production URL
 if os.getenv("PRODUCTION_URL"):
     ALLOWED_ORIGINS.append(os.getenv("PRODUCTION_URL"))
 
@@ -90,6 +91,7 @@ def root():
         "predict_latest": "/api/v1/predict/latest",
         "v2_status": "/api/v2/status",
     }
+
 
 # Routers
 app.include_router(health_router)
