@@ -1,3 +1,16 @@
+"""app.services.model_service
+
+Model loading + prediction utilities for the primary model.
+
+Responsibilities:
+- initialize MLflow tracking/registry connection (via env vars)
+- load a model by "variant" (champion/latest/backup) and cache it in-memory
+- provide lightweight helpers for feature-count validation and single-row prediction
+
+Caching:
+- models are cached by their resolved URI to avoid repeated MLflow downloads
+- a thread lock protects cache access in concurrent API requests
+"""
 import os
 import threading
 from typing import Dict, Tuple
@@ -7,11 +20,14 @@ import numpy as np
 from mlflow.tracking import MlflowClient
 from mlflow.exceptions import RestException
 
+# Thread-safe, process-local model cache:
+# key = model URI, value = (loaded_model, uri_used, run_id)
 _lock = threading.Lock()
 _cache: Dict[str, Tuple[object, str, str | None]] = {}
 
 
 def _fetch_run_id(uri: str) -> str | None:
+    """Extract a MLflow run_id from a model URI (runs:/... or models:/...)."""
     if not uri:
         return None
 
@@ -25,11 +41,13 @@ def _fetch_run_id(uri: str) -> str | None:
 
 
 def _parse_runs_uri(uri: str) -> str | None:
+    """Parse run_id from a `runs:/<run_id>/...` URI."""
     tail = uri[len("runs:/") :]
     return tail.split("/", 1)[0] if tail else None
 
 
 def _parse_models_uri(uri: str) -> str | None:
+    """Resolve a run_id for a `models:/...` URI (version, stage, or alias)."""
     client = MlflowClient()
     tail = uri[len("models:/") :]
     head = tail.split("/", 1)[0]
@@ -66,12 +84,16 @@ def _parse_models_uri(uri: str) -> str | None:
 
 
 def _clean_uri(value: str | None) -> str | None:
+    """Normalize a URI coming from env vars (trim whitespace and wrapping quotes)."""
     if not value:
         return None
     return value.strip().strip('"').strip("'")
 
 
-# Perform one-time mlflow URI initialization at import time if configured.
+# ---------------------------------------------------------------------------
+# MLflow initialization (import-time)
+# ---------------------------------------------------------------------------
+# If MLFLOW_TRACKING_URI is set, configure both tracking + registry URIs once.
 _initial_tracking_uri = os.getenv("MLFLOW_TRACKING_URI")
 if _initial_tracking_uri:
     mlflow.set_tracking_uri(_initial_tracking_uri)
@@ -80,6 +102,7 @@ if _initial_tracking_uri:
 
 # * Expected "entry point"
 def _direct_uri_for_variant(variant: str) -> str | None:
+    """Map a variant name to a direct model URI provided via env vars."""
     v = (variant or "").lower().strip()
     if v in {"champion", "best", "prod", "production"}:
         return _clean_uri(os.getenv("MODEL_URI_PROD"))
@@ -91,6 +114,7 @@ def _direct_uri_for_variant(variant: str) -> str | None:
 
 
 def _init_mlflow() -> str:
+    """Ensure MLflow tracking is configured and return the tracking URI."""
     uri = os.getenv("MLFLOW_TRACKING_URI")
     if not uri:
         raise RuntimeError("MLFLOW_TRACKING_URI is not set")
@@ -131,6 +155,7 @@ def _latest_source_uri(model_name: str) -> str:
 
 
 def _is_models_alias_uri(uri: str) -> bool:
+    """Return True if URI looks like `models:/Name@alias` (alias form)."""
     # True for: models:/Name@alias
     return (
         uri.startswith("models:/")
@@ -190,10 +215,10 @@ def _resolve_alias_to_version_uri(model_name: str, alias: str) -> str:
 
 
 def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
-    """
-    Try loading the provided URI. If it is an alias URI (models:/Name@alias) and
-    the registry rejects alias lookup, resolve to a concrete version URI dynamically.
-    Returns (model, uri_used).
+    """Load a model from a URI, with fallback for alias URIs.
+
+    If `uri` is `models:/Name@alias` and the registry does not support alias lookup,
+    we resolve the alias to a concrete version URI and load that instead.
     """
     try:
         model = mlflow.pyfunc.load_model(uri)
@@ -209,6 +234,7 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
 
 
 def get_model(variant: str = "champion") -> Tuple[object, str] | None:
+    """Load (and cache) the model for a given variant."""
     _init_mlflow()
     try:
         direct_uri = _direct_uri_for_variant(variant)
@@ -228,6 +254,7 @@ def get_model(variant: str = "champion") -> Tuple[object, str] | None:
 
 
 def _expected_feature_count_from_model(model: object) -> int | None:
+    """Best-effort extraction of expected feature count from a loaded sklearn model."""
     impl = getattr(model, "_model_impl", None)
     sk_model = getattr(impl, "sklearn_model", None) if impl else None
     n = getattr(sk_model, "n_features_in_", None) if sk_model else None
@@ -235,6 +262,7 @@ def _expected_feature_count_from_model(model: object) -> int | None:
 
 
 def expected_feature_count(variant: str = "champion") -> int | None:
+    """Return the model's expected number of input features (if detectable)."""
     model, _uri, _run_id = get_model(variant)
     return _expected_feature_count_from_model(model)
 
@@ -242,6 +270,7 @@ def expected_feature_count(variant: str = "champion") -> int | None:
 def predict_one(
     features: list[float], variant: str = "champion"
 ) -> Tuple[float, str, str | None]:
+    """Predict a single row from a flat list of numeric features."""
     model, uri, run_id = get_model(variant)
 
     expected = _expected_feature_count_from_model(model)
@@ -254,6 +283,7 @@ def predict_one(
 
 
 def clear_model_cache() -> None:
+    """Clear the in-memory model cache."""
     global _cache
     with _lock:
         _cache = {}
