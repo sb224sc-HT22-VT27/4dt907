@@ -9,10 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Updated READMEs for root, backend, frontend, and `ml-research` to match current project structure
+- Update READMEs for root, backend, frontend, and `ml-research` to match current project structure
 - Clearer onboarding instructions across all modules
 - This CHANGELOG file
 - CONTRIBUTING guidelines for updating the CHANGELOG
+- `DEPLOYMENT.md` with step-by-step deployment instructions linked from the root README
+- A5 report notebook documenting ensemble/stacking evaluation for regression and classification
+- Stacking ensemble implementation for A2 (regression) and A3 (classification) with supporting figures and metrics artifacts
+- `.env` file specification added to the root README quick-start guide
+
+### Changed
+
+- Bump `actions/checkout` from v4 to v6 in CI/CD workflow
+- Bump `actions/setup-python` from v5 to v6 in CI/CD workflow
+- Bump `actions/setup-node` from v4 to v6 in CI/CD workflow
+- Minor cleanup in `ml_utils.py`
 
 ---
 
