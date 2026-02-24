@@ -8,8 +8,9 @@ FastAPI backend service for 4dt907 ML data-intensive system.
 
 ### Prerequisites
 
-- Python 3.12.10
-- pip
+- [Python 3.12.10](https://www.python.org/downloads/release/python-31210/)
+- For vercel local testing use [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- For docker local testing use pip
 
 ### Installation
 
@@ -20,11 +21,14 @@ source .venv/bin/activate # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# For vercel local testing
+uv sync
 ```
 
 ### Environment variables (.env)
 
-This backend loads MLflow models from DagsHub. Create a `.env` file for local development:
+Create `.env` files using `.env.example` as a template:
 
 `src/.env` (For docker)
 `.env` (in root for `vercel dev`)
@@ -33,37 +37,28 @@ This backend loads MLflow models from DagsHub. Create a `.env` file for local de
 
 ```bash
 # Development server with hot reload
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
 # Or using Python directly
 python -m app.main
 ```
 
-The API will be available at:
+The API available at:
 
-- API: <http://localhost:8000>
-- Interactive docs: <http://localhost:8000/docs>
+- API: <http://localhost:8080>
+- Interactive docs: <http://localhost:8080/docs>
 
 ### Running Tests
 
 ```bash
-# Run all tests
-pytest
-
-# Run with verbose output
-pytest -v
-
-# Run with coverage
-pytest --cov=app tests/
+pytest -v           # Verbose output
+pytest --cov=app    # With coverage report
 ```
 
 ### Linting
 
 ```bash
-# Check code style
 flake8 .
-
-# Format code with black
 black .
 ```
 
@@ -80,13 +75,7 @@ black .
 
 ## Docker
 
-```bash
-# Build image
-docker build -t 4dt907-backend .
-
-# Run container
-docker run -p 8000:8000 4dt907-backend
-```
+Use the docker compose file to build entire project which uses the local Dockerfile for the backend.
 
 ## MLflow Integration
 
@@ -95,19 +84,12 @@ docker run -p 8000:8000 4dt907-backend
 ```text
 backend/
 ├── app/
-│   ├── __init__.py
 │   ├── main.py          # Application entry point
 │   ├── api/             # API route handlers
-│   ├── models/          # Data models
+│   ├── schemas/         # Schemas
 │   └── services/        # Business logic
 ├── tests/
-│   ├── __init__.py
-│   └── test_main.py     # Test cases
 ├── Dockerfile
 ├── requirements.txt
 └── README.md
 ```
-
-## Contributing
-
-Follow the [contribution guidelines](../../CONTRIBUTING.md) in the root repository.
