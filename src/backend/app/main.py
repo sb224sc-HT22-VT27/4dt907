@@ -1,5 +1,14 @@
-"""
-FastAPI backend application for 4dt907 project.
+"""app.main
+
+FastAPI backend application for the 4dt907 project.
+
+This module stays small on purpose: it wires up routers, configures CORS,
+loads environment variables, and exposes the ASGI ``app``.
+
+Notes:
+- ``.env`` discovery walks up the directory tree so the app can be launched from
+  multiple working directories (Docker, Vercel dev, local venv, etc.).
+- CORS origins are kept explicit.
 """
 
 import os
@@ -13,6 +22,15 @@ from app.api.health import router as health_router
 from app.api.v1.router import router as v1_router
 from app.api.v2.router import router as v2_router
 
+# ---------------------------------------------------------------------------
+# Environment loading
+# ---------------------------------------------------------------------------
+#
+# We try to find a .env file in parent folders so the backend can be started from:
+# - src/backend (local development)
+# - src/ (docker compose)
+# - repository root (vercel dev)
+#
 current_path = Path(__file__).resolve()
 env_loaded = False
 
@@ -27,12 +45,15 @@ for i in range(MAX_PARENT_LEVELS):
             break
     except IndexError:
         break
-
+# Fallback: rely on default dotenv search (current working directory).
 if not env_loaded:
     load_dotenv()
-
+# ---------------------------------------------------------------------------
+# App wiring
+# ---------------------------------------------------------------------------
 app = FastAPI(title="4dt907 Backend API")
 
+# Origins allowed to call the API from a browser.
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3030",
@@ -44,7 +65,7 @@ ALLOWED_ORIGINS = [
 if os.getenv("VERCEL_URL"):
     ALLOWED_ORIGINS.append(f"https://{os.getenv("VERCEL_URL")}")
 
-# Ensure we include any custom production URL
+# Ensure (if set) include any custom production URL
 if os.getenv("PRODUCTION_URL"):
     ALLOWED_ORIGINS.append(os.getenv("PRODUCTION_URL"))
 
@@ -72,6 +93,7 @@ def root():
     }
 
 
+# Routers
 app.include_router(health_router)
 app.include_router(v1_router, prefix="/api/v1")
 

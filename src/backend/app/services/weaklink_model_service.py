@@ -1,4 +1,20 @@
-# src/backend/app/services/weaklink_model_service.py
+"""app.services.weaklink_model_service
+
+Model loading + prediction utilities for the “weakest-link” model.
+
+This service mirrors the primary model service, but uses separate env vars/URIs so
+the weakest-link model can evolve independently.
+
+Responsibilities:
+- configure MLflow tracking/registry (via env vars)
+- load a model by variant (champion/latest/backup) with in-memory caching
+- validate expected feature count (best-effort)
+- run single-row predictions
+
+Caching:
+- models are cached by resolved URI to avoid repeated MLflow downloads
+- a thread lock protects cache access in concurrent API requests
+"""
 import os
 import re
 import threading
@@ -9,6 +25,8 @@ import numpy as np
 from mlflow.exceptions import RestException
 from mlflow.tracking import MlflowClient
 
+# Thread-safe, process-local model cache:
+# key = direct URI, value = (loaded_model, uri_used, run_id)
 _lock = threading.Lock()
 _cache: Dict[str, Tuple[object, str, str | None]] = (
     {}
@@ -16,6 +34,7 @@ _cache: Dict[str, Tuple[object, str, str | None]] = (
 
 
 def _clean_uri(value: str | None) -> str | None:
+    """Normalize a URI coming from env vars (trim whitespace and wrapping quotes)."""
     if not value:
         return None
     return value.strip().strip('"').strip("'")
@@ -28,6 +47,7 @@ if _initial_tracking_uri:
 
 
 def _direct_uri_for_variant(variant: str) -> str | None:
+    """Map a variant name to a direct weakest-link model URI from environment variables."""
     v = (variant or "").lower().strip()
     if v in {"champion", "best", "prod", "production"}:
         return _clean_uri(os.getenv("WEAKLINK_MODEL_URI_PROD"))
@@ -39,12 +59,14 @@ def _direct_uri_for_variant(variant: str) -> str | None:
 
 
 def _init_mlflow() -> None:
+    """Validate that MLflow tracking is configured. """
     uri = os.getenv("MLFLOW_TRACKING_URI")
     if not uri:
         raise RuntimeError("MLFLOW_TRACKING_URI is not set")
 
 
 def _is_models_alias_uri(uri: str) -> bool:
+    """Return True if the URI looks like `models:/Name@alias` (alias form)."""
     return (
         uri.startswith("models:/")
         and ("@" in uri)
@@ -53,6 +75,7 @@ def _is_models_alias_uri(uri: str) -> bool:
 
 
 def _parse_models_alias_uri(uri: str) -> tuple[str, str]:
+    """Parse `models:/Name@alias` into (model_name, alias)."""
     tail = uri.replace("models:/", "", 1)
     name, alias = tail.split("@", 1)
     name = name.strip()
@@ -63,6 +86,7 @@ def _parse_models_alias_uri(uri: str) -> tuple[str, str]:
 
 
 def _resolve_alias_to_version_uri(model_name: str, alias: str) -> str:
+    """Resolve an alias (prod/dev/backup) to a concrete `models:/Name/<version>` URI."""
     client = MlflowClient()
     versions = client.search_model_versions(f"name='{model_name}'")
     if not versions:
@@ -92,6 +116,11 @@ def _resolve_alias_to_version_uri(model_name: str, alias: str) -> str:
 
 
 def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
+    """Load a model from a URI, with fallback for alias URIs.
+
+    If the registry rejects `models:/Name@alias`, we resolve it to a concrete
+    version URI and load that instead.
+    """
     try:
         model = mlflow.pyfunc.load_model(uri)
         return model, uri
@@ -106,6 +135,7 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
 
 
 def _fetch_run_id(uri: str) -> str | None:
+    """Best-effort extraction of MLflow run_id from `runs:/...` or `models:/...` URIs."""
     if not uri:
         return None
 
@@ -150,6 +180,7 @@ def _fetch_run_id(uri: str) -> str | None:
 
 
 def get_model(variant: str = "champion") -> Tuple[object, str, str | None]:
+    """Load (and cache) the weakest-link model for a given variant."""
     _init_mlflow()
     direct_uri = _direct_uri_for_variant(variant)
     if not direct_uri:
@@ -168,7 +199,7 @@ def get_model(variant: str = "champion") -> Tuple[object, str, str | None]:
 
 
 def _expected_feature_count_from_model(model: object) -> int | None:
-    # Primary: sklearn n_features_in_ if exposed
+    """Best-effort extraction of expected feature count from a loaded sklearn model."""
     impl = getattr(model, "_model_impl", None)
     sk_model = getattr(impl, "sklearn_model", None) if impl else None
     n = getattr(sk_model, "n_features_in_", None) if sk_model else None
@@ -191,6 +222,7 @@ def _expected_feature_count_from_model(model: object) -> int | None:
 
 
 def expected_feature_count(variant: str = "champion") -> int | None:
+    """Return the model's expected number of input features (if detectable)."""
     model, _uri, _run_id = get_model(variant)
     return _expected_feature_count_from_model(model)
 
@@ -198,6 +230,7 @@ def expected_feature_count(variant: str = "champion") -> int | None:
 def predict_one(
     features: list[float], variant: str = "champion"
 ) -> Tuple[str, str, str | None]:
+    """Predict a single row from a flat list of numeric features."""
     model, uri, run_id = get_model(variant)
 
     expected = _expected_feature_count_from_model(model)
