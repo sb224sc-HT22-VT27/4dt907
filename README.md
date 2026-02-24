@@ -14,7 +14,8 @@ A full-stack ML application with a FastAPI backend and React frontend, deployed 
 2. Copy `.env.example` to `.env` and fill in the values:
 
    ```bash
-   cp .env.example .env
+   cp .env.example .env       # For Vercel
+   cp .env.example src/.env   # For Docker
    ```
 
 3. Choose development path:
