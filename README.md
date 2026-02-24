@@ -17,7 +17,7 @@ A full-stack ML application with a FastAPI backend and React frontend, deployed 
    cp .env.example .env
    ```
 
-3. Choose your development path:
+3. Choose development path:
    - [Backend development](src/backend/README.md)
    - [Frontend development](src/frontend/README.md)
    - [ML research notebooks](src/ml-research/README.md)

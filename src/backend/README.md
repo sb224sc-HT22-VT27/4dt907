@@ -8,8 +8,8 @@ FastAPI backend service for 4dt907 ML data-intensive system.
 
 ### Prerequisites
 
-- Python 3.12.10
-- For vercel local testing use [uv](https://docs.astral.sh/uv/)
+- [Python 3.12.10](https://www.python.org/downloads/release/python-31210/)
+- For vercel local testing use [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - For docker local testing use pip
 
 ### Installation

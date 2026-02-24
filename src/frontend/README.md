@@ -7,7 +7,7 @@ Sends feature vectors to the backend and displays predicted expert scores.
 
 ### Prerequisites
 
-- Node.js 22.22 (LTS)
+- [Node.js 22.22 (LTS)](https://nodejs.org/en/download)
 - npm
 
 ### Installation & Running
