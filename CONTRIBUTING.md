@@ -112,5 +112,5 @@ When adding new ML notebooks:
 
 - Work inside `src/ml-research/`
 - Log all runs to MLflow/DagsHub
-- Do **not** commit data files, model artifacts, or notebook outputs containing sensitive data
+- Do **not** commit data files(unless specified), model artifacts, or notebook outputs containing sensitive data
 - Clear cell outputs before committing if they contain large blobs
