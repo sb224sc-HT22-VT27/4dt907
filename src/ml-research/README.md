@@ -6,12 +6,14 @@ Jupyter notebooks for ML experiments and assignment reporting. Each assignment h
 
 | Assignment | Topic | Notes |
 | ------------ | ------- | ------- |
-| `a1` | Project setup & initial data exploration | Dataset: expert wine quality scores |
-| `a2` | Baseline regression model (scikit-learn) | Gradient Boosted Trees, logged to MLflow/DagsHub |
-| `a3` | Weakest-link analysis | Identified and modelled the weakest-performing feature subset |
-| `a4–a16` | Iterative model improvements | Feature engineering, hyperparameter tuning, alternative algorithms |
+| `a1` | Project setup | Setup of dagshub and utils file |
+| `a2` | Regression model setup | Setup baseline for A2 with linear regression, removed outliers using cooks distance. Threshold multiplier 3 was the best.  |
+| `a3` | Weak-Link classification setup | Tried RFC, Boosting, Logreg, and ETC. "Best" model from Boosting. |
+| `a4` | Comparison of models and improving A2 | Implemented t-test to compare models into utils file aswell as improving A2 using Lasso. |
+| `a5` | Ensemble implementation in A2 and A3 | Implemented stacking ensembles to bothe A2 and A3 to whcih improved results |
 
-Models are tracked in MLflow on DagsHub. The best model is promoted to `@prod` via the alias promotion workflow described below.
+
+Models are tracked in MLflow on DagsHub using a utils file, ML_utils.py. 
 
 ## Setup
 
@@ -26,17 +28,3 @@ pip install -r requirements.txt
 jupyter lab
 ```
 
-## Promoting a Model to Production
-
-```python
-import dagshub, mlflow
-from ml_utils import mlutils
-
-dagshub.init(repo_owner="SamuelFredricBerg", repo_name="4dt907", mlflow=True)
-utils = mlutils("Project_Model")
-
-utils.promote_dev_to_prod()   # @dev → @prod, @prod → @backup
-# utils.revert_backup_to_prod()  # rollback: @backup → @prod
-```
-
-Requires `@prod`, `@dev`, and `@backup` aliases to exist on the model in DagsHub.
