@@ -1,9 +1,16 @@
-// src/frontend/src/components/Predict.jsx
+// Prediction UI: builds an ordered feature vector, fetches model metadata (expected_features),
+// and sends predictions to the backend (primary or weakest-link task).
 
 import { useEffect, useMemo, useState } from "react";
 import FeatureBuilder from "./FeatureBuilder";
 import { FEATURE_GROUPS, EXAMPLE_41 } from "../featuresSchema";
 
+/**
+ * Parse a comma-separated string into a numeric feature array.
+ *
+ * @param {string} input - Comma-separated numbers (e.g. "1, 2, 3").
+ * @returns {{ok: true, value: number[]} | {ok: false, error: string}}
+ */
 function parseFeatures(input) {
   const parts = input
     .split(",")
@@ -20,6 +27,14 @@ function parseFeatures(input) {
   return { ok: true, value: nums };
 }
 
+/**
+ * Build the canonical, ordered list of feature names used by the UI.
+ *
+ * The backend expects a flat array in a specific order. We derive that order from
+ * FEATURE_GROUPS so the UI can render grouped inputs while still producing a stable array.
+ *
+ * @returns {string[]} ordered feature names
+ */
 function buildOrderedFeatureNames() {
   const names = [];
   for (const g of FEATURE_GROUPS) {
@@ -35,20 +50,35 @@ function buildOrderedFeatureNames() {
   }
   return names;
 }
-
+// Canonical order + total size of the UI feature vector (includes all known fields).
 const ORDERED_NAMES = buildOrderedFeatureNames();
 const TOTAL_FEATURES = ORDERED_NAMES.length;
 
+/**
+ * Convert an ordered feature array into an object keyed by feature name.
+ * Missing values are treated as 0 to keep the UI state stable.
+ */
 function fromArray(arr) {
   const obj = {};
   ORDERED_NAMES.forEach((n, i) => (obj[n] = Number(arr?.[i] ?? 0)));
   return obj;
 }
 
+/**
+ * Convert the UI's feature object back into an ordered numeric array.
+ * Unknown/missing fields are treated as 0.
+ */
 function toOrderedArray(valuesObj) {
   return ORDERED_NAMES.map((n) => Number(valuesObj?.[n] ?? 0));
 }
 
+/**
+ * Main prediction screen.
+ *
+ * - Fetches model info (expected feature count) from the backend
+ * - Lets the user edit inputs via FeatureBuilder
+ * - Sends POST requests to the selected prediction endpoint
+ */
 export default function Predict() {
   const [task, setTask] = useState("score");
   // Default to prod
@@ -71,13 +101,14 @@ export default function Predict() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
-
+  // Prediction endpoint depends on task (primary vs weakest-link) and model variant (champion/latest).
   const endpoint = useMemo(() => {
     return task === "weakest"
       ? `/api/v1/weakest-link/${variant}`
       : `/api/v1/predict/${variant}`;
   }, [task, variant]);
 
+  // Model-info endpoint provides expected_features used to validate/limit the outgoing array.
   const modelInfoUrl = useMemo(() => {
     return task === "weakest"
       ? `/api/v1/model-info/weakest-link/${variant}`
@@ -95,6 +126,7 @@ export default function Predict() {
 
     async function loadModelInfo() {
       try {
+        // No-store/no-cache avoids stale expected_features when switching variants or redeploying.
         const res = await fetch(modelInfoUrl, {
           signal: ctrl.signal,
           cache: "no-store",
@@ -131,13 +163,13 @@ export default function Predict() {
     }
 
     loadModelInfo();
-
+    // Abort in-flight requests to prevent state updates after unmount / rapid variant switching.
     return () => {
       cancelled = true;
       ctrl.abort();
     };
   }, [modelInfoUrl]);
-
+  // Small helper to show transient UI hints (stores timeout handle on the function object).
   const flashHint = (msg) => {
     setHint(msg);
     window.clearTimeout(flashHint._t);
