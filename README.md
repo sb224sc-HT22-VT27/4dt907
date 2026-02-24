@@ -21,6 +21,7 @@ A full-stack ML application with a FastAPI backend and React frontend, deployed 
    - [Backend development](src/backend/README.md)
    - [Frontend development](src/frontend/README.md)
    - [ML research notebooks](src/ml-research/README.md)
+   - [Deployment strategies](DEPLOYMENT.md)
 
 4. Or run the full stack with Docker:
 
