@@ -1,10 +1,21 @@
+// FeatureBuilder: renders grouped feature controls and produces a stable, ordered feature set
+// derived from FEATURE_GROUPS. Also supports limiting visible features via `maxFeatures`.
+
 import { useEffect, useMemo, useRef, useState, useId } from "react";
 import { FEATURE_GROUPS } from "../featuresSchema";
 
+/**
+ * Clamp a numeric value into a [lo, hi] range.
+ * Used for both UI safety (knob drag) and numeric input constraints.
+ */
 function clamp(x, lo, hi) {
     return Math.max(lo, Math.min(hi, x));
 }
 
+/**
+ * Choose a display group key for a schema entry.
+ * Keeps grouping logic centralized so FEATURE_GROUPS can stay simple.
+ */
 function groupKeyFromSchema(g) {
     if (g.single) return "Estimated";
     if (String(g.suffix || "").includes("Angle")) return "Angle";
@@ -13,6 +24,10 @@ function groupKeyFromSchema(g) {
     return g.title || "Other";
 }
 
+/**
+ * Create compact labels for UI chips/knobs (A1/N1/T1/E, etc.).
+ * This keeps the grid readable without losing the underlying feature name.
+ */
 function shortLabel(name) {
     if (name.includes("_Angle_Deviation"))
         return `A${name.match(/No_(\d+)_/)?.[1] ?? ""}`;
@@ -25,7 +40,11 @@ function shortLabel(name) {
 }
 
 /**
- * Light glossy iOS knob with a subtle arc.
+ * Knob control for a single feature value.
+ *
+ * - Pointer-driven (drag around center)
+ * - Maps angle sweep -> normalized [0..1] -> [min..max]
+ * - Shows value as an arc ring + numeric input for precision
  */
 function Knob({ name, value, onChange, min = 0, max = 1, step = 0.001 }) {
     const ref = useRef(null);
@@ -50,6 +69,8 @@ function Knob({ name, value, onChange, min = 0, max = 1, step = 0.001 }) {
     const SWEEP_MIN = -135;
     const SWEEP_MAX = 135;
 
+    
+    //Convert pointer coordinates into a new value.
     const setFromPointer = (clientX, clientY) => {
         const el = ref.current;
         if (!el) return;
@@ -74,18 +95,18 @@ function Knob({ name, value, onChange, min = 0, max = 1, step = 0.001 }) {
         v = Number(v.toFixed(6));
         onChange(v);
     };
-
+    // Start interaction, capture pointer so dragging continues outside the element.
     const onPointerDown = (e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture?.(e.pointerId);
         setFromPointer(e.clientX, e.clientY);
     };
-
+    // Update only while we still own the pointer capture (active drag).
     const onPointerMove = (e) => {
         if (!e.currentTarget.hasPointerCapture?.(e.pointerId)) return;
         setFromPointer(e.clientX, e.clientY);
     };
-
+    // End interaction, release pointer capture.
     const onPointerUp = (e) => {
         try {
             e.currentTarget.releasePointerCapture?.(e.pointerId);
@@ -187,6 +208,14 @@ function Knob({ name, value, onChange, min = 0, max = 1, step = 0.001 }) {
     );
 }
 
+/**
+ * Render feature controls grouped into tabs.
+ *
+ * Props:
+ * values, object keyed by feature name -> numeric value
+ * setValues, state setter for updating values
+ * maxFeatures, optional cap to show only the first N features (in schema order)
+ */
 export default function FeatureBuilder({ values, setValues, maxFeatures }) {
     const groups = useMemo(() => {
         const map = new Map();

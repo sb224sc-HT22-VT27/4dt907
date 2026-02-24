@@ -1,3 +1,8 @@
+// Feature schema source of truth for the UI.
+//
+// IMPORTANT:
+// - The order of features here drives the ordered feature vector sent to the backend.
+// - If the backend model expects a different order/count, update this schema (or add a mapping layer).
 export const FEATURE_GROUPS = [
   {
     title: "Angle deviation (13)",
