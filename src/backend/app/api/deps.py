@@ -1,5 +1,9 @@
-"""
-Shared dependencies for endpoints (placeholder for future auth, DB sessions, settings, etc.).
+"""app.api.deps
+
+Shared FastAPI dependencies used across routers/endpoints.
+
+This module is a home for small DI helpers (request metadata, auth, settings,
+DB sessions, etc.). Keep dependencies side effect free so they’re safe to import.
 """
 
 
