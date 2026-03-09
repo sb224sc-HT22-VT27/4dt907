@@ -256,8 +256,15 @@ def get_model(variant: str = "champion") -> Tuple[object, str] | None:
 def _expected_feature_count_from_model(model: object) -> int | None:
     """Best-effort extraction of expected feature count from a loaded sklearn model."""
     impl = getattr(model, "_model_impl", None)
+    # Try standard sklearn pyfunc path first, then fall back to impl itself
     sk_model = getattr(impl, "sklearn_model", None) if impl else None
+    if sk_model is None and impl is not None:
+        sk_model = impl
+
     n = getattr(sk_model, "n_features_in_", None) if sk_model else None
+    if n is None and sk_model is not None and hasattr(sk_model, "steps"):
+        # Pipeline: top-level may not expose n_features_in_, check the first fitted step
+        n = getattr(sk_model.steps[0][1], "n_features_in_", None)
     return int(n) if n is not None else None
 
 
