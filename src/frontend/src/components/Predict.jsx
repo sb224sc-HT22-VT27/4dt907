@@ -100,6 +100,7 @@ export default function Predict() {
   const [hint, setHint] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [responseTimeMs, setResponseTimeMs] = useState(null);
   const [error, setError] = useState("");
   // Prediction endpoint depends on task (primary vs weakest-link) and model variant (champion/latest).
   const endpoint = useMemo(() => {
@@ -304,6 +305,7 @@ export default function Predict() {
   async function onPredict() {
     setError("");
     setResult(null);
+    setResponseTimeMs(null);
 
     if (!hasExpected) {
       setError("Model info is still loading — try again in a moment.");
@@ -319,6 +321,7 @@ export default function Predict() {
     }
 
     setLoading(true);
+    const startTime = Date.now();
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -327,10 +330,12 @@ export default function Predict() {
       });
 
       const data = await res.json().catch(() => ({}));
+      const elapsed = Date.now() - startTime;
       if (!res.ok)
         return setError(data?.detail || `Request failed (${res.status})`);
 
       setResult(data);
+      setResponseTimeMs(elapsed);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -375,6 +380,7 @@ export default function Predict() {
                     onChange={(e) => {
                       setError("");
                       setResult(null);
+                      setResponseTimeMs(null);
                       setTask(e.target.value);
                     }}
                     className="ios-input w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
@@ -393,6 +399,7 @@ export default function Predict() {
                     onChange={(e) => {
                       setError("");
                       setResult(null);
+                      setResponseTimeMs(null);
                       setVariant(e.target.value);
                     }}
                     className="ios-input w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
@@ -499,6 +506,10 @@ export default function Predict() {
                 <div className="mt-2">
                   <span className="text-slate-500">Run ID:</span>{" "}
                   <code className="break-all">{result?.run_id ?? "—"}</code>
+                </div>
+                <div className="mt-2">
+                  <span className="text-slate-500">Response time:</span>{" "}
+                  <code className="font-semibold">{responseTimeMs != null ? `${responseTimeMs} ms` : "—"}</code>
                 </div>
               </div>
             ) : null}
