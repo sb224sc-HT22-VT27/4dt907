@@ -181,42 +181,74 @@
 \section{A5b --- Hyperparameter Tuning}
 
 \begin{frame}{A5b --- Hyperparameter Tuning}
-    \begin{block}{Coming soon}
-        This slide is reserved for A5b results and will be completed by the
-        team after the hyperparameter-tuning sprint.
-    \end{block}
-
-    \textbf{Topics to cover:}
+    \textbf{Tuning of models}
     \begin{itemize}
-        \item Hyperparameter search strategy (grid / random / Bayesian)
-        \item Parameters tuned for A2 regression ensemble
-        \item Parameters tuned for A3 classification ensemble
-        \item Outcome and whether statistical significance was achieved
-        \item SVM exploration for next sprint
+        \item Tested different hyperparameters for A2 and A3 ensembles
+        \item No statistically significant improvement found ($p > 0.05$)
+        \item Tested different tree-based classifiers inside stacking ensembles
+    \end{itemize}
+    \vspace{0.5em}
+    \textbf{Prepared for next sprint}
+    \begin{itemize}
+        \item Investigated SVMs and how to integrate into the stacking ensemble
+    \end{itemize}
+    \vspace{0.5em}
+    \textbf{Retroactive review}
+    \begin{itemize}
+        \item Reviewed prior work for faults, mistakes and potential improvements
+        \item Improved codebase and documentation
     \end{itemize}
 \end{frame}
 
 \section{A6 --- Current Sprint}
 
-\begin{frame}{A6 --- Current Sprint}
-    \begin{block}{Coming soon}
-        This slide is reserved for A6 results and will be completed by the
-        team at the end of the current sprint.
-    \end{block}
-
-    \textbf{Planned topics:}
+\begin{frame}{A6 --- SVM Hyperparameter Optimisation}
+    \textbf{Goal:} Find the best SVM for A3 weak-link classification.
+    \vspace{0.3em}
+    \begin{table}
+        \small
+        \begin{tabular}{l r r r r}
+            \toprule
+            \textbf{Search} & \textbf{Kernel} & \textbf{C} & \textbf{Gamma} & \textbf{F1 Mean} \\
+            \midrule
+            RandomizedSearchCV & rbf  & 10  & auto  & 0.5972 \\
+            GridSearchCV       & rbf  & 5   & 0.02  & 0.6026 \\
+            Refined grid       & \textbf{rbf} & \textbf{5} & \textbf{0.020} & \textbf{0.6026} \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \vspace{0.3em}
+    \textbf{Integration into ensemble}
     \begin{itemize}
-        \item New model or technique introduced this sprint
-        \item Results and comparison to previous champion
-        \item Statistical significance tests
-        \item Next steps
+        \item Optimal SVM (\texttt{rbf}, $C=5$, $\gamma=0.02$) added to level-0 models
+        \item Small but positive improvement to ensemble F1
     \end{itemize}
+    \vspace{0.3em}
 \end{frame}
 
 \section{Metrics}
 
-\begin{frame}{Metrics --- Requested Training Metrics}
+\begin{frame}{Metrics --- 5-Fold Cross-Validation}
+    \begin{columns}
+        \column{0.48\textwidth}
+        \textbf{A2 --- Regression}
+        \begin{itemize}
+            \item $R^2$ Mean: \textbf{0.7913}
+            \item F1 Mean: 0.0129
+        \end{itemize}
 
+        \column{0.48\textwidth}
+        \textbf{A3 --- Classification}
+        \begin{itemize}
+            \item F1 Mean: \textbf{0.6242}
+            \item Std: 0.0183
+        \end{itemize}
+    \end{columns}
+    \vspace{0.5em}
+    \begin{block}{Note}
+        5-fold CV was run against \textit{@prod}, \textit{@dev} and \textit{@backup}
+        models to provide a standardised comparison metric.
+    \end{block}
 \end{frame}
 
 \section{Summary}
@@ -233,8 +265,8 @@
             A3  & Weak-link classification          & F1 0.598                 \\
             A4  & Lasso + statistical comparison    & R\textsuperscript{2} 0.773      \\
             A5  & Stacking ensembles                & $p<0.05$ improvement     \\
-            A5b & Hyperparameter tuning             & \textit{TBD}             \\
-            A6  & Current sprint                    & \textit{TBD}             \\
+            A5b & Hyperparameter tuning             & F1 0.6026 (SVM)          \\
+            A6  & SVM + ensemble integration         & F1 0.6242 (5-fold CV)    \\
             \bottomrule
         \end{tabular}
     \end{table}
