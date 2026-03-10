@@ -74,8 +74,8 @@ When we found the optimized SVM we added that to the level0 models. This increas
 # 5 Fold CV results
 As we used 10 folds in our own comparisons a script was added to our utils diles that loaded the models @prod, @dev and @backup and did a new cross validation using 5 folds. This gave the following results.
 ## A2
-R2 Mean: 0.7798
-F1 Mean: 0.0102
+R2 Mean: 0.7913 
+F1 Mean: 0.0129
 ## A3
 F1 Mean: 0.6242
 STD Mean: 0.0183
