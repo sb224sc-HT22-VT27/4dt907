@@ -1,5 +1,10 @@
 \documentclass{beamer}
 
+\usepackage{booktabs}
+
+\tolerance=1413
+\hfuzz=3pt
+
 \usetheme{Pittsburgh} % Pittsburgh, AnnArbor, CambridgeUS
 \usepackage{url}
 \urlstyle{same}
@@ -12,9 +17,7 @@
 
 \begin{document}
 
-\begin{frame}
-    \titlepage
-\end{frame}
+\begin{frame}\titlepage\end{frame}
 
 \begin{frame}{Agenda}
     \tableofcontents
@@ -67,14 +70,14 @@
     \begin{table}
         \small
         \begin{tabular}{l l r}
-            \hline
+            \toprule
             \textbf{Iteration} & \textbf{Strategy} & \textbf{R\textsuperscript{2} Mean} \\
-            \hline
+            \midrule
             1 & Baseline Linear Regression   & 0.641 \\
             2 & Feature selection            & 0.543 \\
             3 & Outlier removal (Cook's $\times$3) & \textbf{0.706} \\
             4 & Weighted regression          & 0.544 \\
-            \hline
+            \bottomrule
         \end{tabular}
     \end{table}
     \vspace{0.5em}
@@ -92,15 +95,15 @@
     \begin{table}
         \small
         \begin{tabular}{l l r r}
-            \hline
+            \toprule
             \textbf{Iter} & \textbf{Model} & \textbf{F1 Mean} & \textbf{F1 Std} \\
-            \hline
+            \midrule
             1   & Random Forest (baseline)       & 0.590 & 0.019 \\
             1.2 & RFC (tuned params)             & 0.594 & 0.034 \\
             2   & Logistic Regression            & 0.534 & 0.026 \\
             3   & Gradient Boosting (GBC)        & \textbf{0.598} & 0.030 \\
-            4   & Extra Trees / Na{\"i}ve Bayes      & $\leq$0.45 & --- \\
-            \hline
+            4   & Extra Trees / Na\"{\i}ve Bayes & $\leq$0.45 & --- \\
+            \bottomrule
         \end{tabular}
     \end{table}
     \vspace{0.5em}
@@ -162,7 +165,7 @@
     \textbf{Goal:} Improve A3 classification with a Stacking Classifier.
     \vspace{0.5em}
     \begin{itemize}
-        \item Level 0: RFC, Extra Trees, Na{\"i}ve Bayes, Logistic Regression
+        \item Level 0: RFC, Extra Trees, Na\"{\i}ve Bayes, Logistic Regression
         \item Level 1: Logistic Regression
         \item Initial ensemble showed \textbf{no significant gain} ($p > 0.05$)
     \end{itemize}
@@ -175,7 +178,7 @@
     \end{enumerate}
 \end{frame}
 
-\section{A5b -- Hyperparameter Tuning}
+\section{A5b --- Hyperparameter Tuning}
 
 \begin{frame}{A5b --- Hyperparameter Tuning}
     \begin{block}{Coming soon}
@@ -210,23 +213,29 @@
     \end{itemize}
 \end{frame}
 
+\section{Metrics}
+
+\begin{frame}{Metrics --- Requested Training Metrics}
+
+\end{frame}
+
 \section{Summary}
 
 \begin{frame}{Summary --- ML Progress}
     \begin{table}
         \small
         \begin{tabular}{l l l}
-            \hline
+            \toprule
             \textbf{Assignment} & \textbf{Topic} & \textbf{Best Result} \\
-            \hline
-            A1  & Project setup \& infrastructure  & ---                       \\
+            \midrule
+            A1  & Project setup \& infrastructure   & ---                       \\
             A2  & Linear regression (AimoScore)     & R\textsuperscript{2} 0.706      \\
             A3  & Weak-link classification          & F1 0.598                 \\
             A4  & Lasso + statistical comparison    & R\textsuperscript{2} 0.773      \\
             A5  & Stacking ensembles                & $p<0.05$ improvement     \\
             A5b & Hyperparameter tuning             & \textit{TBD}             \\
             A6  & Current sprint                    & \textit{TBD}             \\
-            \hline
+            \bottomrule
         \end{tabular}
     \end{table}
     \vspace{0.5em}
