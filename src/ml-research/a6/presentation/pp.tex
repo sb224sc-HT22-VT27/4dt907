@@ -1,9 +1,13 @@
 \documentclass{beamer}
 
-\usetheme{Madrid} % Change maybe
+\usetheme{Madrid}
+\usepackage{url}
+\urlstyle{same}
 
-\title{4DT907 A6 Current State Presentation}
-\author{Emil Ulvagården, Jesper Wingren, Nasser Al-Obaedi \& Samuel Berg}
+\title{4DT907 -- Current State Presentation}
+\subtitle{ML Research Progress: A1--A6}
+\author{Emil Ulvag\r{a}rden \and Jesper Wingren \and Nasser Al-Obaedi \and Samuel Berg}
+\institute{4DT907 -- Project in Data Intensive Systems}
 \date{\today}
 
 \begin{document}
@@ -12,11 +16,227 @@
     \titlepage
 \end{frame}
 
-\begin{frame}{Introduction to Beamer}
+\begin{frame}{Agenda}
+    \tableofcontents
+\end{frame}
+
+\section{A1 -- Project Setup}
+
+\begin{frame}{A1 -- Project Setup \& Infrastructure}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Team Roles}
+        \begin{itemize}
+            \item \textbf{Samuel} -- Scrum Master / DevOps
+            \item \textbf{Nasser} -- Full-stack Developer
+            \item \textbf{Emil} -- Tester / QA
+            \item \textbf{Jesper} -- Data Scientist / ML
+        \end{itemize}
+
+        \column{0.5\textwidth}
+        \textbf{Infrastructure}
+        \begin{itemize}
+            \item Python 3.12 + FastAPI backend
+            \item React + Vite frontend
+            \item Docker / Docker Compose
+            \item GitHub Actions CI/CD
+            \item MLflow on DagsHub
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{A1 -- ML Experiment Tracking}
     \begin{itemize}
-        \item It creates PDF slides directly.
-        \item You can use \textbf{bold text} or \textit{italics}.
-        \item It handles math beautifully: $e^{i\pi} + 1 = 0$.
+        \item Experiments tracked with \textbf{MLflow} hosted on \textbf{DagsHub}
+        \item Shared \texttt{ml\_utils.py} utility file for consistent logging
+        \item All runs log metrics, parameters and artifacts
+        \item Automated model selection via champion/challenger pattern
+    \end{itemize}
+    \vspace{0.5em}
+    \begin{block}{Logged Artifacts}
+        Metrics (R\textsuperscript{2}, MSE, MAE, F1), parameters, correlation
+        heatmaps, cross-validation fold scores
+    \end{block}
+\end{frame}
+
+\section{A2 -- Regression Model}
+
+\begin{frame}{A2 -- Regression Model (AimoScore)}
+    \textbf{Goal:} Predict a continuous AimoScore from body-movement features.
+    \vspace{0.5em}
+    \begin{table}
+        \small
+        \begin{tabular}{l l r}
+            \hline
+            \textbf{Iteration} & \textbf{Strategy} & \textbf{R\textsuperscript{2} Mean} \\
+            \hline
+            1 & Baseline Linear Regression   & 0.641 \\
+            2 & Feature selection            & 0.543 \\
+            3 & Outlier removal (Cook's $\times$3) & \textbf{0.706} \\
+            4 & Weighted regression          & 0.544 \\
+            \hline
+        \end{tabular}
+    \end{table}
+    \vspace{0.5em}
+    \begin{itemize}
+        \item Cook's distance with threshold multiplier 3 gave the best result
+        \item Best model promoted to \textit{production} in MLflow/DagsHub
+    \end{itemize}
+\end{frame}
+
+\section{A3 -- Classification Model}
+
+\begin{frame}{A3 -- Weak-Link Classification}
+    \textbf{Goal:} Classify the \textit{weak-link} body movement from sensor data.
+    \vspace{0.5em}
+    \begin{table}
+        \small
+        \begin{tabular}{l l r r}
+            \hline
+            \textbf{Iter} & \textbf{Model} & \textbf{F1 Mean} & \textbf{F1 Std} \\
+            \hline
+            1   & Random Forest (baseline)       & 0.590 & 0.019 \\
+            1.2 & RFC (tuned params)             & 0.594 & 0.034 \\
+            2   & Logistic Regression            & 0.534 & 0.026 \\
+            3   & Gradient Boosting (GBC)        & \textbf{0.598} & 0.030 \\
+            4   & Extra Trees / Na{\"i}ve Bayes      & $\leq$0.45 & -- \\
+            \hline
+        \end{tabular}
+    \end{table}
+    \vspace{0.5em}
+    \begin{itemize}
+        \item GBC selected as production champion
+        \item Difficulty classifying \textit{rightarmfallforward} / \textit{leftarmfallforward}
+    \end{itemize}
+\end{frame}
+
+\section{A4 -- Model Comparison \& Improvement}
+
+\begin{frame}{A4 -- Statistical Comparison \& Lasso Improvement}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{T-test Framework (ml\_utils)}
+        \begin{itemize}
+            \item Compares challenger vs.\ production k-fold CV scores
+            \item Produces p-value + visual plot
+            \item Also compares confidence across \textit{test}, \textit{dev} and \textit{prod}
+        \end{itemize}
+
+        \column{0.5\textwidth}
+        \textbf{A2 Improvement with Lasso}
+        \begin{itemize}
+            \item Pipeline: StandardScaler + PolynomialFeatures + LassoCV
+            \item R\textsuperscript{2} Mean: \textbf{0.773}
+            \item MAE Mean: 0.080
+        \end{itemize}
+    \end{columns}
+    \vspace{0.5em}
+    \begin{block}{DevOps -- Vercel Deployment}
+        Application deployed to \url{https://4dt907.vercel.app/} with
+        Dependabot enabled for automated security patches.
+    \end{block}
+\end{frame}
+
+\section{A5 -- Ensemble Methods}
+
+\begin{frame}{A5 -- Stacking Ensemble (Regression)}
+    \textbf{Goal:} Improve A2 regression with a Stacking Regressor.
+    \vspace{0.5em}
+    \begin{itemize}
+        \item \textbf{Champion architecture:}
+              \begin{itemize}
+                  \item Level 0: Random Forest, Gradient Boosting, Lasso
+                  \item Level 1: Lasso with \textit{feature passthrough}
+              \end{itemize}
+        \item Feature passthrough gave meta-learner access to original features
+        \item $p < 0.05$ -- statistically significant improvement over previous prod
+    \end{itemize}
+    \vspace{0.5em}
+    \begin{alertblock}{Key finding}
+        Diversifying the base learners (tree-based + linear) was essential to
+        break the correlation between level-0 errors.
+    \end{alertblock}
+\end{frame}
+
+\begin{frame}{A5 -- Stacking Ensemble (Classification)}
+    \textbf{Goal:} Improve A3 classification with a Stacking Classifier.
+    \vspace{0.5em}
+    \begin{itemize}
+        \item Level 0: RFC, Extra Trees, Na{\"i}ve Bayes, Logistic Regression
+        \item Level 1: Logistic Regression
+        \item Initial ensemble showed \textbf{no significant gain} ($p > 0.05$)
+    \end{itemize}
+    \vspace{0.5em}
+    \textbf{Class Imbalance Strategies Tried}
+    \begin{enumerate}
+        \item Full oversampling to $\sim$600 samples -- overfitting, worse results
+        \item Thresholded oversampling ($<$50 samples) -- marginal F1 improvement
+        \item Data pruning (drop classes $<$10 instances) -- cleaner confusion matrix
+    \end{enumerate}
+\end{frame}
+
+\section{A5b -- Hyperparameter Tuning}
+
+\begin{frame}{A5b -- Hyperparameter Tuning}
+    % ── Placeholder: fill in A5b content ─────────────────────────────────────
+    \begin{block}{Coming soon}
+        This slide is reserved for A5b results and will be completed by the
+        team after the hyperparameter-tuning sprint.
+    \end{block}
+
+    \textbf{Topics to cover:}
+    \begin{itemize}
+        \item Hyperparameter search strategy (grid / random / Bayesian)
+        \item Parameters tuned for A2 regression ensemble
+        \item Parameters tuned for A3 classification ensemble
+        \item Outcome and whether statistical significance was achieved
+        \item SVM exploration for next sprint
+    \end{itemize}
+\end{frame}
+
+\section{A6 -- Current Sprint}
+
+\begin{frame}{A6 -- Current Sprint}
+    % ── Placeholder: fill in A6 content ──────────────────────────────────────
+    \begin{block}{Coming soon}
+        This slide is reserved for A6 results and will be completed by the
+        team at the end of the current sprint.
+    \end{block}
+
+    \textbf{Planned topics:}
+    \begin{itemize}
+        \item New model or technique introduced this sprint
+        \item Results and comparison to previous champion
+        \item Statistical significance tests
+        \item Next steps
+    \end{itemize}
+\end{frame}
+
+\section{Summary}
+
+\begin{frame}{Summary -- ML Progress}
+    \begin{table}
+        \small
+        \begin{tabular}{l l l}
+            \hline
+            \textbf{Assignment} & \textbf{Topic} & \textbf{Best Result} \\
+            \hline
+            A1  & Project setup \& infrastructure  & --                       \\
+            A2  & Linear regression (AimoScore)     & R\textsuperscript{2} 0.706      \\
+            A3  & Weak-link classification          & F1 0.598                 \\
+            A4  & Lasso + statistical comparison    & R\textsuperscript{2} 0.773      \\
+            A5  & Stacking ensembles                & $p<0.05$ improvement     \\
+            A5b & Hyperparameter tuning             & \textit{TBD}             \\
+            A6  & Current sprint                    & \textit{TBD}             \\
+            \hline
+        \end{tabular}
+    \end{table}
+    \vspace{0.5em}
+    \begin{itemize}
+        \item All experiments tracked in \textbf{MLflow on DagsHub}
+        \item Champion/challenger pattern ensures only significant improvements
+              are promoted to production
+        \item Application live at \url{https://4dt907.vercel.app/}
     \end{itemize}
 \end{frame}
 
