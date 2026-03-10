@@ -66,3 +66,16 @@ refined_param_grid = {
 | 8 | 0.5927 | 0.0251 | rbf | 3 | 0.025 |
 | 9 | 0.5926 | 0.0276 | rbf | 4 | 0.020 |
 | 10 | 0.5891 | 0.0324 | rbf | 3 | 0.020 |
+
+# Implementation into ensemble
+When we found the optimized SVM we added that to the level0 models. This increased the F1 by a small bit but not significantly better.
+
+
+# 5 Fold CV results
+As we used 10 folds in our own comparisons a script was added to our utils diles that loaded the models @prod, @dev and @backup and did a new cross validation using 5 folds. This gave the following results.
+## A2
+R2 Mean: 0.7798
+F1 Mean: 0.0102
+## A3
+F1 Mean: 0.6242
+STD Mean: 0.0183
