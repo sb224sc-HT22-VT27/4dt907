@@ -1,6 +1,8 @@
-# Grid optimization
+# Assignment 6 Report
 
-## RandomizedSearchCV 
+## Grid optimization
+
+### RandomizedSearchCV 
 RandomizedSearchCV to find around where the optimal could be, gave this result.
 
 | Rank | Mean F1 (Weighted) | Std Dev | Kernel | C | Gamma | Degree | Coef0 |
@@ -16,7 +18,7 @@ RandomizedSearchCV to find around where the optimal could be, gave this result.
 | 9 | 0.5585 | 0.0119 | linear | 100 | 0.01 | 3 | 0.0 |
 | 10 | 0.5585 | 0.0119 | linear | 100 | scale | 2 | 0.0 |
 
-## GridsearchCV
+### GridsearchCV
 
 We then used GridSearchCV for poly and rbf aswell as narrowing the other values 
 
@@ -43,7 +45,7 @@ refined_param_grid = {
 | 7 | 0.5972 | 0.0328 | rbf | 10 | auto | 1.0 | 3 |
 | 10 | 0.5969 | 0.0270 | rbf | 8 | auto | 0.5 | 3 |
 
-## Further improving
+### Further improving
 
 ```python
 refined_param_grid = {
@@ -67,15 +69,22 @@ refined_param_grid = {
 | 9 | 0.5926 | 0.0276 | rbf | 4 | 0.020 |
 | 10 | 0.5891 | 0.0324 | rbf | 3 | 0.020 |
 
-# Implementation into ensemble
+## Implementation into ensemble
 When we found the optimized SVM we added that to the level0 models. This increased the F1 by a small bit but not significantly better.
 
 
-# 5 Fold CV results
-As we used 10 folds in our own comparisons a script was added to our utils diles that loaded the models @prod, @dev and @backup and did a new cross validation using 5 folds. This gave the following results.
-## A2
+## 5 Fold CV results
+As we used 10 folds in our own comparisons a script was added to our utils file that loaded the models @prod, @dev and @backup and did a new cross validation using 5 folds. This gave the following results.
+### A2
 R2 Mean: 0.7913 
-F1 Mean: 0.0129
-## A3
+std: 0.0129
+### A3
 F1 Mean: 0.6242
-STD Mean: 0.0183
+std: 0.0183
+
+## More tuning of A2
+We also tuned the A2 model ensemble using different models inside the level0 and level1 models. We tried diferent stacking ensembles and regressors and icluded SVR into our level0. Using RF, GB, KNN, SVR in level0 and GradientBoosting in level1 we reached a new champion which was significantly better p<0.05 than previous prod. 
+10-Fold CV:
+R2 Mean: 0.7955
+std: 0.02013
+
