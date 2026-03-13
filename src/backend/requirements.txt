@@ -3,4 +3,5 @@ uvicorn
 mlflow-skinny
 pandas
 scikit-learn
+imbalanced-learn
 python-dotenv
