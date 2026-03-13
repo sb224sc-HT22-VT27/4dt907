@@ -1,8 +1,11 @@
+import mlflow
 from mlflow.tracking import MlflowClient
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import stats
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score
 
 
 class mlutils:
@@ -221,3 +224,106 @@ class mlutils:
         except Exception as e:
             print(f"Error: {e}")
             return True, 1.0
+
+    def compare_all_registry_aliases(self, X, y, n_splits=5):
+        """
+        Pulls exactly the version tied to each alias and runs a 5-Fold CV.
+        Matches the backend's preference for concrete version loading.
+        """
+        results = {}
+        aliases = ["prod", "dev", "backup"]
+        kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+        print(f"\n--- Registry Validation: Comparing Aliases {aliases} ---")
+
+        for alias in aliases:
+            try:
+                # 1. Ask the client: "What version is currently tagged as this alias?"
+                # This call works even if the models:/ URI syntax doesn't.
+                print("getting version for ", alias)
+                model_version_entity = self.client.get_model_version_by_alias(self.model_name, alias)
+                print("Loaded model", model_version_entity)
+                version = model_version_entity.version
+
+                print("Loaded model version", version)
+                
+                # 2. Build the concrete URI: models:/Name/Version
+                # DagsHub supports this format perfectly.
+                model_uri = f"models:/{self.model_name}/{version}"
+                
+                print(f"Testing @{alias} (Resolved to Version {version})...")
+                
+                # 3. Load the native sklearn model
+                loaded_model = mlflow.sklearn.load_model(model_uri)
+                
+                # 4. Run CV
+                scores = cross_val_score(loaded_model, X, y, cv=kf, scoring='f1_weighted', n_jobs=-1)
+                results[alias] = scores
+                
+            except Exception as e:
+                # If the alias simply doesn't exist yet, we catch it here
+                print(f"Note: Could not load alias '@{alias}'. Error: {e}")
+                results[alias] = None
+
+        # Print Comparison Table
+        print("\n" + "="*50)
+        print(f"{'ALIAS':<10} | {'VERSION':<8} | {'MEAN F1':<10} | {'STD DEV':<10}")
+        print("-" * 50)
+        for alias, scores in results.items():
+            if scores is not None:
+                # Get the version again for the table display
+                v = self.client.get_model_version_by_alias(self.model_name, alias).version
+                print(f"{alias:<10} | {v:<8} | {scores.mean():.4f}     | {scores.std():.4f}")
+            else:
+                print(f"{alias:<10} | {'N/A':<8} | {'N/A':<10}     | {'N/A':<10}")
+        print("="*50 + "\n")
+
+        return results
+    
+    def compare_all_registry_aliases_r2(self, X, y, n_splits=5):
+        """
+        Pulls @prod, @dev, and @backup models and runs 5-Fold CV for R2.
+        Bypasses DagsHub URI errors by resolving aliases to version numbers.
+        """
+        results = {}
+        aliases = ["prod", "dev", "backup"]
+        
+        # Use KFold for Regression (A2)
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+        print(f"\n--- Registry Validation: Comparing {aliases} (5-Fold R2) ---")
+
+        for alias in aliases:
+            try:
+                # 1. Resolve alias to version (Stable DagsHub handshake)
+                ver_entity = self.client.get_model_version_by_alias(self.model_name, alias)
+                version = ver_entity.version
+                
+                # 2. Build concrete URI
+                model_uri = f"models:/{self.model_name}/{version}"
+                
+                # 3. Load native sklearn model
+                loaded_model = mlflow.sklearn.load_model(model_uri)
+
+                print(f"Testing @{alias} (Version {version})...")
+                
+                # 4. Run CV using R2
+                scores = cross_val_score(loaded_model, X, y, cv=kf, scoring='r2', n_jobs=-1)
+                results[alias] = scores
+                
+            except Exception as e:
+                print(f"Note: Alias '@{alias}' not found or could not be loaded.")
+                results[alias] = None
+
+        # Print Comparison Table
+        print("\n" + "="*50)
+        print(f"{'ALIAS':<10} | {'MEAN R2':<10} | {'STD DEV':<10}")
+        print("-" * 50)
+        for alias, scores in results.items():
+            if scores is not None:
+                print(f"{alias:<10} | {scores.mean():.4f}     | {scores.std():.4f}")
+            else:
+                print(f"{alias:<10} | {'N/A':<10}     | {'N/A':<10}")
+        print("="*50 + "\n")
+
+        return results
