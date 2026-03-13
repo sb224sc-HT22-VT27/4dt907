@@ -1,0 +1,283 @@
+\documentclass{beamer}
+
+\usepackage{booktabs}
+
+\tolerance=1413
+\hfuzz=3pt
+
+\usetheme{Pittsburgh}
+\usepackage{url}
+\urlstyle{same}
+
+\title{4DT907 --- Current State Presentation}
+\subtitle{ML Research Progress: A1--A6}
+\author{Emil Ulvag\r{a}rden \and Jesper Wingren \and Nasser Al-Obaedi \and Samuel Berg}
+\institute{4DT907 --- Project in Data Intensive Systems}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}\titlepage\end{frame}
+
+\begin{frame}{Agenda}
+    \tableofcontents
+\end{frame}
+
+\section{A1 --- Project Setup}
+
+\begin{frame}{A1 --- Project Setup \& Infrastructure}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Team Roles}
+        \begin{itemize}
+            \item \textbf{Samuel} --- Scrum Master / DevOps
+            \item \textbf{Nasser} --- Full-stack Developer
+            \item \textbf{Emil} --- Tester / QA
+            \item \textbf{Jesper} --- Data Scientist / ML
+        \end{itemize}
+
+        \column{0.5\textwidth}
+        \textbf{Infrastructure}
+        \begin{itemize}
+            \item Python 3.12 + FastAPI backend
+            \item React + Vite frontend
+            \item Docker / Docker Compose
+            \item GitHub Actions CI/CD
+            \item MLflow on DagsHub
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{A1 --- ML Experiment Tracking}
+    \begin{itemize}
+        \item Experiments tracked with \textbf{MLflow} hosted on \textbf{DagsHub}
+        \item Shared \texttt{ml\_utils.py} utility file for consistent logging
+        \item All runs log metrics, parameters and artifacts
+        \item Automated model selection via champion/challenger pattern
+    \end{itemize}
+    \vspace{0.5em}
+    \begin{block}{Logged Artifacts}
+        Metrics (R\textsuperscript{2}, MSE, MAE, F1), parameters, correlation
+        heatmaps, cross-validation fold scores
+    \end{block}
+\end{frame}
+
+\section{A2 --- Regression Model}
+
+\begin{frame}{A2 --- Regression Model (AimoScore)}
+    \textbf{Goal:} Predict a continuous AimoScore from body-movement features.
+    \vspace{0.5em}
+    \begin{table}
+        \small
+        \begin{tabular}{l l r}
+            \toprule
+            \textbf{Iteration} & \textbf{Strategy} & \textbf{R\textsuperscript{2} Mean} \\
+            \midrule
+            1 & Baseline Linear Regression   & 0.641 \\
+            2 & Feature selection            & 0.543 \\
+            3 & Outlier removal (Cook's $\times$3) & \textbf{0.706} \\
+            4 & Weighted regression          & 0.544 \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \vspace{0.5em}
+    \begin{itemize}
+        \item Cook's distance with threshold multiplier 3 gave the best result
+        \item Best model promoted to \textit{production} in MLflow/DagsHub
+    \end{itemize}
+\end{frame}
+
+\section{A3 --- Classification Model}
+
+\begin{frame}{A3 --- Weak-Link Classification}
+    \textbf{Goal:} Classify the \textit{weak-link} body movement from sensor data.
+    \vspace{0.5em}
+    \begin{table}
+        \small
+        \begin{tabular}{l l r r}
+            \toprule
+            \textbf{Iter} & \textbf{Model} & \textbf{F1 Mean} & \textbf{F1 Std} \\
+            \midrule
+            1   & Random Forest (baseline)       & 0.590 & 0.019 \\
+            1.2 & RFC (tuned params)             & 0.594 & 0.034 \\
+            2   & Logistic Regression            & 0.534 & 0.026 \\
+            3   & Gradient Boosting (GBC)        & \textbf{0.598} & 0.030 \\
+            4   & Extra Trees / Na\"{\i}ve Bayes & $\leq$0.45 & --- \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \vspace{0.5em}
+    \begin{itemize}
+        \item GBC selected as production champion
+        \item Difficulty classifying \textit{rightarmfallforward} / \textit{leftarmfallforward}
+    \end{itemize}
+\end{frame}
+
+\section{A4 --- Model Comparison \& Improvement}
+
+\begin{frame}{A4 --- Statistical Comparison \& Lasso Improvement}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{T-test Framework (ml\_utils)}
+        \begin{itemize}
+            \item Compares challenger vs.\ production k-fold CV scores
+            \item Produces p-value + visual plot
+            \item Also compares confidence across \textit{test}, \textit{dev} and \textit{prod}
+        \end{itemize}
+
+        \column{0.5\textwidth}
+        \textbf{A2 Improvement with Lasso}
+        \begin{itemize}
+            \item Pipeline: StandardScaler + PolynomialFeatures + LassoCV
+            \item R\textsuperscript{2} Mean: \textbf{0.773}
+            \item MAE Mean: 0.080
+        \end{itemize}
+    \end{columns}
+    \vspace{0.5em}
+    \begin{block}{DevOps --- Vercel Deployment}
+        Application deployed to \url{https://4dt907.vercel.app/} with
+        Dependabot enabled for automated security patches.
+    \end{block}
+\end{frame}
+
+\section{A5 --- Ensemble Methods}
+
+\begin{frame}{A5 --- Stacking Ensemble (Regression)}
+    \textbf{Goal:} Improve A2 regression with a Stacking Regressor.
+    \vspace{0.5em}
+    \begin{itemize}
+        \item \textbf{Champion architecture:}
+              \begin{itemize}
+                  \item Level 0: Random Forest, Gradient Boosting, Lasso
+                  \item Level 1: Lasso with \textit{feature passthrough}
+              \end{itemize}
+        \item Feature passthrough gave meta-learner access to original features
+        \item $p < 0.05$ --- statistically significant improvement over previous prod
+    \end{itemize}
+    \vspace{0.5em}
+    \begin{alertblock}{Key finding}
+        Diversifying the base learners (tree-based + linear) was essential to
+        break the correlation between level-0 errors.
+    \end{alertblock}
+\end{frame}
+
+\begin{frame}{A5 --- Stacking Ensemble (Classification)}
+    \textbf{Goal:} Improve A3 classification with a Stacking Classifier.
+    \vspace{0.5em}
+    \begin{itemize}
+        \item Level 0: RFC, Extra Trees, Na\"{\i}ve Bayes, Logistic Regression
+        \item Level 1: Logistic Regression
+        \item Initial ensemble showed \textbf{no significant gain} ($p > 0.05$)
+    \end{itemize}
+    \vspace{0.5em}
+    \textbf{Class Imbalance Strategies Tried}
+    \begin{enumerate}
+        \item Full oversampling to $\sim$600 samples --- overfitting, worse results
+        \item Thresholded oversampling ($<$50 samples) --- marginal F1 improvement
+        \item Data pruning (drop classes $<$10 instances) --- cleaner confusion matrix
+    \end{enumerate}
+\end{frame}
+
+\section{A5b --- Hyperparameter Tuning}
+
+\begin{frame}{A5b --- Hyperparameter Tuning}
+    \textbf{Tuning of models}
+    \begin{itemize}
+        \item Tested different hyperparameters for A2 and A3 ensembles
+        \item No statistically significant improvement found ($p > 0.05$)
+        \item Tested different tree-based classifiers inside stacking ensembles
+    \end{itemize}
+    \vspace{0.5em}
+    \textbf{Prepared for next sprint}
+    \begin{itemize}
+        \item Investigated SVMs and how to integrate into the stacking ensemble
+    \end{itemize}
+    \vspace{0.5em}
+    \textbf{Retroactive review}
+    \begin{itemize}
+        \item Reviewed prior work for faults, mistakes and potential improvements
+        \item Improved codebase and documentation
+    \end{itemize}
+\end{frame}
+
+\section{A6 --- Current Sprint}
+
+\begin{frame}{A6 --- SVM Hyperparameter Optimisation}
+    \textbf{Goal:} Find the best SVM for A3 weak-link classification.
+    \vspace{0.3em}
+    \begin{table}
+        \small
+        \begin{tabular}{l r r r r}
+            \toprule
+            \textbf{Search} & \textbf{Kernel} & \textbf{C} & \textbf{Gamma} & \textbf{F1 Mean} \\
+            \midrule
+            RandomizedSearchCV & rbf  & 10  & auto  & 0.5972 \\
+            GridSearchCV       & rbf  & 5   & 0.02  & 0.6026 \\
+            Refined grid       & \textbf{rbf} & \textbf{5} & \textbf{0.020} & \textbf{0.6026} \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \vspace{0.3em}
+    \textbf{Integration into ensemble}
+    \begin{itemize}
+        \item Optimal SVM (\texttt{rbf}, $C=5$, $\gamma=0.02$) added to level-0 models
+        \item Small but positive improvement to ensemble F1
+    \end{itemize}
+    \vspace{0.3em}
+\end{frame}
+
+\section{Metrics}
+
+\begin{frame}{Metrics --- 5-Fold Cross-Validation}
+    \begin{columns}
+        \column{0.48\textwidth}
+        \textbf{A2 --- Regression}
+        \begin{itemize}
+            \item $R^2$ Mean: \textbf{0.7913}
+            \item Std: 0.0129
+        \end{itemize}
+
+        \column{0.48\textwidth}
+        \textbf{A3 --- Classification}
+        \begin{itemize}
+            \item F1 Mean: \textbf{0.6242}
+            \item Std: 0.0183
+        \end{itemize}
+    \end{columns}
+    \vspace{0.5em}
+    \begin{block}{Note}
+        5-fold CV was run against \textit{@prod}, \textit{@dev} and \textit{@backup}
+        models to provide a standardised comparison metric.
+    \end{block}
+\end{frame}
+
+\section{Summary}
+
+\begin{frame}{Summary --- ML Progress}
+    \begin{table}
+        \small
+        \begin{tabular}{l l l}
+            \toprule
+            \textbf{Assignment} & \textbf{Topic}    & \textbf{Best Result}          \\
+            \midrule
+            A1  & Project setup \& infrastructure   & ---                           \\
+            A2  & Linear regression (AimoScore)     & R\textsuperscript{2} 0.706    \\
+            A3  & Weak-link classification          & F1 0.598                      \\
+            A4  & Lasso + statistical comparison    & R\textsuperscript{2} 0.773    \\
+            A5  & Stacking ensembles                & $p<0.05$ improvement          \\
+            A5b & Hyperparameter tuning             & ---               \\
+            A6  & SVM + ensemble integration        & F1 0.6242 (5-fold CV)         \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \vspace{0.5em}
+    \begin{itemize}
+        \item All experiments tracked in \textbf{MLflow on DagsHub}
+        \item Champion/challenger pattern ensures only significant improvements
+              are promoted to production
+        \item Application live at \url{https://4dt907.vercel.app/}
+        \item Application deployment backup split Vercel (frontend) and Render (backend)
+    \end{itemize}
+\end{frame}
+
+\end{document}
