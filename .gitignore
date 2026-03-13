@@ -254,3 +254,17 @@ __marimo__/
 # Vercel
 .vercel/
 .vercel
+
+# LaTeX
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Include
+!pp.pdf
