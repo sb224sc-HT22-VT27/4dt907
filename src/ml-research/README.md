@@ -11,7 +11,7 @@ Jupyter notebooks for ML experiments and assignment reporting. Each assignment h
 | $A3$ | Weak-Link classification setup | Tried RFC, Boosting, Logreg, and ETC. "Best" model from Boosting. |
 | $A4$ | Comparison of models and improving A2 | Implemented t-test to compare models into utils file aswell as improving A2 using Lasso. |
 | $A5$ | Ensemble implementation in A2 and A3 | Implemented stacking ensembles to bothe A2 and A3 to whcih improved results |
-| $A5b$ | - | - |
+| $A5b$ | Hyperparameter tuning | Tested different hyperparameters to try and improve results |
 | $A6$ | - | - |
 | $A7$ | - | - |
 | $A8$ | - | - |
