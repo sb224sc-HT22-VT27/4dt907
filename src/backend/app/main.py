@@ -65,6 +65,12 @@ ALLOWED_ORIGINS = [
 if os.getenv("VERCEL_URL"):
     ALLOWED_ORIGINS.append(f"https://{os.getenv("VERCEL_URL")}")
 
+# Render automatically sets RENDER_EXTERNAL_URL for the running service.
+# Add it so the backend accepts requests from the Vercel frontend when the
+# frontend is configured to call this Render service directly.
+if os.getenv("RENDER_EXTERNAL_URL"):
+    ALLOWED_ORIGINS.append(os.getenv("RENDER_EXTERNAL_URL"))
+
 # Ensure (if set) include any custom production URL
 if os.getenv("PRODUCTION_URL"):
     ALLOWED_ORIGINS.append(os.getenv("PRODUCTION_URL"))

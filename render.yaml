@@ -1,0 +1,37 @@
+# Render Infrastructure-as-Code
+# https://render.com/docs/infrastructure-as-code
+#
+# Defines the backend web service that runs the FastAPI app.
+# Connect your Render account to this repository and Render will automatically
+# pick up this file to create (or update) the service.
+
+services:
+  - type: web
+    name: 4dt907-backend
+    runtime: python
+    rootDir: src/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Health-check path used by Render to decide when the service is ready.
+    healthCheckPath: /health
+    envVars:
+      # Set these in the Render dashboard under Environment → Secret Files / Env Vars.
+      # See DEPLOYMENT.md for a full description of each variable.
+      - key: MLFLOW_TRACKING_URI
+        sync: false
+      - key: MODEL_URI_PROD
+        sync: false
+      - key: MODEL_URI_DEV
+        sync: false
+      - key: MODEL_URI_BACKUP
+        sync: false
+      - key: WEAKLINK_MODEL_URI_PROD
+        sync: false
+      - key: WEAKLINK_MODEL_URI_DEV
+        sync: false
+      - key: WEAKLINK_MODEL_URI_BACKUP
+        sync: false
+      # PRODUCTION_URL: set to the Vercel frontend URL so the backend allows it in CORS.
+      # Example: https://your-project.vercel.app
+      - key: PRODUCTION_URL
+        sync: false

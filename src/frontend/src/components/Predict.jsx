@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import FeatureBuilder from "./FeatureBuilder";
 import { FEATURE_GROUPS, EXAMPLE_41 } from "../featuresSchema";
+import { apiUrl } from "../apiBase";
 
 /**
  * Parse a comma-separated string into a numeric feature array.
@@ -105,15 +106,15 @@ export default function Predict() {
   // Prediction endpoint depends on task (primary vs weakest-link) and model variant (champion/latest).
   const endpoint = useMemo(() => {
     return task === "weakest"
-      ? `/api/v1/weakest-link/${variant}`
-      : `/api/v1/predict/${variant}`;
+      ? apiUrl(`/api/v1/weakest-link/${variant}`)
+      : apiUrl(`/api/v1/predict/${variant}`);
   }, [task, variant]);
 
   // Model-info endpoint provides expected_features used to validate/limit the outgoing array.
   const modelInfoUrl = useMemo(() => {
     return task === "weakest"
-      ? `/api/v1/model-info/weakest-link/${variant}`
-      : `/api/v1/model-info/${variant}`;
+      ? apiUrl(`/api/v1/model-info/weakest-link/${variant}`)
+      : apiUrl(`/api/v1/model-info/${variant}`);
   }, [task, variant]);
 
   // Load expected feature count from backend ONLY (no cache, no fallback)
