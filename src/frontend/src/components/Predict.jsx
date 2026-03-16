@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import FeatureBuilder from "./FeatureBuilder";
 import { FEATURE_GROUPS, EXAMPLE_41 } from "../featuresSchema";
+import { apiUrl } from "../apiBase";
 
 /**
  * Parse a comma-separated string into a numeric feature array.
@@ -12,19 +13,19 @@ import { FEATURE_GROUPS, EXAMPLE_41 } from "../featuresSchema";
  * @returns {{ok: true, value: number[]} | {ok: false, error: string}}
  */
 function parseFeatures(input) {
-  const parts = input
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+    const parts = input
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
 
-  if (parts.length === 0)
-    return { ok: false, error: "Paste comma-separated numbers." };
+    if (parts.length === 0)
+        return { ok: false, error: "Paste comma-separated numbers." };
 
-  const nums = parts.map(Number);
-  if (nums.some((n) => Number.isNaN(n))) {
-    return { ok: false, error: "Use comma-separated numbers only." };
-  }
-  return { ok: true, value: nums };
+    const nums = parts.map(Number);
+    if (nums.some((n) => Number.isNaN(n))) {
+        return { ok: false, error: "Use comma-separated numbers only." };
+    }
+    return { ok: true, value: nums };
 }
 
 /**
@@ -36,19 +37,19 @@ function parseFeatures(input) {
  * @returns {string[]} ordered feature names
  */
 function buildOrderedFeatureNames() {
-  const names = [];
-  for (const g of FEATURE_GROUPS) {
-    if (g.single) {
-      names.push(g.single);
-      continue;
+    const names = [];
+    for (const g of FEATURE_GROUPS) {
+        if (g.single) {
+            names.push(g.single);
+            continue;
+        }
+        const start = g.startIndex ?? 1;
+        for (let i = 0; i < g.count; i++) {
+            const idx = start + i;
+            names.push(`${g.prefix}${idx}${g.suffix}`);
+        }
     }
-    const start = g.startIndex ?? 1;
-    for (let i = 0; i < g.count; i++) {
-      const idx = start + i;
-      names.push(`${g.prefix}${idx}${g.suffix}`);
-    }
-  }
-  return names;
+    return names;
 }
 // Canonical order + total size of the UI feature vector (includes all known fields).
 const ORDERED_NAMES = buildOrderedFeatureNames();
@@ -59,9 +60,9 @@ const TOTAL_FEATURES = ORDERED_NAMES.length;
  * Missing values are treated as 0 to keep the UI state stable.
  */
 function fromArray(arr) {
-  const obj = {};
-  ORDERED_NAMES.forEach((n, i) => (obj[n] = Number(arr?.[i] ?? 0)));
-  return obj;
+    const obj = {};
+    ORDERED_NAMES.forEach((n, i) => (obj[n] = Number(arr?.[i] ?? 0)));
+    return obj;
 }
 
 /**
@@ -69,7 +70,7 @@ function fromArray(arr) {
  * Unknown/missing fields are treated as 0.
  */
 function toOrderedArray(valuesObj) {
-  return ORDERED_NAMES.map((n) => Number(valuesObj?.[n] ?? 0));
+    return ORDERED_NAMES.map((n) => Number(valuesObj?.[n] ?? 0));
 }
 
 /**
@@ -80,522 +81,566 @@ function toOrderedArray(valuesObj) {
  * - Sends POST requests to the selected prediction endpoint
  */
 export default function Predict() {
-  const [task, setTask] = useState("score");
-  // Default to prod
-  const [variant, setVariant] = useState("champion");
+    const [task, setTask] = useState("score");
+    // Default to prod
+    const [variant, setVariant] = useState("champion");
 
-  // IMPORTANT: no hard-coded “expected” fallback — rely purely on backend
-  const [expectedCount, setExpectedCount] = useState(null); // number | null
-  const [expectedLoading, setExpectedLoading] = useState(true);
-  const [modelInfoError, setModelInfoError] = useState("");
+    // IMPORTANT: no hard-coded “expected” fallback — rely purely on backend
+    const [expectedCount, setExpectedCount] = useState(null); // number | null
+    const [expectedLoading, setExpectedLoading] = useState(true);
+    const [modelInfoError, setModelInfoError] = useState("");
 
-  const hasExpected = Number.isFinite(expectedCount);
-  const activeExpected = hasExpected ? expectedCount : null;
+    const hasExpected = Number.isFinite(expectedCount);
+    const activeExpected = hasExpected ? expectedCount : null;
 
-  const [featureValues, setFeatureValues] = useState(() => fromArray(EXAMPLE_41));
+    const [featureValues, setFeatureValues] = useState(() =>
+        fromArray(EXAMPLE_41),
+    );
 
-  const [importOpen, setImportOpen] = useState(false);
-  const [importText, setImportText] = useState("");
+    const [importOpen, setImportOpen] = useState(false);
+    const [importText, setImportText] = useState("");
 
-  const [hint, setHint] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [responseTimeMs, setResponseTimeMs] = useState(null);
-  const [error, setError] = useState("");
-  // Prediction endpoint depends on task (primary vs weakest-link) and model variant (champion/latest).
-  const endpoint = useMemo(() => {
-    return task === "weakest"
-      ? `/api/v1/weakest-link/${variant}`
-      : `/api/v1/predict/${variant}`;
-  }, [task, variant]);
+    const [hint, setHint] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState(null);
+    const [responseTimeMs, setResponseTimeMs] = useState(null);
+    const [error, setError] = useState("");
+    // Prediction endpoint depends on task (primary vs weakest-link) and model variant (champion/latest).
+    const endpoint = useMemo(() => {
+        return task === "weakest"
+            ? apiUrl(`/api/v1/weakest-link/${variant}`)
+            : apiUrl(`/api/v1/predict/${variant}`);
+    }, [task, variant]);
 
-  // Model-info endpoint provides expected_features used to validate/limit the outgoing array.
-  const modelInfoUrl = useMemo(() => {
-    return task === "weakest"
-      ? `/api/v1/model-info/weakest-link/${variant}`
-      : `/api/v1/model-info/${variant}`;
-  }, [task, variant]);
+    // Model-info endpoint provides expected_features used to validate/limit the outgoing array.
+    const modelInfoUrl = useMemo(() => {
+        return task === "weakest"
+            ? apiUrl(`/api/v1/model-info/weakest-link/${variant}`)
+            : apiUrl(`/api/v1/model-info/${variant}`);
+    }, [task, variant]);
 
-  // Load expected feature count from backend ONLY (no cache, no fallback)
-  useEffect(() => {
-    const ctrl = new AbortController();
-    let cancelled = false;
+    // Load expected feature count from backend ONLY (no cache, no fallback)
+    useEffect(() => {
+        const ctrl = new AbortController();
+        let cancelled = false;
 
-    setExpectedLoading(true);
-    setExpectedCount(null);
-    setModelInfoError("");
+        setExpectedLoading(true);
+        setExpectedCount(null);
+        setModelInfoError("");
 
-    async function loadModelInfo() {
-      try {
-        // No-store/no-cache avoids stale expected_features when switching variants or redeploying.
-        const res = await fetch(modelInfoUrl, {
-          signal: ctrl.signal,
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-          },
-        });
+        async function loadModelInfo() {
+            try {
+                // No-store/no-cache avoids stale expected_features when switching variants or redeploying.
+                const res = await fetch(modelInfoUrl, {
+                    signal: ctrl.signal,
+                    cache: "no-store",
+                    headers: {
+                        "Cache-Control": "no-cache",
+                        Pragma: "no-cache",
+                    },
+                });
 
-        const data = await res.json().catch(() => ({}));
+                const data = await res.json().catch(() => ({}));
 
-        const count =
-          res.ok && typeof data?.expected_features === "number"
-            ? data.expected_features
-            : null;
+                const count =
+                    res.ok && typeof data?.expected_features === "number"
+                        ? data.expected_features
+                        : null;
 
-        if (!cancelled) {
-          setExpectedCount(count);
-          if (!res.ok || typeof count !== "number") {
-            setModelInfoError(
-              data?.detail ||
-                "Could not load model info (expected_features missing)."
+                if (!cancelled) {
+                    setExpectedCount(count);
+                    if (!res.ok || typeof count !== "number") {
+                        setModelInfoError(
+                            data?.detail ||
+                                "Could not load model info (expected_features missing).",
+                        );
+                    }
+                }
+            } catch (e) {
+                if (!cancelled) {
+                    setExpectedCount(null);
+                    setModelInfoError(String(e));
+                }
+            } finally {
+                if (!cancelled) setExpectedLoading(false);
+            }
+        }
+
+        loadModelInfo();
+        // Abort in-flight requests to prevent state updates after unmount / rapid variant switching.
+        return () => {
+            cancelled = true;
+            ctrl.abort();
+        };
+    }, [modelInfoUrl]);
+    // Small helper to show transient UI hints (stores timeout handle on the function object).
+    const flashHint = (msg) => {
+        setHint(msg);
+        window.clearTimeout(flashHint._t);
+        flashHint._t = window.setTimeout(() => setHint(""), 1200);
+    };
+
+    // Modal behavior
+    useEffect(() => {
+        if (!importOpen) return;
+
+        const onKeyDown = (e) => {
+            if (e.key === "Escape") setImportOpen(false);
+        };
+
+        document.addEventListener("keydown", onKeyDown);
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+
+        return () => {
+            document.removeEventListener("keydown", onKeyDown);
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [importOpen]);
+
+    const controlsDisabled = loading || expectedLoading || !hasExpected;
+
+    function loadExample() {
+        setError("");
+        setResult(null);
+
+        if (!hasExpected) {
+            setError("Model info is still loading — try again in a moment.");
+            return;
+        }
+
+        // Keep internal state size stable (TOTAL_FEATURES) but only “use” activeExpected when sending
+        const slice = EXAMPLE_41.slice(0, activeExpected);
+        const padded = slice.concat(
+            new Array(TOTAL_FEATURES - slice.length).fill(0),
+        );
+        setFeatureValues(fromArray(padded));
+
+        flashHint("Example loaded.");
+    }
+
+    function zeroAll() {
+        setError("");
+        setResult(null);
+
+        // Zeroing doesn't need expectedCount; it just sets all known UI fields to 0
+        const zeros = new Array(TOTAL_FEATURES).fill(0);
+        setFeatureValues(fromArray(zeros));
+        flashHint("All values set to 0.");
+    }
+
+    async function copyValues() {
+        setError("");
+        if (!hasExpected) {
+            setError("Model info is still loading — try again in a moment.");
+            return;
+        }
+
+        try {
+            const text = toOrderedArray(featureValues)
+                .slice(0, activeExpected)
+                .join(", ");
+            await navigator.clipboard.writeText(text);
+            flashHint("Copied.");
+        } catch {
+            setImportText(
+                toOrderedArray(featureValues)
+                    .slice(0, activeExpected)
+                    .join(", "),
             );
-          }
+            setImportOpen(true);
+            flashHint("Clipboard blocked — copy from the box.");
         }
-      } catch (e) {
-        if (!cancelled) {
-          setExpectedCount(null);
-          setModelInfoError(String(e));
+    }
+
+    async function pasteValues() {
+        setError("");
+        if (!hasExpected) {
+            setError("Model info is still loading — try again in a moment.");
+            return;
         }
-      } finally {
-        if (!cancelled) setExpectedLoading(false);
-      }
+
+        setImportOpen(true);
+        try {
+            const text = await navigator.clipboard.readText();
+            setImportText(text);
+            flashHint("Pasted. Click Apply.");
+        } catch {
+            flashHint("Paste into the box.");
+        }
     }
 
-    loadModelInfo();
-    // Abort in-flight requests to prevent state updates after unmount / rapid variant switching.
-    return () => {
-      cancelled = true;
-      ctrl.abort();
-    };
-  }, [modelInfoUrl]);
-  // Small helper to show transient UI hints (stores timeout handle on the function object).
-  const flashHint = (msg) => {
-    setHint(msg);
-    window.clearTimeout(flashHint._t);
-    flashHint._t = window.setTimeout(() => setHint(""), 1200);
-  };
-
-  // Modal behavior
-  useEffect(() => {
-    if (!importOpen) return;
-
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") setImportOpen(false);
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [importOpen]);
-
-  const controlsDisabled = loading || expectedLoading || !hasExpected;
-
-  function loadExample() {
-    setError("");
-    setResult(null);
-
-    if (!hasExpected) {
-      setError("Model info is still loading — try again in a moment.");
-      return;
+    function openImport() {
+        setError("");
+        if (!hasExpected) {
+            setError("Model info is still loading — try again in a moment.");
+            return;
+        }
+        setImportOpen(true);
+        flashHint("Paste values and click Apply.");
     }
 
-    // Keep internal state size stable (TOTAL_FEATURES) but only “use” activeExpected when sending
-    const slice = EXAMPLE_41.slice(0, activeExpected);
-    const padded = slice.concat(new Array(TOTAL_FEATURES - slice.length).fill(0));
-    setFeatureValues(fromArray(padded));
+    function applyImport() {
+        setError("");
+        if (!hasExpected) {
+            setError("Model info is still loading — try again in a moment.");
+            return;
+        }
 
-    flashHint("Example loaded.");
-  }
+        const parsed = parseFeatures(importText);
+        if (!parsed.ok) return setError(parsed.error);
 
-  function zeroAll() {
-    setError("");
-    setResult(null);
+        // Allow pasting more than expected: take the first activeExpected values.
+        let values = parsed.value;
+        if (values.length > activeExpected)
+            values = values.slice(0, activeExpected);
 
-    // Zeroing doesn't need expectedCount; it just sets all known UI fields to 0
-    const zeros = new Array(TOTAL_FEATURES).fill(0);
-    setFeatureValues(fromArray(zeros));
-    flashHint("All values set to 0.");
-  }
+        if (values.length !== activeExpected) {
+            return setError(
+                `Expected ${activeExpected} features, but got ${values.length}.`,
+            );
+        }
 
-  async function copyValues() {
-    setError("");
-    if (!hasExpected) {
-      setError("Model info is still loading — try again in a moment.");
-      return;
+        // Store in TOTAL_FEATURES-sized structure for UI
+        const padded = values.concat(
+            new Array(TOTAL_FEATURES - values.length).fill(0),
+        );
+        setFeatureValues(fromArray(padded));
+
+        setResult(null);
+        setImportOpen(false);
+        flashHint("Imported.");
     }
 
-    try {
-      const text = toOrderedArray(featureValues)
-        .slice(0, activeExpected)
-        .join(", ");
-      await navigator.clipboard.writeText(text);
-      flashHint("Copied.");
-    } catch {
-      setImportText(
-        toOrderedArray(featureValues).slice(0, activeExpected).join(", ")
-      );
-      setImportOpen(true);
-      flashHint("Clipboard blocked — copy from the box.");
-    }
-  }
+    async function onPredict() {
+        setError("");
+        setResult(null);
+        setResponseTimeMs(null);
 
-  async function pasteValues() {
-    setError("");
-    if (!hasExpected) {
-      setError("Model info is still loading — try again in a moment.");
-      return;
-    }
+        if (!hasExpected) {
+            setError("Model info is still loading — try again in a moment.");
+            return;
+        }
 
-    setImportOpen(true);
-    try {
-      const text = await navigator.clipboard.readText();
-      setImportText(text);
-      flashHint("Pasted. Click Apply.");
-    } catch {
-      flashHint("Paste into the box.");
-    }
-  }
+        const features = toOrderedArray(featureValues).slice(0, activeExpected);
 
-  function openImport() {
-    setError("");
-    if (!hasExpected) {
-      setError("Model info is still loading — try again in a moment.");
-      return;
-    }
-    setImportOpen(true);
-    flashHint("Paste values and click Apply.");
-  }
+        if (features.length !== activeExpected) {
+            return setError(
+                `Expected ${activeExpected} features, but got ${features.length}.`,
+            );
+        }
 
-  function applyImport() {
-    setError("");
-    if (!hasExpected) {
-      setError("Model info is still loading — try again in a moment.");
-      return;
+        setLoading(true);
+        const startTime = Date.now();
+        try {
+            const res = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ features }),
+            });
+
+            const data = await res.json().catch(() => ({}));
+            const elapsed = Date.now() - startTime;
+            if (!res.ok)
+                return setError(
+                    data?.detail || `Request failed (${res.status})`,
+                );
+
+            setResult(data);
+            setResponseTimeMs(elapsed);
+        } catch (e) {
+            setError(String(e));
+        } finally {
+            setLoading(false);
+        }
     }
 
-    const parsed = parseFeatures(importText);
-    if (!parsed.ok) return setError(parsed.error);
+    return (
+        <div className="ios-bg min-h-screen">
+            <div className="mx-auto max-w-5xl px-4 py-10">
+                <div className="ios-card rounded-[28px]">
+                    <div className="p-6 md:p-8">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                            <div>
+                                <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
+                                    Model Prediction
+                                </h1>
+                                <p className="mt-2 text-slate-600">
+                                    Adjust values. Predict. Clean and simple.
+                                </p>
+                            </div>
 
-    // Allow pasting more than expected: take the first activeExpected values.
-    let values = parsed.value;
-    if (values.length > activeExpected) values = values.slice(0, activeExpected);
+                            <div className="text-sm text-slate-600">
+                                Expects{" "}
+                                <span className="font-semibold text-slate-900">
+                                    {hasExpected ? activeExpected : "…"}
+                                </span>{" "}
+                                features
+                                {expectedLoading ? (
+                                    <span className="ml-2 text-slate-400">
+                                        (loading)
+                                    </span>
+                                ) : null}
+                            </div>
+                        </div>
 
-    if (values.length !== activeExpected) {
-      return setError(
-        `Expected ${activeExpected} features, but got ${values.length}.`
-      );
-    }
+                        {/* Controls */}
+                        <div className="mt-6 mx-auto max-w-4xl">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
+                                <div className="w-full md:w-[420px]">
+                                    <div className="text-sm text-slate-700 mb-2">
+                                        Task
+                                    </div>
+                                    <select
+                                        value={task}
+                                        onChange={(e) => {
+                                            setError("");
+                                            setResult(null);
+                                            setResponseTimeMs(null);
+                                            setTask(e.target.value);
+                                        }}
+                                        className="ios-input w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
+                                    >
+                                        <option value="score">
+                                            Score prediction (A2)
+                                        </option>
+                                        <option value="weakest">
+                                            Weakest link classification (A3)
+                                        </option>
+                                    </select>
+                                </div>
 
-    // Store in TOTAL_FEATURES-sized structure for UI
-    const padded = values.concat(new Array(TOTAL_FEATURES - values.length).fill(0));
-    setFeatureValues(fromArray(padded));
+                                <div className="w-full md:w-[420px]">
+                                    <div className="text-sm text-slate-700 mb-2">
+                                        Model
+                                    </div>
+                                    <select
+                                        value={variant}
+                                        onChange={(e) => {
+                                            setError("");
+                                            setResult(null);
+                                            setResponseTimeMs(null);
+                                            setVariant(e.target.value);
+                                        }}
+                                        className="ios-input w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
+                                    >
+                                        <option value="champion">
+                                            Champion (prod)
+                                        </option>
+                                        <option value="latest">
+                                            Latest (dev)
+                                        </option>
+                                    </select>
+                                </div>
 
-    setResult(null);
-    setImportOpen(false);
-    flashHint("Imported.");
-  }
+                                <div className="flex flex-wrap gap-2 md:ml-auto">
+                                    <button
+                                        type="button"
+                                        onClick={loadExample}
+                                        disabled={controlsDisabled}
+                                        className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800 disabled:opacity-50"
+                                    >
+                                        Example
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={zeroAll}
+                                        className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800"
+                                    >
+                                        Zero
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={copyValues}
+                                        disabled={controlsDisabled}
+                                        className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800 disabled:opacity-50"
+                                    >
+                                        Copy
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={openImport}
+                                        disabled={controlsDisabled}
+                                        className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800 disabled:opacity-50"
+                                    >
+                                        Import
+                                    </button>
 
-  async function onPredict() {
-    setError("");
-    setResult(null);
-    setResponseTimeMs(null);
+                                    <button
+                                        onClick={onPredict}
+                                        disabled={controlsDisabled}
+                                        className="ios-btn ios-btn-primary rounded-full px-5 py-3 text-sm font-semibold disabled:opacity-50"
+                                    >
+                                        {loading
+                                            ? "Predicting…"
+                                            : expectedLoading
+                                              ? "Loading model…"
+                                              : "Predict"}
+                                    </button>
+                                </div>
+                            </div>
 
-    if (!hasExpected) {
-      setError("Model info is still loading — try again in a moment.");
-      return;
-    }
+                            <div className="mt-2 h-5 text-xs text-slate-500">
+                                {hint || ""}
+                            </div>
+                        </div>
 
-    const features = toOrderedArray(featureValues).slice(0, activeExpected);
+                        {/* Model-info error (separate from prediction errors) */}
+                        {modelInfoError ? (
+                            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                <b>Model info warning:</b> {modelInfoError}
+                            </div>
+                        ) : null}
 
-    if (features.length !== activeExpected) {
-      return setError(
-        `Expected ${activeExpected} features, but got ${features.length}.`
-      );
-    }
+                        {/* Builder */}
+                        <div className="mt-6">
+                            {hasExpected ? (
+                                <FeatureBuilder
+                                    values={featureValues}
+                                    setValues={setFeatureValues}
+                                    maxFeatures={activeExpected}
+                                />
+                            ) : (
+                                <div className="ios-card rounded-[28px] p-5 text-sm text-slate-600">
+                                    Loading model info…
+                                </div>
+                            )}
+                        </div>
 
-    setLoading(true);
-    const startTime = Date.now();
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ features }),
-      });
+                        <div className="mt-4 text-xs text-slate-500">
+                            Endpoint:{" "}
+                            <code className="text-slate-700">{endpoint}</code>
+                        </div>
 
-      const data = await res.json().catch(() => ({}));
-      const elapsed = Date.now() - startTime;
-      if (!res.ok)
-        return setError(data?.detail || `Request failed (${res.status})`);
+                        {error ? (
+                            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                                <b>Error:</b> {error}
+                            </div>
+                        ) : null}
 
-      setResult(data);
-      setResponseTimeMs(elapsed);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="ios-bg min-h-screen">
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <div className="ios-card rounded-[28px]">
-          <div className="p-6 md:p-8">
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
-                  Model Prediction
-                </h1>
-                <p className="mt-2 text-slate-600">
-                  Adjust values. Predict. Clean and simple.
-                </p>
-              </div>
-
-              <div className="text-sm text-slate-600">
-                Expects{" "}
-                <span className="font-semibold text-slate-900">
-                  {hasExpected ? activeExpected : "…"}
-                </span>{" "}
-                features
-                {expectedLoading ? (
-                  <span className="ml-2 text-slate-400">(loading)</span>
-                ) : null}
-              </div>
+                        {result ? (
+                            <div className="mt-4 ios-pill rounded-[28px] p-4 text-sm text-slate-800">
+                                <div>
+                                    <span className="text-slate-500">
+                                        Prediction:
+                                    </span>{" "}
+                                    <code className="font-semibold">
+                                        {String(result?.prediction ?? "—")}
+                                    </code>
+                                </div>
+                                <div className="mt-2">
+                                    <span className="text-slate-500">
+                                        Model URI:
+                                    </span>{" "}
+                                    <code className="break-all">
+                                        {result?.model_uri ?? "—"}
+                                    </code>
+                                </div>
+                                <div className="mt-2">
+                                    <span className="text-slate-500">
+                                        Run ID:
+                                    </span>{" "}
+                                    <code className="break-all">
+                                        {result?.run_id ?? "—"}
+                                    </code>
+                                </div>
+                                <div className="mt-2">
+                                    <span className="text-slate-500">
+                                        Response time:
+                                    </span>{" "}
+                                    <code className="font-semibold">
+                                        {responseTimeMs != null
+                                            ? `${responseTimeMs} ms`
+                                            : "—"}
+                                    </code>
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
             </div>
 
-            {/* Controls */}
-            <div className="mt-6 mx-auto max-w-4xl">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
-                <div className="w-full md:w-[420px]">
-                  <div className="text-sm text-slate-700 mb-2">Task</div>
-                  <select
-                    value={task}
-                    onChange={(e) => {
-                      setError("");
-                      setResult(null);
-                      setResponseTimeMs(null);
-                      setTask(e.target.value);
-                    }}
-                    className="ios-input w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
-                  >
-                    <option value="score">Score prediction (A2)</option>
-                    <option value="weakest">
-                      Weakest link classification (A3)
-                    </option>
-                  </select>
+            {/* Import Modal */}
+            {importOpen ? (
+                <div className="fixed inset-0 z-50">
+                    <div
+                        className="absolute inset-0 bg-slate-900/10 backdrop-blur-[2px]"
+                        onClick={() => setImportOpen(false)}
+                    />
+                    <div className="relative mx-auto mt-20 w-[min(92vw,720px)] px-4">
+                        <div className="ios-card rounded-[28px] p-5">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <div className="text-lg font-semibold text-slate-900">
+                                        Import values
+                                    </div>
+                                    <div className="text-sm text-slate-600">
+                                        {hasExpected
+                                            ? `Paste ${activeExpected} comma-separated numbers.`
+                                            : "Loading model info…"}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setImportOpen(false)}
+                                    className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800"
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                            <textarea
+                                value={importText}
+                                onChange={(e) => setImportText(e.target.value)}
+                                rows={6}
+                                placeholder="0.1, 0.2, 0.3, ..."
+                                className="ios-input mt-4 w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
+                            />
+
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={applyImport}
+                                    disabled={!hasExpected}
+                                    className="ios-btn ios-btn-primary rounded-full px-5 py-2 text-sm font-semibold disabled:opacity-50"
+                                >
+                                    Apply
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!hasExpected) return;
+                                        setImportText(
+                                            toOrderedArray(featureValues)
+                                                .slice(0, activeExpected)
+                                                .join(", "),
+                                        );
+                                    }}
+                                    disabled={!hasExpected}
+                                    className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50"
+                                >
+                                    Fill current
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={pasteValues}
+                                    disabled={!hasExpected}
+                                    className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50"
+                                >
+                                    Paste
+                                </button>
+                            </div>
+
+                            <div className="mt-3 text-xs text-slate-500">
+                                Tip: press{" "}
+                                <span className="font-semibold">Esc</span> to
+                                close.
+                            </div>
+                        </div>
+                    </div>
                 </div>
-
-                <div className="w-full md:w-[420px]">
-                  <div className="text-sm text-slate-700 mb-2">Model</div>
-                  <select
-                    value={variant}
-                    onChange={(e) => {
-                      setError("");
-                      setResult(null);
-                      setResponseTimeMs(null);
-                      setVariant(e.target.value);
-                    }}
-                    className="ios-input w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
-                  >
-                    <option value="champion">Champion (prod)</option>
-                    <option value="latest">Latest (dev)</option>
-                  </select>
-                </div>
-
-                <div className="flex flex-wrap gap-2 md:ml-auto">
-                  <button
-                    type="button"
-                    onClick={loadExample}
-                    disabled={controlsDisabled}
-                    className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800 disabled:opacity-50"
-                  >
-                    Example
-                  </button>
-                  <button
-                    type="button"
-                    onClick={zeroAll}
-                    className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800"
-                  >
-                    Zero
-                  </button>
-                  <button
-                    type="button"
-                    onClick={copyValues}
-                    disabled={controlsDisabled}
-                    className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800 disabled:opacity-50"
-                  >
-                    Copy
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openImport}
-                    disabled={controlsDisabled}
-                    className="ios-btn rounded-full px-4 py-3 text-sm font-medium text-slate-800 disabled:opacity-50"
-                  >
-                    Import
-                  </button>
-
-                  <button
-                    onClick={onPredict}
-                    disabled={controlsDisabled}
-                    className="ios-btn ios-btn-primary rounded-full px-5 py-3 text-sm font-semibold disabled:opacity-50"
-                  >
-                    {loading
-                      ? "Predicting…"
-                      : expectedLoading
-                      ? "Loading model…"
-                      : "Predict"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-2 h-5 text-xs text-slate-500">{hint || ""}</div>
-            </div>
-
-            {/* Model-info error (separate from prediction errors) */}
-            {modelInfoError ? (
-              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                <b>Model info warning:</b> {modelInfoError}
-              </div>
             ) : null}
-
-            {/* Builder */}
-            <div className="mt-6">
-              {hasExpected ? (
-                <FeatureBuilder
-                  values={featureValues}
-                  setValues={setFeatureValues}
-                  maxFeatures={activeExpected}
-                />
-              ) : (
-                <div className="ios-card rounded-[28px] p-5 text-sm text-slate-600">
-                  Loading model info…
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 text-xs text-slate-500">
-              Endpoint: <code className="text-slate-700">{endpoint}</code>
-            </div>
-
-            {error ? (
-              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                <b>Error:</b> {error}
-              </div>
-            ) : null}
-
-            {result ? (
-              <div className="mt-4 ios-pill rounded-[28px] p-4 text-sm text-slate-800">
-                <div>
-                  <span className="text-slate-500">Prediction:</span>{" "}
-                  <code className="font-semibold">
-                    {String(result?.prediction ?? "—")}
-                  </code>
-                </div>
-                <div className="mt-2">
-                  <span className="text-slate-500">Model URI:</span>{" "}
-                  <code className="break-all">{result?.model_uri ?? "—"}</code>
-                </div>
-                <div className="mt-2">
-                  <span className="text-slate-500">Run ID:</span>{" "}
-                  <code className="break-all">{result?.run_id ?? "—"}</code>
-                </div>
-                <div className="mt-2">
-                  <span className="text-slate-500">Response time:</span>{" "}
-                  <code className="font-semibold">{responseTimeMs != null ? `${responseTimeMs} ms` : "—"}</code>
-                </div>
-              </div>
-            ) : null}
-          </div>
         </div>
-      </div>
-
-      {/* Import Modal */}
-      {importOpen ? (
-        <div className="fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-slate-900/10 backdrop-blur-[2px]"
-            onClick={() => setImportOpen(false)}
-          />
-          <div className="relative mx-auto mt-20 w-[min(92vw,720px)] px-4">
-            <div className="ios-card rounded-[28px] p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-lg font-semibold text-slate-900">
-                    Import values
-                  </div>
-                  <div className="text-sm text-slate-600">
-                    {hasExpected
-                      ? `Paste ${activeExpected} comma-separated numbers.`
-                      : "Loading model info…"}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setImportOpen(false)}
-                  className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800"
-                >
-                  Close
-                </button>
-              </div>
-
-              <textarea
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                rows={6}
-                placeholder="0.1, 0.2, 0.3, ..."
-                className="ios-input mt-4 w-full rounded-2xl px-4 py-3 text-slate-900 outline-none focus:ring-4 focus:ring-sky-200/50"
-              />
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={applyImport}
-                  disabled={!hasExpected}
-                  className="ios-btn ios-btn-primary rounded-full px-5 py-2 text-sm font-semibold disabled:opacity-50"
-                >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!hasExpected) return;
-                    setImportText(
-                      toOrderedArray(featureValues)
-                        .slice(0, activeExpected)
-                        .join(", ")
-                    );
-                  }}
-                  disabled={!hasExpected}
-                  className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50"
-                >
-                  Fill current
-                </button>
-                <button
-                  type="button"
-                  onClick={pasteValues}
-                  disabled={!hasExpected}
-                  className="ios-btn rounded-full px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50"
-                >
-                  Paste
-                </button>
-              </div>
-
-              <div className="mt-3 text-xs text-slate-500">
-                Tip: press <span className="font-semibold">Esc</span> to close.
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
+    );
 }
