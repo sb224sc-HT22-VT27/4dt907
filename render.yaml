@@ -1,0 +1,32 @@
+# Render Infrastructure-as-Code
+# https://render.com/docs/infrastructure-as-code
+#
+# Defines the backend web service that runs the FastAPI app.
+# Connect your Render account to this repository and Render will automatically
+# pick up this file to create (or update) the service.
+
+services:
+    - type: web
+      name: 4dt907-backend
+      runtime: python
+      rootDir: src/backend
+      buildCommand: pip install -r requirements.txt
+      startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+      healthCheckPath: /health
+      envVars:
+          - key: MLFLOW_TRACKING_URI
+            sync: false
+          - key: MODEL_URI_PROD
+            sync: false
+          - key: MODEL_URI_DEV
+            sync: false
+          - key: MODEL_URI_BACKUP
+            sync: false
+          - key: WEAKLINK_MODEL_URI_PROD
+            sync: false
+          - key: WEAKLINK_MODEL_URI_DEV
+            sync: false
+          - key: WEAKLINK_MODEL_URI_BACKUP
+            sync: false
+          - key: PRODUCTION_URL
+            sync: false

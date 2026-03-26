@@ -6,20 +6,119 @@ This document describes the deployment strategies for 4dt907.
 
 | Strategy | Frontend | Backend | When to use |
 | -------- | -------- | ------- | ----------- |
-| **Primary** | Vercel (static) | Vercel (serverless) | Normal production |
-| **Backup** | Vercel (static) | Render (web service) | If serverless backend limitations are hit |
+| **Primary** | Vercel (static) | Render (web service) | Normal production |
+| **Fallback** | Vercel (static) | Vercel (serverless) | If Render is unavailable |
 
 ---
 
-## Primary Strategy: Full Vercel Deployment
+## Primary Strategy: Vercel (frontend) + Render (backend)
 
-Both the frontend and backend are deployed together on Vercel using `vercel.json` at the repository root.
+The frontend is deployed as a static site on Vercel and the backend runs as a
+long-lived web service on [Render](https://render.com).
+This avoids serverless cold starts, execution time limits, and memory constraints
+that can affect ML model serving.
 
 ### How it works
 
 - The **frontend** is built from `src/frontend/` as a static site (`@vercel/static-build`).
-- The **backend** is served as a serverless function via `api/index.py` (`@vercel/python`), which wraps the FastAPI app.
-- Requests to `/api/*` are rewritten to the serverless function; all other requests serve the frontend.
+- The **backend** runs the FastAPI app directly on Render via `uvicorn`.
+- The frontend is built with `VITE_BACKEND_URL` pointing to the Render service so all
+  `/api/*` calls go directly to Render (no server-side proxy needed on Vercel).
+
+```Text
+┌─────────────────────┐   VITE_BACKEND_URL   ┌─────────────────────┐
+│       Vercel        │ ──────────────────►  │       Render        │
+│  Frontend (static)  │                      │   Backend (FastAPI) │
+└─────────────────────┘                      └─────────────────────┘
+```
+
+### Configuration
+
+`vercel.json` at the repository root controls the Vercel build (frontend only):
+
+```json
+{
+  "builds": [
+    { "src": "src/frontend/package.json", "use": "@vercel/static-build",
+      "config": { "distDir": "dist" } }
+  ],
+  "rewrites": [
+    { "source": "/(.*)", "destination": "src/frontend/$1" }
+  ]
+}
+```
+
+`render.yaml` at the repository root is picked up by Render automatically when you
+connect the repository:
+
+```yaml
+services:
+  - type: web
+    name: 4dt907-backend
+    runtime: python
+    rootDir: src/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+```
+
+### Step 1 – Deploy the backend on Render
+
+1. Create a new **Web Service** on [render.com](https://render.com) and connect the
+   repository. Render will detect `render.yaml` and pre-fill most settings.
+2. Confirm the service settings:
+
+   | Setting | Value |
+   | ------- | ----- |
+   | **Root directory** | `src/backend` |
+   | **Runtime** | Python 3 |
+   | **Build command** | `pip install -r requirements.txt` |
+   | **Start command** | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+   | **Health check path** | `/health` |
+
+3. Add the following environment variables in the Render dashboard:
+
+   | Variable | Description |
+   | -------- | ----------- |
+   | `MLFLOW_TRACKING_URI` | MLflow / DagsHub tracking server URI |
+   | `MODEL_URI_PROD` | Production model URI |
+   | `MODEL_URI_DEV` | Development model URI |
+   | `MODEL_URI_BACKUP` | Backup model URI |
+   | `WEAKLINK_MODEL_URI_PROD` | Weakest-Link production model URI |
+   | `WEAKLINK_MODEL_URI_DEV` | Weakest-Link development model URI |
+   | `WEAKLINK_MODEL_URI_BACKUP` | Weakest-Link backup model URI |
+   | `PRODUCTION_URL` | Your Vercel frontend URL (for CORS), e.g. `https://your-project.vercel.app` |
+
+4. Deploy the service and note the external URL (e.g. `https://4dt907-backend.onrender.com`).
+
+### Step 2 – Deploy the frontend on Vercel
+
+1. Create (or update) a Vercel project connected to this repository.
+2. In the Vercel project settings → **Environment Variables**, add:
+
+   | Variable | Value |
+   | -------- | ----- |
+   | `VITE_BACKEND_URL` | `https://<your-service>.onrender.com` |
+
+3. Trigger a new deployment (or let Vercel deploy automatically on push).
+   The static build will bake `VITE_BACKEND_URL` into the bundle so every API call
+   goes directly to Render.
+
+---
+
+## Fallback Strategy: Full Vercel Deployment
+
+Use this strategy if Render is unavailable.
+Both the frontend and a Python serverless function are deployed on Vercel.
+
+> The serverless function may hit cold-start delays, execution time limits or
+> memory constraints when loading large ML models.
+
+### How it works
+
+- The **frontend** is built as a static site.
+- The **backend** is served as a serverless function via `api/index.py` (`@vercel/python`).
+- Requests to `/api/*` are rewritten to the serverless function.
 
 ```Text
 ┌──────────────────────────────────────┐
@@ -35,15 +134,16 @@ Both the frontend and backend are deployed together on Vercel using `vercel.json
 └──────────────────────────────────────┘
 ```
 
-### Configuration
+### Restoring the full-Vercel `vercel.json`
 
-`vercel.json` at the repository root controls routing and build steps:
+Replace the contents of `vercel.json` with:
 
 ```json
 {
+  "version": 2,
   "builds": [
-    { "src": "api/index.py",            "use": "@vercel/python" },
-    { "src": "src/frontend/package.json","use": "@vercel/static-build",
+    { "src": "api/index.py", "use": "@vercel/python" },
+    { "src": "src/frontend/package.json", "use": "@vercel/static-build",
       "config": { "distDir": "dist" } }
   ],
   "rewrites": [
@@ -67,9 +167,10 @@ Set the following in the Vercel project settings under **Environment Variables**
 | `WEAKLINK_MODEL_URI_DEV` | Weakest-Link development model URI |
 | `WEAKLINK_MODEL_URI_BACKUP` | Weakest-Link backup model URI |
 
-Leave `BACKEND_URL` empty – the frontend will use the `/api` proxy automatically.
+Leave `VITE_BACKEND_URL` empty – the frontend will use relative `/api/*` paths which
+Vercel rewrites to the serverless function.
 
-### Local preview
+### Local preview (full-Vercel)
 
 ```bash
 # Install Vercel CLI
@@ -78,54 +179,6 @@ npm i -g vercel
 # From repository root
 vercel dev
 ```
-
----
-
-## Backup Strategy: Frontend on Vercel, Backend on Render
-
-Use this strategy if serverless constraints (cold starts, execution time limits, memory) become a problem for the backend.
-
-### How it works
-
-- The **frontend** is still deployed on Vercel (static build only, no serverless function).
-- The **backend** runs as a long-lived web service on [Render](https://render.com), directly serving the FastAPI app.
-- The frontend is configured with `BACKEND_URL` pointing to the Render service.
-
-```Text
-┌─────────────────────┐      BACKEND_URL       ┌─────────────────────┐
-│       Vercel        │ ─────────────────────► │       Render        │
-│  Frontend (static)  │                        │   Backend (FastAPI) │
-└─────────────────────┘                        └─────────────────────┘
-```
-
-### Setting up the backend on Render
-
-1. Create a new **Web Service** on [render.com](https://render.com) and connect the repository.
-2. Set the following in the Render service settings:
-
-   | Setting | Value |
-   | ------- | ----- |
-   | **Root directory** | `src/backend` |
-   | **Runtime** | Python 3 |
-   | **Build command** | `pip install -r requirements.txt` |
-   | **Start command** | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
-
-3. Add the environment variables listed in the [Primary strategy](#environment-variables-vercel-dashboard) table to the Render service's environment settings.
-
-### Configuring the frontend on Vercel
-
-1. In the Vercel project settings, add (or update) the environment variable:
-
-   | Variable | Value |
-   | -------- | ----- |
-   | `BACKEND_URL` | `https://<your-service>.onrender.com` |
-
-2. Redeploy the frontend on Vercel for the change to take effect.
-
-### Switching back to the primary strategy
-
-1. Remove or clear `BACKEND_URL` in the Vercel environment variables.
-2. Redeploy on Vercel.
 
 ---
 
