@@ -12,11 +12,8 @@ services:
       rootDir: src/backend
       buildCommand: pip install -r requirements.txt
       startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-      # Health-check path used by Render to decide when the service is ready.
       healthCheckPath: /health
       envVars:
-          # Set these in the Render dashboard under Environment -> Secret Files / Env Vars.
-          # See DEPLOYMENT.md for a full description of each variable.
           - key: MLFLOW_TRACKING_URI
             sync: false
           - key: MODEL_URI_PROD
