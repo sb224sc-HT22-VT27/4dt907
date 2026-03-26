@@ -28,7 +28,5 @@ services:
             sync: false
           - key: WEAKLINK_MODEL_URI_BACKUP
             sync: false
-          # PRODUCTION_URL: set to the Vercel frontend URL so the backend allows it in CORS.
-          # Example: https://your-project.vercel.app
           - key: PRODUCTION_URL
             sync: false
