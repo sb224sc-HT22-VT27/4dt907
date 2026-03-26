@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.0] – 2026-03-26
+
+Assignment 7 – Unsupervised learning: PCA and clustering, plus split-deployment preparation.
+
+### Added
+
+- PCA and K-means/hierarchical clustering analysis for the dataset (`src/ml-research/a7/`)
+- A7 report notebook documenting PCA, elbow method, and clustering results with visualisations
+- `render.yaml` infrastructure-as-code for deploying the backend as a Render web service
+- `BACKEND_URL` / `PRODUCTION_URL` environment variable support for split frontend–backend deployment
+
+### Changed
+
+- Frontend `apiBase.js` updated to support configurable backend URL for split deployment
+- `DEPLOYMENT.md` expanded with Render and split-deployment instructions
+- `.env.example` updated with additional environment variable specifications
+- `vercel.json` archived (`vercel.old.json`) in favour of Render-based backend hosting
+
+---
+
+## [0.6.0] – 2026-03-13
+
+Assignment 6 – SVM hyperparameter optimisation, model robustness improvements, and frontend enhancements.
+
+### Added
+
+- SVM classifier with `RandomizedSearchCV` + `GridSearchCV` hyperparameter optimisation (`src/ml-research/a6/`)
+- 5-fold cross-validation comparison notebooks for regression and classification (`compare5kfolds.ipynb`, `compare5kfoldsA2.ipynb`)
+- A6 report notebook and presentation slides documenting SVM results and model comparisons
+- Frontend request/response duration timing displayed in the UI
+- `imbalanced-learn` added to backend requirements for handling class imbalance
+
+### Changed
+
+- Bump `docker/setup-buildx-action` from v3 to v4 in CI/CD workflow
+
+### Fixed
+
+- Model info endpoints hardened: added error handling, logging, and HTTP 503 response when model info is unavailable
+- Feature count detection improved for sklearn pipeline models (`n_features_in_` read from final estimator)
+- Weakest-link model service updated with the same robust feature detection logic
+
+---
+
 ## [0.5.0] – 2026-02-25
 
 ### Added
