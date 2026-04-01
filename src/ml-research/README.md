@@ -23,6 +23,7 @@ Jupyter notebooks for ML experiments and assignment reporting. Each assignment h
 | $A14$ | - | - |
 | $A15$ | - | - |
 | $A16$ | - | - |
+| PoseNet | Adapt the PoseNet Python port | Run PoseNet on images/videos; joint positions saved to CSV and JSON files |
 
 Models are tracked in MLflow on DagsHub using a utils file, ml_utils.py.
 
@@ -38,3 +39,15 @@ cd src/ml-research/<current-assignment>
 pip install -r requirements.txt
 jupyter lab
 ```
+
+### PoseNet assignment
+
+```bash
+cd src/ml-research/posenet
+pip install -r requirements.txt
+jupyter lab posenet_demo.ipynb
+```
+
+Place input images in `src/ml-research/posenet/images/` and a video file at  
+`src/ml-research/posenet/video.mp4` before running the notebook.  
+The notebook will write joint-position data to `src/ml-research/posenet/output/`.
