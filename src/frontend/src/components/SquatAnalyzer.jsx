@@ -1,6 +1,6 @@
 // SquatAnalyzer: uses MediaPipe Pose (tasks-vision) to detect squat keypoints
-// from a live webcam feed, then sends them to the Python backend for angle
-// calculation and depth classification (Deep / Shallow / Invalid).
+// from a live webcam feed or an uploaded video file, then sends them to the
+// Python backend for angle calculation and depth classification (Deep / Shallow / Invalid).
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { apiUrl } from "../apiBase";
@@ -72,22 +72,70 @@ async function loadPoseLandmarker() {
 export default function SquatAnalyzer() {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
+    const fileInputRef = useRef(null);
     const landmarkerRef = useRef(null);
     const rafRef = useRef(null);
     const lastTimestampRef = useRef(-1);
+    const videoBlobUrlRef = useRef(null);
 
+    // "webcam" | "upload"
+    const [inputMode, setInputMode] = useState("webcam");
     const [status, setStatus] = useState("idle"); // idle | loading | running | error
     const [result, setResult] = useState(null);   // last classification response
     const [errorMsg, setErrorMsg] = useState("");
+    const [uploadedFileName, setUploadedFileName] = useState("");
+    const [videoPaused, setVideoPaused] = useState(false);
 
     // -----------------------------------------------------------------------
-    // Initialise MediaPipe and webcam
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    /** Release any blob URL previously created for an uploaded video. */
+    function revokeBlobUrl() {
+        if (videoBlobUrlRef.current) {
+            URL.revokeObjectURL(videoBlobUrlRef.current);
+            videoBlobUrlRef.current = null;
+        }
+    }
+
+    /** Fully stop all media and cancel the detection loop. */
+    const stopAll = useCallback(() => {
+        cancelAnimationFrame(rafRef.current);
+        const video = videoRef.current;
+        if (video) {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach((t) => t.stop());
+                video.srcObject = null;
+            }
+            video.pause();
+            video.src = "";
+            video.load();
+        }
+        revokeBlobUrl();
+        lastTimestampRef.current = -1;
+        setStatus("idle");
+        setVideoPaused(false);
+    }, []);
+
+    // Switch mode: reset everything first.
+    const switchMode = useCallback((newMode) => {
+        stopAll();
+        setInputMode(newMode);
+        setResult(null);
+        setErrorMsg("");
+        setUploadedFileName("");
+    }, [stopAll]);
+
+    // -----------------------------------------------------------------------
+    // Webcam start
     // -----------------------------------------------------------------------
     const startCamera = useCallback(async () => {
         setStatus("loading");
         setErrorMsg("");
         try {
-            landmarkerRef.current = await loadPoseLandmarker();
+            if (!landmarkerRef.current) {
+                landmarkerRef.current = await loadPoseLandmarker();
+            }
 
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { width: 640, height: 480 },
@@ -104,18 +152,64 @@ export default function SquatAnalyzer() {
         }
     }, []);
 
-    const stopCamera = useCallback(() => {
-        cancelAnimationFrame(rafRef.current);
-        const video = videoRef.current;
-        if (video?.srcObject) {
-            video.srcObject.getTracks().forEach((t) => t.stop());
-            video.srcObject = null;
+    // -----------------------------------------------------------------------
+    // Video upload
+    // -----------------------------------------------------------------------
+    const handleFileChange = useCallback(async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Only accept video files.
+        if (!file.type.startsWith("video/")) {
+            setErrorMsg("Please select a video file.");
+            setStatus("error");
+            return;
         }
-        setStatus("idle");
+
+        stopAll();
+        setResult(null);
+        setErrorMsg("");
+        setUploadedFileName(file.name);
+        setStatus("loading");
+
+        try {
+            if (!landmarkerRef.current) {
+                landmarkerRef.current = await loadPoseLandmarker();
+            }
+
+            revokeBlobUrl();
+            const blobUrl = URL.createObjectURL(file);
+            videoBlobUrlRef.current = blobUrl;
+
+            const video = videoRef.current;
+            video.srcObject = null;
+            video.src = blobUrl;
+            video.load();
+            await video.play();
+
+            setStatus("running");
+            setVideoPaused(false);
+        } catch (err) {
+            setStatus("error");
+            setErrorMsg(String(err));
+        }
+    }, [stopAll]);
+
+    /** Toggle play / pause for an uploaded video. */
+    const togglePlayPause = useCallback(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        if (video.paused) {
+            video.play();
+            setVideoPaused(false);
+        } else {
+            video.pause();
+            setVideoPaused(true);
+        }
     }, []);
 
     // -----------------------------------------------------------------------
-    // Detection loop
+    // Detection loop (shared by both webcam and uploaded video)
     // -----------------------------------------------------------------------
     useEffect(() => {
         if (status !== "running") return;
@@ -133,6 +227,12 @@ export default function SquatAnalyzer() {
                 return;
             }
 
+            // Don't process while paused.
+            if (video.paused || video.ended) {
+                rafRef.current = requestAnimationFrame(detect);
+                return;
+            }
+
             // Avoid re-processing the same video frame.
             if (timestamp <= lastTimestampRef.current) {
                 rafRef.current = requestAnimationFrame(detect);
@@ -140,14 +240,14 @@ export default function SquatAnalyzer() {
             }
             lastTimestampRef.current = timestamp;
 
-            const result = landmarker.detectForVideo(video, timestamp);
-            drawOverlay(canvas, video, result);
+            const detection = landmarker.detectForVideo(video, timestamp);
+            drawOverlay(canvas, video, detection);
 
             // Throttle backend calls to avoid overwhelming the server.
             frameCounter++;
-            if (frameCounter % SEND_EVERY_N_FRAMES === 0 && result.landmarks?.length > 0) {
-                const kp2d = filterSquatKeypoints(result.landmarks[0], false);
-                const kp3d = filterSquatKeypoints(result.worldLandmarks?.[0] ?? [], true);
+            if (frameCounter % SEND_EVERY_N_FRAMES === 0 && detection.landmarks?.length > 0) {
+                const kp2d = filterSquatKeypoints(detection.landmarks[0], false);
+                const kp3d = filterSquatKeypoints(detection.worldLandmarks?.[0] ?? [], true);
                 sendToBackend(kp2d, kp3d);
             }
 
@@ -235,12 +335,36 @@ export default function SquatAnalyzer() {
                 squat depth via the Python backend.
             </p>
 
+            {/* Mode toggle */}
+            <div className="flex rounded-lg overflow-hidden border border-slate-600">
+                <button
+                    onClick={() => switchMode("webcam")}
+                    className={`px-5 py-2 text-sm font-semibold transition ${
+                        inputMode === "webcam"
+                            ? "bg-sky-600 text-white"
+                            : "bg-slate-800 text-slate-400 hover:text-white"
+                    }`}
+                >
+                    📷 Live Camera
+                </button>
+                <button
+                    onClick={() => switchMode("upload")}
+                    className={`px-5 py-2 text-sm font-semibold transition ${
+                        inputMode === "upload"
+                            ? "bg-sky-600 text-white"
+                            : "bg-slate-800 text-slate-400 hover:text-white"
+                    }`}
+                >
+                    🎬 Upload Video
+                </button>
+            </div>
+
             {/* Video + canvas overlay */}
-            <div className="relative rounded-xl overflow-hidden border border-slate-700">
+            <div className="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-900">
                 <video
                     ref={videoRef}
                     className="block"
-                    style={{ width: 640, height: 480 }}
+                    style={{ width: 640, height: 480, objectFit: "contain" }}
                     muted
                     playsInline
                 />
@@ -251,29 +375,76 @@ export default function SquatAnalyzer() {
                 />
             </div>
 
-            {/* Controls */}
-            <div className="flex gap-3">
-                {status !== "running" ? (
-                    <button
-                        onClick={startCamera}
-                        disabled={status === "loading"}
-                        className="px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold transition"
-                    >
-                        {status === "loading" ? "Loading…" : "Start Camera"}
-                    </button>
-                ) : (
-                    <button
-                        onClick={stopCamera}
-                        className="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold transition"
-                    >
-                        Stop
-                    </button>
-                )}
-            </div>
+            {/* Controls — webcam mode */}
+            {inputMode === "webcam" && (
+                <div className="flex gap-3">
+                    {status !== "running" ? (
+                        <button
+                            onClick={startCamera}
+                            disabled={status === "loading"}
+                            className="px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold transition"
+                        >
+                            {status === "loading" ? "Loading…" : "Start Camera"}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={stopAll}
+                            className="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold transition"
+                        >
+                            Stop
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* Controls — upload mode */}
+            {inputMode === "upload" && (
+                <div className="flex flex-col items-center gap-3">
+                    <div className="flex gap-3 items-center">
+                        {/* Hidden file input, triggered by the button */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="video/*"
+                            className="hidden"
+                            onChange={handleFileChange}
+                        />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={status === "loading"}
+                            className="px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold transition"
+                        >
+                            {status === "loading" ? "Loading…" : "Choose Video…"}
+                        </button>
+
+                        {status === "running" && (
+                            <>
+                                <button
+                                    onClick={togglePlayPause}
+                                    className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-semibold transition"
+                                >
+                                    {videoPaused ? "▶ Play" : "⏸ Pause"}
+                                </button>
+                                <button
+                                    onClick={stopAll}
+                                    className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold transition"
+                                >
+                                    ✕ Stop
+                                </button>
+                            </>
+                        )}
+                    </div>
+                    {uploadedFileName && (
+                        <p className="text-slate-400 text-xs">
+                            {uploadedFileName}
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* Error */}
             {status === "error" && (
-                <p className="text-red-400 text-sm">{errorMsg || "Camera access failed."}</p>
+                <p className="text-red-400 text-sm">{errorMsg || "An error occurred."}</p>
             )}
 
             {/* Classification result */}
