@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import Predict from "./components/Predict";
 import SquatAnalyzer from "./components/SquatAnalyzer";
+import BackendStatus from "./components/BackendStatus";
 
 const TABS = [
     { id: "predict", label: "Predict" },
@@ -17,7 +18,7 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-aurora">
-            <nav className="flex gap-2 px-6 pt-4">
+            <nav className="flex items-center gap-2 px-6 pt-4">
                 {TABS.map((tab) => (
                     <button
                         key={tab.id}
@@ -31,6 +32,10 @@ export default function App() {
                         {tab.label}
                     </button>
                 ))}
+                {/* Push the backend status pill to the right end of the nav bar */}
+                <span className="ml-auto">
+                    <BackendStatus />
+                </span>
             </nav>
             {activeTab === "predict" && <Predict />}
             {activeTab === "squat" && <SquatAnalyzer />}
