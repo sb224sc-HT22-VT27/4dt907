@@ -68,7 +68,11 @@ export default function BackendStatus() {
             pollTimerRef.current = null;
         }
 
-        function scheduleNext(delayMs, nextState) {
+        // pollingMode controls the retry interval and state to set on failure:
+        //   "online"  — standard 60-second poll; failure → sleeping
+        //   "waking"  — fast 5-second retry; failure → stay waking
+        //   "sleeping" — standard poll; failure → stay sleeping
+        function scheduleNext(delayMs, pollingMode) {
             clearPoll();
             pollTimerRef.current = setTimeout(async () => {
                 if (!mountedRef.current) return;
@@ -77,7 +81,8 @@ export default function BackendStatus() {
                 if (ok) {
                     setBackendState("online");
                     scheduleNext(POLL_ONLINE_MS, "online");
-                } else if (nextState === "waking") {
+                } else if (pollingMode === "waking") {
+                    setBackendState("waking");
                     scheduleNext(POLL_WAKING_MS, "waking");
                 } else {
                     setBackendState("sleeping");
