@@ -17,21 +17,25 @@ export default function App() {
     const [activeTab, setActiveTab] = useState("predict");
 
     return (
-        <div className="min-h-screen bg-aurora">
-            <nav className="flex items-center gap-2 px-6 pt-4">
-                {TABS.map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition ${
-                            activeTab === tab.id
-                                ? "bg-slate-800 text-white"
-                                : "text-slate-400 hover:text-white"
-                        }`}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
+        <div className="min-h-screen ios-bg">
+            {/* Navbar — glass strip pinned to the top */}
+            <nav className="sticky top-0 z-50 flex items-center gap-3 px-6 py-3 ios-pill border-b border-black/5">
+                {/* iOS-style segmented control */}
+                <div className="flex rounded-full bg-black/[0.06] p-0.5 gap-px">
+                    {TABS.map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-all duration-150 ${
+                                activeTab === tab.id
+                                    ? "bg-white text-slate-800 shadow-sm"
+                                    : "text-slate-500 hover:text-slate-700"
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
                 {/* Push the backend status pill to the right end of the nav bar */}
                 <span className="ml-auto">
                     <BackendStatus />
