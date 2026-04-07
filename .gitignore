@@ -4,6 +4,7 @@
 **/cache/
 *.pdf
 outputs/
+*.pt
 
 # Node.js
 node_modules/
