@@ -1,9 +1,11 @@
 // SquatAnalyzer: uses MediaPipe Pose (tasks-vision) to detect squat keypoints
 // from a live webcam feed or an uploaded video file, then sends them to the
 // Python backend for angle calculation and depth classification (Deep / Shallow / Invalid).
+// Keypoints are also stored in Supabase (squat_sessions table) in parallel.
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { apiUrl } from "../apiBase";
+import supabase from "../supabaseClient";
 
 // ---------------------------------------------------------------------------
 // MediaPipe keypoint indices used for squat analysis
@@ -162,9 +164,12 @@ export default function SquatAnalyzer() {
     const rafRef = useRef(null);
     const lastTimestampRef = useRef(-1);
     const videoBlobUrlRef = useRef(null);
+    // Mirror of sessionName state — readable inside async rAF callbacks.
+    const sessionNameRef = useRef("");
 
     // "webcam" | "upload"
     const [inputMode, setInputMode] = useState("webcam");
+    const [sessionName, setSessionName] = useState("");
     const [status, setStatus] = useState("idle"); // idle | loading | running | error
     const [result, setResult] = useState(null); // last classification response
     const [errorMsg, setErrorMsg] = useState("");
@@ -350,7 +355,7 @@ export default function SquatAnalyzer() {
                     detection.worldLandmarks?.[0] ?? [],
                     true,
                 );
-                sendToBackend(kp2d, kp3d);
+                sendFrame(kp2d, kp3d);
 
                 // Collect all 33 landmarks for the debug panel.
                 const all = detection.landmarks[0].map((lm, i) => ({
@@ -372,9 +377,28 @@ export default function SquatAnalyzer() {
     }, [status]);
 
     // -----------------------------------------------------------------------
-    // Backend request
+    // Backend + Supabase — combined per-frame dispatch
+    //
+    // Flow:
+    //   1. POST keypoints to the Python backend for classification.
+    //   2. Update the UI with the result.
+    //   3. Insert one row to Supabase's squat_sessions table using the
+    //      classification result from step 1 (score = confidence).
+    //
+    // raw_keypoints shape stored in DB:
+    //   {
+    //     "2d": [ [x, y], … ],   // one [x, y]  pair per squat keypoint
+    //     "3d": [ [x, y, z], … ] // one [x, y, z] triple per squat keypoint
+    //   }
     // -----------------------------------------------------------------------
-    async function sendToBackend(keypoints2d, keypoints3d) {
+
+    // Keep the ref in sync so the async callback always sees the latest name.
+    sessionNameRef.current = sessionName;
+
+    async function sendFrame(keypoints2d, keypoints3d) {
+        // --- 1. Backend classification ---
+        let classification = null;
+        let confidence = null;
         try {
             const res = await fetch(apiUrl("/api/v1/squat/classify"), {
                 method: "POST",
@@ -384,11 +408,36 @@ export default function SquatAnalyzer() {
                     keypoints_3d: keypoints3d,
                 }),
             });
-            if (!res.ok) return;
-            const data = await res.json();
-            setResult(data);
+            if (res.ok) {
+                const data = await res.json();
+                setResult(data);
+                classification = data.classification ?? null;
+                confidence = data.confidence ?? null;
+            }
         } catch {
             // Network errors are silently ignored during live detection.
+        }
+
+        // --- 2. Supabase insert ---
+        if (!supabase) return;
+        // id_name is nullable — send null when the user hasn't entered a name.
+        const idName = sessionNameRef.current.trim() || null;
+
+        // Shape raw_keypoints: 2D points as [x, y], 3D points as [x, y, z].
+        const rawKeypoints = {
+            "2d": keypoints2d.map(({ x, y }) => [x, y]),
+            "3d": keypoints3d.map(({ x, y, z }) => [x, y, z]),
+        };
+
+        try {
+            await supabase.from("squat_sessions").insert({
+                id_name: idName,
+                raw_keypoints: rawKeypoints,
+                score: confidence,
+                classification,
+            });
+        } catch {
+            // DB errors are silently ignored so they never interrupt detection.
         }
     }
 
@@ -453,6 +502,27 @@ export default function SquatAnalyzer() {
                     classified by the Python backend.
                 </p>
             </div>
+
+            {/* Session name — stored as id_name in Supabase squat_sessions */}
+            {supabase && (
+                <div className="flex flex-col items-center gap-1">
+                    <label
+                        htmlFor="session-name"
+                        className="text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                    >
+                        Your name
+                    </label>
+                    <input
+                        id="session-name"
+                        type="text"
+                        value={sessionName}
+                        onChange={(e) => setSessionName(e.target.value)}
+                        placeholder="Your name (optional)"
+                        disabled={status === "running"}
+                        className="ios-card rounded-xl px-4 py-2 text-sm text-slate-700 placeholder-slate-400 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-400 w-72 disabled:opacity-50"
+                    />
+                </div>
+            )}
 
             {/* Mode toggle — iOS segmented control */}
             <div className="ios-pill flex rounded-full p-0.5 gap-px">
