@@ -3,6 +3,8 @@
 // Python backend for angle calculation and depth classification (Deep / Shallow / Invalid).
 // Keypoints are also stored in Supabase (public.squat_keypoints table) in parallel.
 
+// TODO: Add image upload aswell
+
 import { useEffect, useRef, useState, useCallback } from "react";
 import { apiUrl } from "../apiBase";
 import supabase from "../supabaseClient";
@@ -12,6 +14,7 @@ import supabase from "../supabaseClient";
 // https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker
 // ---------------------------------------------------------------------------
 const SQUAT_LANDMARK_NAMES = {
+    // TODO: Take updated version from provided A11 .csv files
     11: "left_shoulder",
     12: "right_shoulder",
     13: "left_elbow",
@@ -111,6 +114,7 @@ const POSE_CONNECTIONS = [
 ];
 
 // Indices that are squat-relevant (highlighted brighter).
+// TODO: Take updated version from provided A11 .csv files
 const SQUAT_INDICES = new Set([
     11, 12, 13, 14, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 ]);
