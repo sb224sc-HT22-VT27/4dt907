@@ -22,61 +22,88 @@ const SQUAT_LANDMARK_NAMES = {
 
 // All 33 MediaPipe landmark names in index order.
 const ALL_LANDMARK_NAMES = [
-    "nose",            // 0
-    "left_eye_inner",  // 1
-    "left_eye",        // 2
-    "left_eye_outer",  // 3
+    "nose", // 0
+    "left_eye_inner", // 1
+    "left_eye", // 2
+    "left_eye_outer", // 3
     "right_eye_inner", // 4
-    "right_eye",       // 5
+    "right_eye", // 5
     "right_eye_outer", // 6
-    "left_ear",        // 7
-    "right_ear",       // 8
-    "mouth_left",      // 9
-    "mouth_right",     // 10
-    "left_shoulder",   // 11
-    "right_shoulder",  // 12
-    "left_elbow",      // 13
-    "right_elbow",     // 14
-    "left_wrist",      // 15
-    "right_wrist",     // 16
-    "left_pinky",      // 17
-    "right_pinky",     // 18
-    "left_index",      // 19
-    "right_index",     // 20
-    "left_thumb",      // 21
-    "right_thumb",     // 22
-    "left_hip",        // 23
-    "right_hip",       // 24
-    "left_knee",       // 25
-    "right_knee",      // 26
-    "left_ankle",      // 27
-    "right_ankle",     // 28
-    "left_heel",       // 29
-    "right_heel",      // 30
+    "left_ear", // 7
+    "right_ear", // 8
+    "mouth_left", // 9
+    "mouth_right", // 10
+    "left_shoulder", // 11
+    "right_shoulder", // 12
+    "left_elbow", // 13
+    "right_elbow", // 14
+    "left_wrist", // 15
+    "right_wrist", // 16
+    "left_pinky", // 17
+    "right_pinky", // 18
+    "left_index", // 19
+    "right_index", // 20
+    "left_thumb", // 21
+    "right_thumb", // 22
+    "left_hip", // 23
+    "right_hip", // 24
+    "left_knee", // 25
+    "right_knee", // 26
+    "left_ankle", // 27
+    "right_ankle", // 28
+    "left_heel", // 29
+    "right_heel", // 30
     "left_foot_index", // 31
-    "right_foot_index",// 32
+    "right_foot_index", // 32
 ];
 
 // Full body skeleton connections (MediaPipe BlazePose topology).
 const POSE_CONNECTIONS = [
     // Face
-    [0, 1], [1, 2], [2, 3], [3, 7],
-    [0, 4], [4, 5], [5, 6], [6, 8],
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 7],
+    [0, 4],
+    [4, 5],
+    [5, 6],
+    [6, 8],
     [9, 10],
     // Torso
-    [11, 12], [11, 23], [12, 24], [23, 24],
+    [11, 12],
+    [11, 23],
+    [12, 24],
+    [23, 24],
     // Left arm
-    [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
+    [11, 13],
+    [13, 15],
+    [15, 17],
+    [15, 19],
+    [15, 21],
+    [17, 19],
     // Right arm
-    [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
+    [12, 14],
+    [14, 16],
+    [16, 18],
+    [16, 20],
+    [16, 22],
+    [18, 20],
     // Left leg
-    [23, 25], [25, 27], [27, 29], [27, 31], [29, 31],
+    [23, 25],
+    [25, 27],
+    [27, 29],
+    [27, 31],
+    [29, 31],
     // Right leg
-    [24, 26], [26, 28], [28, 30], [28, 32], [30, 32],
+    [24, 26],
+    [26, 28],
+    [28, 30],
+    [28, 32],
+    [30, 32],
 ];
 
 // Indices that are squat-relevant (highlighted brighter).
-const SQUAT_INDICES = new Set([23, 24, 25, 26, 27, 28, 29, 30, 31, 32]);
+const SQUAT_INDICES = new Set([23, 24, 25, 26, 27, 28, 29, 30, 31, 32]); // TODO: Missing components????
 
 const CLASSIFICATION_COLORS = {
     Deep: "text-green-600",
@@ -113,7 +140,7 @@ async function loadPoseLandmarker() {
         await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm");
 
     const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm",
     );
 
     return PoseLandmarker.createFromOptions(vision, {
@@ -139,7 +166,7 @@ export default function SquatAnalyzer() {
     // "webcam" | "upload"
     const [inputMode, setInputMode] = useState("webcam");
     const [status, setStatus] = useState("idle"); // idle | loading | running | error
-    const [result, setResult] = useState(null);   // last classification response
+    const [result, setResult] = useState(null); // last classification response
     const [errorMsg, setErrorMsg] = useState("");
     const [uploadedFileName, setUploadedFileName] = useState("");
     const [videoPaused, setVideoPaused] = useState(false);
@@ -178,13 +205,16 @@ export default function SquatAnalyzer() {
     }, []);
 
     // Switch mode: reset everything first.
-    const switchMode = useCallback((newMode) => {
-        stopAll();
-        setInputMode(newMode);
-        setResult(null);
-        setErrorMsg("");
-        setUploadedFileName("");
-    }, [stopAll]);
+    const switchMode = useCallback(
+        (newMode) => {
+            stopAll();
+            setInputMode(newMode);
+            setResult(null);
+            setErrorMsg("");
+            setUploadedFileName("");
+        },
+        [stopAll],
+    );
 
     // -----------------------------------------------------------------------
     // Webcam start
@@ -215,45 +245,48 @@ export default function SquatAnalyzer() {
     // -----------------------------------------------------------------------
     // Video upload
     // -----------------------------------------------------------------------
-    const handleFileChange = useCallback(async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const handleFileChange = useCallback(
+        async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
 
-        // Only accept video files.
-        if (!file.type.startsWith("video/")) {
-            setErrorMsg("Please select a video file.");
-            setStatus("error");
-            return;
-        }
-
-        stopAll();
-        setResult(null);
-        setErrorMsg("");
-        setUploadedFileName(file.name);
-        setStatus("loading");
-
-        try {
-            if (!landmarkerRef.current) {
-                landmarkerRef.current = await loadPoseLandmarker();
+            // Only accept video files.
+            if (!file.type.startsWith("video/")) {
+                setErrorMsg("Please select a video file.");
+                setStatus("error");
+                return;
             }
 
-            revokeBlobUrl();
-            const blobUrl = URL.createObjectURL(file);
-            videoBlobUrlRef.current = blobUrl;
+            stopAll();
+            setResult(null);
+            setErrorMsg("");
+            setUploadedFileName(file.name);
+            setStatus("loading");
 
-            const video = videoRef.current;
-            video.srcObject = null;
-            video.src = blobUrl;
-            video.load();
-            await video.play();
+            try {
+                if (!landmarkerRef.current) {
+                    landmarkerRef.current = await loadPoseLandmarker();
+                }
 
-            setStatus("running");
-            setVideoPaused(false);
-        } catch (err) {
-            setStatus("error");
-            setErrorMsg(String(err));
-        }
-    }, [stopAll]);
+                revokeBlobUrl();
+                const blobUrl = URL.createObjectURL(file);
+                videoBlobUrlRef.current = blobUrl;
+
+                const video = videoRef.current;
+                video.srcObject = null;
+                video.src = blobUrl;
+                video.load();
+                await video.play();
+
+                setStatus("running");
+                setVideoPaused(false);
+            } catch (err) {
+                setStatus("error");
+                setErrorMsg(String(err));
+            }
+        },
+        [stopAll],
+    );
 
     /** Toggle play / pause for an uploaded video. */
     const togglePlayPause = useCallback(() => {
@@ -305,9 +338,18 @@ export default function SquatAnalyzer() {
 
             // Throttle backend calls and state updates to ~2 Hz.
             frameCounter++;
-            if (frameCounter % SEND_EVERY_N_FRAMES === 0 && detection.landmarks?.length > 0) {
-                const kp2d = filterSquatKeypoints(detection.landmarks[0], false);
-                const kp3d = filterSquatKeypoints(detection.worldLandmarks?.[0] ?? [], true);
+            if (
+                frameCounter % SEND_EVERY_N_FRAMES === 0 &&
+                detection.landmarks?.length > 0
+            ) {
+                const kp2d = filterSquatKeypoints(
+                    detection.landmarks[0],
+                    false,
+                );
+                const kp3d = filterSquatKeypoints(
+                    detection.worldLandmarks?.[0] ?? [],
+                    true,
+                );
                 sendToBackend(kp2d, kp3d);
 
                 // Collect all 33 landmarks for the debug panel.
@@ -375,8 +417,8 @@ export default function SquatAnalyzer() {
             ctx.moveTo(la.x * w, la.y * h);
             ctx.lineTo(lb.x * w, lb.y * h);
             ctx.strokeStyle = isSquatBone
-                ? "rgba(244, 114, 182, 0.92)"   // pink — squat legs
-                : "rgba(148, 163, 184, 0.55)";  // slate — rest of body
+                ? "rgba(244, 114, 182, 0.92)" // pink — squat legs
+                : "rgba(148, 163, 184, 0.55)"; // slate — rest of body
             ctx.lineWidth = isSquatBone ? 3 : 1.5;
             ctx.stroke();
         });
@@ -395,15 +437,20 @@ export default function SquatAnalyzer() {
     // -----------------------------------------------------------------------
     // Render
     // -----------------------------------------------------------------------
-    const colorClass = result ? (CLASSIFICATION_COLORS[result.classification] ?? "text-slate-700") : "";
+    const colorClass = result
+        ? (CLASSIFICATION_COLORS[result.classification] ?? "text-slate-700")
+        : "";
 
     return (
         <div className="flex flex-col items-center gap-5 px-6 py-8 max-w-3xl mx-auto">
             {/* Header */}
             <div className="text-center">
-                <h2 className="text-2xl font-bold text-slate-800">Squat Analyzer</h2>
+                <h2 className="text-2xl font-bold text-slate-800">
+                    Squat Analyzer
+                </h2>
                 <p className="text-slate-500 text-sm mt-1">
-                    MediaPipe detects all 33 body landmarks. Squat depth is classified by the Python backend.
+                    MediaPipe detects all 33 body landmarks. Squat depth is
+                    classified by the Python backend.
                 </p>
             </div>
 
@@ -432,7 +479,10 @@ export default function SquatAnalyzer() {
             </div>
 
             {/* Video + canvas overlay */}
-            <div className="ios-card relative rounded-2xl overflow-hidden" style={{ width: 640, height: 480 }}>
+            <div
+                className="ios-card relative rounded-2xl overflow-hidden"
+                style={{ width: 640, height: 480 }}
+            >
                 <video
                     ref={videoRef}
                     className="block bg-black"
@@ -485,7 +535,9 @@ export default function SquatAnalyzer() {
                             disabled={status === "loading"}
                             className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
                         >
-                            {status === "loading" ? "Loading…" : "Choose Video…"}
+                            {status === "loading"
+                                ? "Loading…"
+                                : "Choose Video…"}
                         </button>
 
                         {status === "running" && (
@@ -506,36 +558,50 @@ export default function SquatAnalyzer() {
                         )}
                     </div>
                     {uploadedFileName && (
-                        <p className="text-slate-400 text-xs">{uploadedFileName}</p>
+                        <p className="text-slate-400 text-xs">
+                            {uploadedFileName}
+                        </p>
                     )}
                 </div>
             )}
 
             {/* Error */}
             {status === "error" && (
-                <p className="text-red-500 text-sm">{errorMsg || "An error occurred."}</p>
+                <p className="text-red-500 text-sm">
+                    {errorMsg || "An error occurred."}
+                </p>
             )}
 
             {/* Classification result */}
             {result && (
                 <div className="ios-card rounded-2xl p-5 text-center w-72">
-                    <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Classification</p>
+                    <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">
+                        Classification
+                    </p>
                     <p className={`text-4xl font-bold mb-4 ${colorClass}`}>
                         {result.classification}
                     </p>
                     <div className="flex justify-around text-sm">
                         <div>
                             <p className="text-slate-400 text-xs">Left knee</p>
-                            <p className="font-mono text-slate-700 font-semibold">{result.left_knee_angle?.toFixed(1)}°</p>
+                            <p className="font-mono text-slate-700 font-semibold">
+                                {result.left_knee_angle?.toFixed(1)}°
+                            </p>
                         </div>
                         <div>
                             <p className="text-slate-400 text-xs">Right knee</p>
-                            <p className="font-mono text-slate-700 font-semibold">{result.right_knee_angle?.toFixed(1)}°</p>
+                            <p className="font-mono text-slate-700 font-semibold">
+                                {result.right_knee_angle?.toFixed(1)}°
+                            </p>
                         </div>
                         {result.confidence != null && (
                             <div>
-                                <p className="text-slate-400 text-xs">Confidence</p>
-                                <p className="font-mono text-slate-700 font-semibold">{(result.confidence * 100).toFixed(0)}%</p>
+                                <p className="text-slate-400 text-xs">
+                                    Confidence
+                                </p>
+                                <p className="font-mono text-slate-700 font-semibold">
+                                    {(result.confidence * 100).toFixed(0)}%
+                                </p>
                             </div>
                         )}
                     </div>
@@ -558,10 +624,16 @@ export default function SquatAnalyzer() {
                                         : "text-slate-400"
                                 }`}
                             >
-                                <span className="w-5 text-right text-slate-300">{kp.index}</span>
+                                <span className="w-5 text-right text-slate-300">
+                                    {kp.index}
+                                </span>
                                 <span className="w-28 truncate">{kp.name}</span>
-                                <span className="tabular-nums">{kp.x.toFixed(3)}</span>
-                                <span className="tabular-nums">{kp.y.toFixed(3)}</span>
+                                <span className="tabular-nums">
+                                    {kp.x.toFixed(3)}
+                                </span>
+                                <span className="tabular-nums">
+                                    {kp.y.toFixed(3)}
+                                </span>
                                 <span className="text-slate-300 tabular-nums">
                                     {(kp.visibility * 100).toFixed(0)}%
                                 </span>
