@@ -1,7 +1,7 @@
 // SquatAnalyzer: uses MediaPipe Pose (tasks-vision) to detect squat keypoints
 // from a live webcam feed or an uploaded video file, then sends them to the
 // Python backend for angle calculation and depth classification (Deep / Shallow / Invalid).
-// Keypoints are also stored in Supabase (public.squat_keypoints table) in parallel.
+// Keypoints are also stored in Supabase (public.squat_sessions table) in parallel.
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { apiUrl } from "../apiBase";
@@ -20,6 +20,8 @@ const SQUAT_LANDMARK_NAMES = {
     28: "right_ankle",
     29: "left_heel",
     30: "right_heel",
+    31: "left_foot_index",
+    32: "right_foot_index",
 };
 
 // All 33 MediaPipe landmark names in index order.
@@ -105,7 +107,7 @@ const POSE_CONNECTIONS = [
 ];
 
 // Indices that are squat-relevant (highlighted brighter).
-const SQUAT_INDICES = new Set([23, 24, 25, 26, 27, 28, 29, 30, 31, 32]); // TODO: Missing components????
+const SQUAT_INDICES = new Set([23, 24, 25, 26, 27, 28, 29, 30, 31, 32]);
 
 const CLASSIFICATION_COLORS = {
     Deep: "text-green-600",
@@ -382,7 +384,7 @@ export default function SquatAnalyzer() {
     // Flow:
     //   1. POST keypoints to the Python backend for classification.
     //   2. Update the UI with the result.
-    //   3. Insert one row to Supabase's public.squat_keypoints table using the
+    //   3. Insert one row to Supabase's public.squat_sessions table using the
     //      classification result from step 1.
     //
     // raw_keypoints shape stored in DB:
@@ -396,9 +398,15 @@ export default function SquatAnalyzer() {
     sessionNameRef.current = sessionName;
 
     /**
-     * TODO: Current impl is stupid, needs reimpl on DL learning
-     * Train DL model and publish model to dagshub which will be callable on new endpoint.
-     * This model will handle classification and scoring in the future for now create a backup which is the current predict and classfiy based on the keypoints.
+     * Classification is handled by the Python backend (POST /api/v1/squat/classify).
+     * The backend attempts PyTorch inference using the trained SquatNet model first
+     * and automatically falls back to a rule-based threshold classifier when the
+     * model file is absent or torch is unavailable — so the endpoint is always
+     * responsive even without a trained checkpoint.
+     *
+     * Future work: train an improved model, publish it to DAGsHub / MLflow, and
+     * register it at a new versioned endpoint. The rule-based path will remain the
+     * fallback throughout.
      */
     async function sendFrame(keypoints2d, keypoints3d) {
         // --- 1. Backend classification ---
@@ -434,15 +442,15 @@ export default function SquatAnalyzer() {
             "3d": keypoints3d.map(({ x, y, z }) => [x, y, z]),
         };
 
-        try {
-            await supabase.from("squat_keypoints").insert({
-                id_name: idName,
-                raw_keypoints: rawKeypoints,
-                score: confidence,
-                classification,
-            });
-        } catch {
-            // DB errors are silently ignored so they never interrupt detection.
+        // Supabase JS client returns { data, error } rather than throwing.
+        const { error: dbError } = await supabase.from("squat_sessions").insert({
+            id_name: idName,
+            raw_keypoints: rawKeypoints,
+            score: confidence,
+            classification,
+        });
+        if (dbError) {
+            console.warn("Supabase insert error:", dbError.message);
         }
     }
 
@@ -508,7 +516,7 @@ export default function SquatAnalyzer() {
                 </p>
             </div>
 
-            {/* Session name — stored as id_name in Supabase public.squat_keypoints */}
+            {/* Session name — stored as id_name in Supabase public.squat_sessions */}
             {supabase && (
                 <div className="flex flex-col items-center gap-1">
                     <label
