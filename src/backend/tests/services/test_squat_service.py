@@ -1,4 +1,5 @@
 """Tests for squat_service module."""
+
 import math
 
 import pytest
@@ -6,11 +7,7 @@ import pytest
 from app.services.squat_service import calculate_knee_angle, classify_squat
 
 
-# ---------------------------------------------------------------------------
 # calculate_knee_angle
-# ---------------------------------------------------------------------------
-
-
 def _pt3(x, y, z):
     return {"x": x, "y": y, "z": z}
 
@@ -51,11 +48,7 @@ def test_calculate_knee_angle_zero_length_returns_180():
     assert angle == 180.0
 
 
-# ---------------------------------------------------------------------------
 # classify_squat
-# ---------------------------------------------------------------------------
-
-
 def _make_kp3(name, x, y, z):
     return {"name": name, "x": x, "y": y, "z": z}
 

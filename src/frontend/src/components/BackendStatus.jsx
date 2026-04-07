@@ -57,9 +57,7 @@ export default function BackendStatus() {
     // Expose wakeUp handler from the main effect so the button can call it.
     const wakeUpRef = useRef(null);
 
-    // -----------------------------------------------------------------------
     // Main polling effect
-    // -----------------------------------------------------------------------
     useEffect(() => {
         mountedRef.current = true;
 
@@ -128,12 +126,10 @@ export default function BackendStatus() {
         };
     }, []);
 
-    // -----------------------------------------------------------------------
     // Render
-    // -----------------------------------------------------------------------
-
     // Shared pill shell — glass background, rounded-full badge look
-    const pillBase = "ios-pill inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium";
+    const pillBase =
+        "ios-pill inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium";
 
     if (backendState === "checking") {
         return (
@@ -162,8 +158,19 @@ export default function BackendStatus() {
                     fill="none"
                     viewBox="0 0 24 24"
                 >
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                    />
+                    <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8H4z"
+                    />
                 </svg>
                 Waking up…
             </span>
@@ -186,5 +193,3 @@ export default function BackendStatus() {
         </span>
     );
 }
-
-

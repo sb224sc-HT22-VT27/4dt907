@@ -1,4 +1,5 @@
 """Tests for the /api/v1/squat/classify endpoint."""
+
 import math
 
 from fastapi import FastAPI

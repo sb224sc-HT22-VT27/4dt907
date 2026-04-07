@@ -9,10 +9,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { apiUrl } from "../apiBase";
 import supabase from "../supabaseClient";
 
-// ---------------------------------------------------------------------------
 // MediaPipe keypoint indices used for squat analysis
 // https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker
-// ---------------------------------------------------------------------------
 const SQUAT_LANDMARK_NAMES = {
     // TODO: Take updated version from provided A11 .csv files
     11: "left_shoulder",
@@ -190,10 +188,7 @@ export default function SquatAnalyzer() {
     // All 33 raw landmarks from the last processed frame (for debug display).
     const [allKeypoints, setAllKeypoints] = useState([]);
 
-    // -----------------------------------------------------------------------
     // Helpers
-    // -----------------------------------------------------------------------
-
     /** Release any blob URL previously created for an uploaded video. */
     function revokeBlobUrl() {
         if (videoBlobUrlRef.current) {
@@ -233,9 +228,7 @@ export default function SquatAnalyzer() {
         [stopAll],
     );
 
-    // -----------------------------------------------------------------------
     // Webcam start
-    // -----------------------------------------------------------------------
     const startCamera = useCallback(async () => {
         setStatus("loading");
         setErrorMsg("");
@@ -259,9 +252,7 @@ export default function SquatAnalyzer() {
         }
     }, []);
 
-    // -----------------------------------------------------------------------
     // Video upload
-    // -----------------------------------------------------------------------
     const handleFileChange = useCallback(
         async (e) => {
             const file = e.target.files?.[0];
@@ -318,9 +309,7 @@ export default function SquatAnalyzer() {
         }
     }, []);
 
-    // -----------------------------------------------------------------------
     // Detection loop (shared by both webcam and uploaded video)
-    // -----------------------------------------------------------------------
     useEffect(() => {
         if (status !== "running") return;
 
@@ -388,7 +377,6 @@ export default function SquatAnalyzer() {
         return () => cancelAnimationFrame(rafRef.current);
     }, [status]);
 
-    // -----------------------------------------------------------------------
     // Backend + Supabase — combined per-frame dispatch
     //
     // Flow:
@@ -402,8 +390,6 @@ export default function SquatAnalyzer() {
     //     "2d": [ [x, y], … ],   // one [x, y]  pair per squat keypoint
     //     "3d": [ [x, y, z], … ] // one [x, y, z] triple per squat keypoint
     //   }
-    // -----------------------------------------------------------------------
-
     // Keep the ref in sync so the async callback always sees the latest name.
     sessionNameRef.current = sessionName;
 
@@ -466,9 +452,7 @@ export default function SquatAnalyzer() {
         }
     }
 
-    // -----------------------------------------------------------------------
     // Canvas overlay — full body skeleton + highlighted squat joints
-    // -----------------------------------------------------------------------
     function drawOverlay(canvas, video, detectionResult) {
         const ctx = canvas.getContext("2d");
         canvas.width = video.videoWidth;
@@ -508,9 +492,7 @@ export default function SquatAnalyzer() {
         });
     }
 
-    // -----------------------------------------------------------------------
     // Render
-    // -----------------------------------------------------------------------
     const colorClass = result
         ? (CLASSIFICATION_COLORS[result.classification] ?? "text-slate-700")
         : "";
