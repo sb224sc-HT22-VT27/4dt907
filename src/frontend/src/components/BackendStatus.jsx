@@ -132,27 +132,30 @@ export default function BackendStatus() {
     // Render
     // -----------------------------------------------------------------------
 
+    // Shared pill shell — glass background, rounded-full badge look
+    const pillBase = "ios-pill inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium";
+
     if (backendState === "checking") {
         return (
-            <span className="flex items-center gap-1.5 text-xs text-slate-400 px-3 py-1">
-                <span className="inline-block w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
-                Checking backend…
+            <span className={`${pillBase} text-slate-400`}>
+                <span className="inline-block w-2 h-2 rounded-full bg-slate-400 animate-pulse" />
+                Checking…
             </span>
         );
     }
 
     if (backendState === "online") {
         return (
-            <span className="flex items-center gap-1.5 text-xs text-emerald-400 px-3 py-1">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-                Backend online
+            <span className={`${pillBase} text-emerald-600`}>
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                Online
             </span>
         );
     }
 
     if (backendState === "waking") {
         return (
-            <span className="flex items-center gap-1.5 text-xs text-amber-400 px-3 py-1">
+            <span className={`${pillBase} text-amber-600`}>
                 <svg
                     className="animate-spin w-3 h-3"
                     xmlns="http://www.w3.org/2000/svg"
@@ -162,21 +165,21 @@ export default function BackendStatus() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
-                Waking up… (may take ~30s)
+                Waking up…
             </span>
         );
     }
 
     // backendState === "sleeping"
     return (
-        <span className="flex items-center gap-2 text-xs px-3 py-1">
-            <span className="flex items-center gap-1.5 text-slate-400">
-                <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
-                Backend sleeping
+        <span className={`${pillBase} text-slate-500 gap-2`}>
+            <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-red-400" />
+                Sleeping
             </span>
             <button
                 onClick={() => wakeUpRef.current?.()}
-                className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-500 text-white font-semibold transition text-xs"
+                className="ios-btn px-2 py-0.5 rounded-full text-amber-700 font-semibold text-xs"
             >
                 Wake up
             </button>
