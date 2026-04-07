@@ -122,7 +122,7 @@ def _init_mlflow() -> str:
     return uri
 
 
-# * Current "entry point"
+# TODO: Unused???
 def _model_name_for_variant(variant: str) -> str:
     v = (variant or "").lower().strip()
     if v in {"champion", "best"}:
