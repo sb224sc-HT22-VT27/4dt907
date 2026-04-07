@@ -1,7 +1,7 @@
 // SquatAnalyzer: uses MediaPipe Pose (tasks-vision) to detect squat keypoints
 // from a live webcam feed or an uploaded video file, then sends them to the
 // Python backend for angle calculation and depth classification (Deep / Shallow / Invalid).
-// Keypoints are also stored in Supabase (public.squat_sessions table) in parallel.
+// Keypoints are also stored in Supabase (public.squat_keypoints table) in parallel.
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { apiUrl } from "../apiBase";
@@ -384,7 +384,7 @@ export default function SquatAnalyzer() {
     // Flow:
     //   1. POST keypoints to the Python backend for classification.
     //   2. Update the UI with the result.
-    //   3. Insert one row to Supabase's public.squat_sessions table using the
+    //   3. Insert one row to Supabase's public.squat_keypoints table using the
     //      classification result from step 1.
     //
     // raw_keypoints shape stored in DB:
@@ -443,7 +443,7 @@ export default function SquatAnalyzer() {
         };
 
         // Supabase JS client returns { data, error } rather than throwing.
-        const { error: dbError } = await supabase.from("squat_sessions").insert({
+        const { error: dbError } = await supabase.from("squat_keypoints").insert({
             id_name: idName,
             raw_keypoints: rawKeypoints,
             score: confidence,
@@ -516,7 +516,7 @@ export default function SquatAnalyzer() {
                 </p>
             </div>
 
-            {/* Session name — stored as id_name in Supabase public.squat_sessions */}
+            {/* Session name — stored as id_name in Supabase public.squat_keypoints */}
             {supabase && (
                 <div className="flex flex-col items-center gap-1">
                     <label
