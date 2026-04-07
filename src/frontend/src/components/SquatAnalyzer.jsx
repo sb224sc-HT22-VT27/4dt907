@@ -1,7 +1,7 @@
 // SquatAnalyzer: uses MediaPipe Pose (tasks-vision) to detect squat keypoints
 // from a live webcam feed or an uploaded video file, then sends them to the
 // Python backend for angle calculation and depth classification (Deep / Shallow / Invalid).
-// Keypoints are also stored in Supabase (squat_sessions table) in parallel.
+// Keypoints are also stored in Supabase (public.squat_keypoints table) in parallel.
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { apiUrl } from "../apiBase";
@@ -382,8 +382,8 @@ export default function SquatAnalyzer() {
     // Flow:
     //   1. POST keypoints to the Python backend for classification.
     //   2. Update the UI with the result.
-    //   3. Insert one row to Supabase's squat_sessions table using the
-    //      classification result from step 1 (score = confidence).
+    //   3. Insert one row to Supabase's public.squat_keypoints table using the
+    //      classification result from step 1.
     //
     // raw_keypoints shape stored in DB:
     //   {
@@ -395,6 +395,11 @@ export default function SquatAnalyzer() {
     // Keep the ref in sync so the async callback always sees the latest name.
     sessionNameRef.current = sessionName;
 
+    /**
+     * TODO: Current impl is stupid, needs reimpl on DL learning
+     * Train DL model and publish model to dagshub which will be callable on new endpoint.
+     * This model will handle classification and scoring in the future for now create a backup which is the current predict and classfiy based on the keypoints.
+     */
     async function sendFrame(keypoints2d, keypoints3d) {
         // --- 1. Backend classification ---
         let classification = null;
@@ -430,7 +435,7 @@ export default function SquatAnalyzer() {
         };
 
         try {
-            await supabase.from("squat_sessions").insert({
+            await supabase.from("squat_keypoints").insert({
                 id_name: idName,
                 raw_keypoints: rawKeypoints,
                 score: confidence,
@@ -503,7 +508,7 @@ export default function SquatAnalyzer() {
                 </p>
             </div>
 
-            {/* Session name — stored as id_name in Supabase squat_sessions */}
+            {/* Session name — stored as id_name in Supabase public.squat_keypoints */}
             {supabase && (
                 <div className="flex flex-col items-center gap-1">
                     <label
@@ -534,7 +539,7 @@ export default function SquatAnalyzer() {
                             : "text-slate-500 hover:text-slate-700"
                     }`}
                 >
-                    📷 Live Camera
+                    Live Camera
                 </button>
                 <button
                     onClick={() => switchMode("upload")}
@@ -544,7 +549,7 @@ export default function SquatAnalyzer() {
                             : "text-slate-500 hover:text-slate-700"
                     }`}
                 >
-                    🎬 Upload Video
+                    Upload Video
                 </button>
             </div>
 
