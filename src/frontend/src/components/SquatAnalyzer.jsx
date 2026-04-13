@@ -122,20 +122,17 @@ const CLASSIFICATION_COLORS = {
 };
 
 /**
- * Filter a MediaPipe landmarks array to only the joints needed for a squat.
+ * Filter a MediaPipe world-landmarks array to only the 3-D joints needed for a squat.
  *
- * @param {Array} landmarks - Full array of 33 landmark objects from MediaPipe.
- * @param {boolean} is3d - Whether the landmarks contain a `z` component.
- * @returns {Array} Filtered array of { name, x, y, z?, score } objects.
+ * @param {Array} landmarks - Full array of 33 world landmark objects from MediaPipe.
+ * @returns {Array} Filtered array of { name, x, y, z, score } objects.
  */
-function filterSquatKeypoints(landmarks, is3d = false) {
+function filterSquatKeypoints3d(landmarks) {
     if (!landmarks) return [];
     return Object.entries(SQUAT_LANDMARK_NAMES).flatMap(([idx, name]) => {
         const lm = landmarks[Number(idx)];
         if (!lm) return [];
-        const kp = { name, x: lm.x, y: lm.y, score: lm.visibility ?? null };
-        if (is3d) kp.z = lm.z ?? 0;
-        return [kp];
+        return [{ name, x: lm.x, y: lm.y, z: lm.z ?? 0, score: lm.visibility ?? null }];
     });
 }
 
@@ -346,15 +343,10 @@ export default function SquatAnalyzer() {
                 frameCounter % SEND_EVERY_N_FRAMES === 0 &&
                 detection.landmarks?.length > 0
             ) {
-                const kp2d = filterSquatKeypoints(
-                    detection.landmarks[0],
-                    false,
-                );
-                const kp3d = filterSquatKeypoints(
+                const kp3d = filterSquatKeypoints3d(
                     detection.worldLandmarks?.[0] ?? [],
-                    true,
                 );
-                sendFrame(kp2d, kp3d);
+                sendFrame(kp3d);
 
                 // Collect all 33 landmarks for the debug panel.
                 const all = detection.landmarks[0].map((lm, i) => ({
@@ -378,7 +370,7 @@ export default function SquatAnalyzer() {
     // Backend + Supabase — combined per-frame dispatch
     //
     // Flow:
-    //   1. POST keypoints to the Python backend for classification.
+    //   1. POST 3-D keypoints to the Python backend for classification.
     //   2. Update the UI with the result.
     //   3. Insert one row to Supabase's public.squat_keypoints table using the
     //      classification result from step 1.
@@ -387,9 +379,6 @@ export default function SquatAnalyzer() {
     //   {
     //     "3d": [ [x, y, z], … ] // one [x, y, z] triple per squat keypoint
     //   }
-    // Note: 2D keypoints are used only for backend classification and are not
-    // persisted to the database or exported to CSV.
-    //
     // Keep the ref in sync so the async callback always sees the latest name.
     sessionNameRef.current = sessionName;
 
@@ -404,7 +393,7 @@ export default function SquatAnalyzer() {
      * register it at a new versioned endpoint. The rule-based path will remain the
      * fallback throughout.
      */
-    async function sendFrame(keypoints2d, keypoints3d) {
+    async function sendFrame(keypoints3d) {
         // --- 1. Backend classification ---
         let classification = null;
         let confidence = null;
@@ -413,7 +402,6 @@ export default function SquatAnalyzer() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    keypoints_2d: keypoints2d,
                     keypoints_3d: keypoints3d,
                 }),
             });

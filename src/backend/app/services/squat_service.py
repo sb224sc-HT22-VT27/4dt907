@@ -5,8 +5,7 @@ Squat analysis service.
 Implements two phases of the squat-classification pipeline:
 
 1. **Angle calculation** — uses the law of cosines to derive knee angles
-   from hip, knee, and ankle 3-D (or 2-D) coordinates sent by the React
-   frontend:
+   from hip, knee, and ankle 3-D coordinates sent by the React frontend:
 
        θ = arccos((a² + b² − c²) / (2ab))
 
@@ -45,32 +44,22 @@ def _dist3d(p1: Dict, p2: Dict) -> float:
     )
 
 
-def _dist2d(p1: Dict, p2: Dict) -> float:
-    return math.sqrt((p1["x"] - p2["x"]) ** 2 + (p1["y"] - p2["y"]) ** 2)
-
-
-def calculate_knee_angle(
-    hip: Dict, knee: Dict, ankle: Dict, use_3d: bool = True
-) -> float:
+def calculate_knee_angle(hip: Dict, knee: Dict, ankle: Dict) -> float:
     """Calculate the knee angle using the law of cosines.
 
     Parameters
     ----------
     hip, knee, ankle:
-        Dicts with at least ``x``, ``y`` keys (and ``z`` when *use_3d* is True).
-    use_3d:
-        If True use the z-component; fall back to 2-D otherwise.
+        Dicts with at least ``x``, ``y``, ``z`` keys.
 
     Returns
     -------
     float
         Angle in degrees (0–180).
     """
-    dist = _dist3d if use_3d else _dist2d
-
-    a = dist(hip, knee)  # hip → knee
-    b = dist(knee, ankle)  # knee → ankle
-    c = dist(hip, ankle)  # hip → ankle
+    a = _dist3d(hip, knee)   # hip → knee
+    b = _dist3d(knee, ankle)  # knee → ankle
+    c = _dist3d(hip, ankle)   # hip → ankle
 
     if a == 0 or b == 0:
         return 180.0
@@ -188,16 +177,13 @@ def _pytorch_classify(left_angle: float, right_angle: float) -> Tuple[str, float
 
 def classify_squat(
     keypoints_3d: list,
-    keypoints_2d: list,
 ) -> Tuple[str, float, float, Optional[float]]:
-    """Classify a squat from MediaPipe keypoint data.
+    """Classify a squat from MediaPipe 3-D keypoint data.
 
     Parameters
     ----------
     keypoints_3d:
         List of dicts with keys ``name``, ``x``, ``y``, ``z``.
-    keypoints_2d:
-        List of dicts with keys ``name``, ``x``, ``y``.
 
     Returns
     -------
@@ -205,7 +191,6 @@ def classify_squat(
         ``(classification, left_knee_angle, right_knee_angle, confidence)``
     """
     kp3 = {kp["name"]: kp for kp in keypoints_3d}
-    kp2 = {kp["name"]: kp for kp in keypoints_2d}
 
     required = [
         "left_hip",
@@ -216,21 +201,14 @@ def classify_squat(
         "right_ankle",
     ]
 
-    # Prefer 3-D if all required keys are present.
-    if all(k in kp3 for k in required):
-        kp = kp3
-        use_3d = True
-    elif all(k in kp2 for k in required):
-        kp = kp2
-        use_3d = False
-    else:
+    if not all(k in kp3 for k in required):
         return "Invalid", 0.0, 0.0, None
 
     left_angle = calculate_knee_angle(
-        kp["left_hip"], kp["left_knee"], kp["left_ankle"], use_3d
+        kp3["left_hip"], kp3["left_knee"], kp3["left_ankle"]
     )
     right_angle = calculate_knee_angle(
-        kp["right_hip"], kp["right_knee"], kp["right_ankle"], use_3d
+        kp3["right_hip"], kp3["right_knee"], kp3["right_ankle"]
     )
 
     classification, confidence = _pytorch_classify(left_angle, right_angle)
