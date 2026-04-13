@@ -4,8 +4,8 @@
 Normalizes Kinect CSV data files to be compatible with MediaPipe world landmark
 data stored in the database after webcam/video/image uploads.
 
-Two normalizations are applied
--------------------------------
+Three normalizations are applied in sequence
+--------------------------------------------
 1. **Name normalization** — Kinect joint names are remapped to the MediaPipe
    landmark vocabulary:
 
@@ -25,6 +25,20 @@ Two normalizations are applied
    that the origin is consistently at the centre of the hips, exactly matching
    MediaPipe's world-coordinate convention.
 
+3. **Column suffix normalization** — MediaPipe CSV files store 3-D world
+   coordinates as ``{joint}_3d_x``, ``{joint}_3d_y``, ``{joint}_3d_z``
+   (distinct from the 2-D screen-projection columns ``{joint}_x``,
+   ``{joint}_y``).  Kinect data only contains 3-D world coordinates, so the
+   ``_{axis}`` suffix is renamed to ``_3d_{axis}`` so that both datasets share
+   the same column names and can be concatenated directly for model training
+   without any further column renaming.
+
+   **Use the 3-D columns for training** — they represent actual body geometry
+   in metric space (hip-centred, in metres) and are invariant to camera angle
+   and subject position.  The 2-D columns in MediaPipe CSVs are normalised
+   screen projections that discard depth information and vary with camera
+   placement, making them unsuitable for cross-dataset training.
+
 Usage
 -----
     python normalize_kinect_data.py                        # auto-detects src/data
@@ -37,6 +51,7 @@ Normalized files are written to new directories named
 
 import argparse
 import logging
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -126,14 +141,54 @@ def hip_center_normalize(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def add_3d_suffix(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename coordinate columns from ``{joint}_x/y/z`` to ``{joint}_3d_x/y/z``.
+
+    MediaPipe CSV files separate 2-D screen coordinates (``{joint}_x``,
+    ``{joint}_y``) from 3-D world coordinates (``{joint}_3d_x``,
+    ``{joint}_3d_y``, ``{joint}_3d_z``).  Kinect data only provides 3-D world
+    coordinates, so their column names are updated to use the ``_3d_`` infix so
+    that both datasets share identical column names for the 3-D features.
+
+    Only columns whose names match the pattern ``<anything>_x``,
+    ``<anything>_y``, or ``<anything>_z`` are renamed; other columns such as
+    ``FrameNo`` are passed through unchanged.
+
+    Parameters
+    ----------
+    df:
+        DataFrame whose coordinate columns use the plain ``{joint}_{axis}``
+        naming (i.e. after :func:`remap_column` and
+        :func:`hip_center_normalize` have already been applied).
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of *df* with renamed columns.
+    """
+    _AXIS_RE = re.compile(r"^(.+)_(x|y|z)$")
+
+    def _rename(col: str) -> str:
+        m = _AXIS_RE.match(col)
+        if m:
+            return f"{m.group(1)}_3d_{m.group(2)}"
+        return col
+
+    df = df.copy()
+    df.columns = [_rename(c) for c in df.columns]
+    return df
+
+
 def normalize_file(src: Path, dst: Path) -> None:
     """Read a Kinect CSV file, normalize names and values, and write to *dst*.
 
-    Applies both normalizations in sequence:
+    Applies all three normalizations in sequence:
 
     1. :func:`remap_column` — rename joints to the MediaPipe vocabulary.
     2. :func:`hip_center_normalize` — shift coordinates so the hip midpoint is
        the origin, matching MediaPipe world-landmark convention.
+    3. :func:`add_3d_suffix` — rename ``{joint}_x/y/z`` to
+       ``{joint}_3d_x/y/z`` to match the MediaPipe CSV 3-D column convention.
 
     Parameters
     ----------
@@ -146,6 +201,7 @@ def normalize_file(src: Path, dst: Path) -> None:
     df = pd.read_csv(src)
     df.columns = [remap_column(c) for c in df.columns]
     df = hip_center_normalize(df)
+    df = add_3d_suffix(df)
     dst.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(dst, index=False)
     logger.debug("Normalized %s → %s", src.name, dst)

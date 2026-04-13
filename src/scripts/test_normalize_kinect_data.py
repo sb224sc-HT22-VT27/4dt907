@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from normalize_kinect_data import (
     KINECT_TO_MEDIAPIPE,
+    add_3d_suffix,
     hip_center_normalize,
     normalize_file,
     remap_column,
@@ -137,6 +138,7 @@ class TestNormalizeFile:
         assert dst.exists()
 
     def test_renamed_columns_present(self, tmp_path):
+        """After normalization all MediaPipe joint names appear with _3d_ suffix."""
         src = _make_kinect_csv(tmp_path)
         dst = tmp_path / "out" / "sample.csv"
         normalize_file(src, dst)
@@ -144,10 +146,11 @@ class TestNormalizeFile:
         result = pd.read_csv(dst)
         for mediapipe_name in KINECT_TO_MEDIAPIPE.values():
             for axis in ("x", "y", "z"):
-                col = f"{mediapipe_name}_{axis}"
+                col = f"{mediapipe_name}_3d_{axis}"
                 assert col in result.columns, f"Expected column {col!r} in output"
 
     def test_original_kinect_columns_absent(self, tmp_path):
+        """Kinect-only joint names must not appear in the normalized output."""
         src = _make_kinect_csv(tmp_path)
         dst = tmp_path / "out" / "sample.csv"
         normalize_file(src, dst)
@@ -155,8 +158,11 @@ class TestNormalizeFile:
         result = pd.read_csv(dst)
         for kinect_name in KINECT_TO_MEDIAPIPE:
             for axis in ("x", "y", "z"):
-                col = f"{kinect_name}_{axis}"
-                assert col not in result.columns, f"Column {col!r} should be renamed"
+                # Neither plain nor _3d_ variant of the original Kinect name
+                col_plain = f"{kinect_name}_{axis}"
+                col_3d = f"{kinect_name}_3d_{axis}"
+                assert col_plain not in result.columns, f"Column {col_plain!r} should be renamed"
+                assert col_3d not in result.columns, f"Column {col_3d!r} should not exist"
 
     def test_data_values_hip_centered(self, tmp_path):
         """Normalized values must be hip-centered (hip midpoint = 0)."""
@@ -165,9 +171,10 @@ class TestNormalizeFile:
         normalize_file(src, dst)
 
         result = pd.read_csv(dst)
-        mid_x = (result["left_hip_x"] + result["right_hip_x"]) / 2.0
-        mid_y = (result["left_hip_y"] + result["right_hip_y"]) / 2.0
-        mid_z = (result["left_hip_z"] + result["right_hip_z"]) / 2.0
+        # After add_3d_suffix the hip columns are left_hip_3d_x etc.
+        mid_x = (result["left_hip_3d_x"] + result["right_hip_3d_x"]) / 2.0
+        mid_y = (result["left_hip_3d_y"] + result["right_hip_3d_y"]) / 2.0
+        mid_z = (result["left_hip_3d_z"] + result["right_hip_3d_z"]) / 2.0
         assert (mid_x.abs() < 1e-9).all(), "Hip midpoint x must be 0 after normalization"
         assert (mid_y.abs() < 1e-9).all(), "Hip midpoint y must be 0 after normalization"
         assert (mid_z.abs() < 1e-9).all(), "Hip midpoint z must be 0 after normalization"
@@ -293,3 +300,51 @@ class TestHipCenterNormalize:
         # Frame 1: hip_mid_x = (0.5+0.7)/2 = 0.6 → nose_x should become 0.6-0.6 = 0.0
         assert abs(float(result["nose_x"].iloc[0]) - 0.0) < 1e-9
         assert abs(float(result["nose_x"].iloc[1]) - 0.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# add_3d_suffix
+# ---------------------------------------------------------------------------
+
+
+class TestAdd3dSuffix:
+    """Unit tests for the _3d_ column-suffix normalization."""
+
+    def _make_df(self) -> pd.DataFrame:
+        return pd.DataFrame({
+            "FrameNo": [0],
+            "nose_x": [0.1],
+            "nose_y": [0.2],
+            "nose_z": [0.3],
+            "left_hip_x": [-0.07],
+            "left_hip_y": [0.0],
+            "left_hip_z": [-0.03],
+        })
+
+    def test_x_y_z_get_3d_infix(self):
+        result = add_3d_suffix(self._make_df())
+        assert "nose_3d_x" in result.columns
+        assert "nose_3d_y" in result.columns
+        assert "nose_3d_z" in result.columns
+        assert "left_hip_3d_x" in result.columns
+
+    def test_plain_x_y_z_columns_gone(self):
+        result = add_3d_suffix(self._make_df())
+        assert "nose_x" not in result.columns
+        assert "nose_y" not in result.columns
+        assert "nose_z" not in result.columns
+
+    def test_frameno_unchanged(self):
+        result = add_3d_suffix(self._make_df())
+        assert "FrameNo" in result.columns
+
+    def test_values_preserved(self):
+        df = self._make_df()
+        result = add_3d_suffix(df)
+        assert float(result["nose_3d_x"].iloc[0]) == pytest.approx(0.1)
+        assert float(result["left_hip_3d_z"].iloc[0]) == pytest.approx(-0.03)
+
+    def test_original_dataframe_not_mutated(self):
+        df = self._make_df()
+        add_3d_suffix(df)
+        assert "nose_x" in df.columns
