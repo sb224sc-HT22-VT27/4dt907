@@ -111,7 +111,6 @@ const POSE_CONNECTIONS = [
 ];
 
 // Indices that are squat-relevant (highlighted brighter).
-// Includes nose (0) and wrists (15, 16) to match the normalized Kinect A11 landmark set.
 const SQUAT_INDICES = new Set([
     0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28,
 ]);
