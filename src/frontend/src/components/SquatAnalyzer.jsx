@@ -11,22 +11,21 @@ import supabase from "../supabaseClient";
 
 // MediaPipe keypoint indices used for squat analysis
 // https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker
+// Landmark set aligned with the normalized Kinect CSV files
 const SQUAT_LANDMARK_NAMES = {
-    // TODO: Take updated version from provided A11 .csv files
+    0: "nose",
     11: "left_shoulder",
     12: "right_shoulder",
     13: "left_elbow",
     14: "right_elbow",
+    15: "left_wrist",
+    16: "right_wrist",
     23: "left_hip",
     24: "right_hip",
     25: "left_knee",
     26: "right_knee",
     27: "left_ankle",
     28: "right_ankle",
-    29: "left_heel",
-    30: "right_heel",
-    31: "left_foot_index",
-    32: "right_foot_index",
 };
 
 // All 33 MediaPipe landmark names in index order.
@@ -112,9 +111,8 @@ const POSE_CONNECTIONS = [
 ];
 
 // Indices that are squat-relevant (highlighted brighter).
-// TODO: Take updated version from provided A11 .csv files
 const SQUAT_INDICES = new Set([
-    11, 12, 13, 14, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+    0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28,
 ]);
 
 const CLASSIFICATION_COLORS = {
