@@ -385,9 +385,11 @@ export default function SquatAnalyzer() {
     //
     // raw_keypoints shape stored in DB:
     //   {
-    //     "2d": [ [x, y], … ],   // one [x, y]  pair per squat keypoint
     //     "3d": [ [x, y, z], … ] // one [x, y, z] triple per squat keypoint
     //   }
+    // Note: 2D keypoints are used only for backend classification and are not
+    // persisted to the database or exported to CSV.
+    //
     // Keep the ref in sync so the async callback always sees the latest name.
     sessionNameRef.current = sessionName;
 
@@ -430,9 +432,9 @@ export default function SquatAnalyzer() {
         // id_name is nullable — send null when the user hasn't entered a name.
         const idName = sessionNameRef.current.trim() || null;
 
-        // Shape raw_keypoints: 2D points as [x, y], 3D points as [x, y, z].
+        // Shape raw_keypoints: only 3D points as [x, y, z]; 2D data is
+        // used for classification only and is not persisted.
         const rawKeypoints = {
-            "2d": keypoints2d.map(({ x, y }) => [x, y]),
             "3d": keypoints3d.map(({ x, y, z }) => [x, y, z]),
         };
 

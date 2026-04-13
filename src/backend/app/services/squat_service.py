@@ -30,6 +30,13 @@ LABELS = ["Deep", "Shallow", "Invalid"]
 # Path where the trained model weights are expected to live.
 _MODEL_PATH = Path(__file__).parent.parent / "models" / "squat_model.pt"
 
+# Module-level cache for the loaded PyTorch model and normalisation tensors.
+# Populated on first successful load; None signals "not yet attempted".
+_cached_model = None
+_cached_feat_mean = None
+_cached_feat_std = None
+_model_load_attempted = False
+
 
 # Geometry helpers
 def _dist3d(p1: Dict, p2: Dict) -> float:
@@ -92,8 +99,11 @@ def _pytorch_classify(left_angle: float, right_angle: float) -> Tuple[str, float
     """Classify using a pre-trained small PyTorch network.
 
     Falls back to rule-based if torch is unavailable or the model file is
-    missing.
+    missing.  The model is loaded once and cached at the module level to avoid
+    the per-request overhead of reading the checkpoint from disk.
     """
+    global _cached_model, _cached_feat_mean, _cached_feat_std, _model_load_attempted
+
     try:
         import torch
         import torch.nn as nn
@@ -105,48 +115,65 @@ def _pytorch_classify(left_angle: float, right_angle: float) -> Tuple[str, float
         logger.debug("squat_model.pt not found — using rule-based classification")
         return _rule_based(left_angle, right_angle)
 
-    class SquatNet(nn.Module):
-        """Tiny 2→16→8→3 feed-forward network for squat classification."""
+    # Load and cache on first call; subsequent calls reuse the cached objects.
+    if not _model_load_attempted:
+        _model_load_attempted = True
 
-        def __init__(self):
-            super().__init__()
-            self.fc = nn.Sequential(
-                nn.Linear(2, 16),
-                nn.ReLU(),
-                nn.Linear(16, 8),
-                nn.ReLU(),
-                nn.Linear(8, 3),
+        class SquatNet(nn.Module):
+            """Tiny 2→16→8→3 feed-forward network for squat classification."""
+
+            def __init__(self):
+                super().__init__()
+                self.fc = nn.Sequential(
+                    nn.Linear(2, 16),
+                    nn.ReLU(),
+                    nn.Linear(16, 8),
+                    nn.ReLU(),
+                    nn.Linear(8, 3),
+                )
+
+            def forward(self, x):
+                return self.fc(x)
+
+        try:
+            model = SquatNet()
+            checkpoint = torch.load(_MODEL_PATH, map_location="cpu", weights_only=True)
+
+            # Checkpoint may be a plain state_dict or a dict with state_dict +
+            # normalisation constants saved by the notebook.
+            if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+                model.load_state_dict(checkpoint["state_dict"])
+                feat_mean = torch.tensor(
+                    checkpoint.get("mean", [0.0, 0.0]), dtype=torch.float32
+                )
+                feat_std = torch.tensor(
+                    checkpoint.get("std", [1.0, 1.0]), dtype=torch.float32
+                )
+            else:
+                model.load_state_dict(checkpoint)
+                # No normalisation stored — identity transform (raw angles).
+                feat_mean = torch.zeros(2)
+                feat_std = torch.ones(2)
+
+            model.eval()
+            _cached_model = model
+            _cached_feat_mean = feat_mean
+            _cached_feat_std = feat_std
+        except Exception:
+            logger.warning(
+                "PyTorch model load failed — falling back to rule-based", exc_info=True
             )
 
-        def forward(self, x):
-            return self.fc(x)
+    if _cached_model is None:
+        return _rule_based(left_angle, right_angle)
 
     try:
-        model = SquatNet()
-        checkpoint = torch.load(_MODEL_PATH, map_location="cpu", weights_only=True)
-
-        # Checkpoint may be a plain state_dict or a dict with state_dict +
-        # normalisation constants saved by the notebook.
-        if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
-            model.load_state_dict(checkpoint["state_dict"])
-            feat_mean = torch.tensor(
-                checkpoint.get("mean", [0.0, 0.0]), dtype=torch.float32
-            )
-            feat_std = torch.tensor(
-                checkpoint.get("std", [1.0, 1.0]), dtype=torch.float32
-            )
-        else:
-            model.load_state_dict(checkpoint)
-            # No normalisation stored — identity transform (raw angles).
-            feat_mean = torch.zeros(2)
-            feat_std = torch.ones(2)
-
-        model.eval()
+        import torch
 
         with torch.no_grad():
             raw = torch.tensor([[left_angle, right_angle]], dtype=torch.float32)
-            x = (raw - feat_mean) / (feat_std + 1e-8)
-            logits = model(x)
+            x = (raw - _cached_feat_mean) / (_cached_feat_std + 1e-8)
+            logits = _cached_model(x)
             probs = torch.softmax(logits, dim=1)
             idx = int(torch.argmax(probs, dim=1).item())
             confidence = float(probs[0, idx].item())

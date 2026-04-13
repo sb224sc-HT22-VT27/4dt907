@@ -43,6 +43,6 @@ def squat_classify(req: SquatRequest):
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
+    except Exception:
         logger.exception("Squat classification failed")
-        raise HTTPException(status_code=503, detail=f"{type(e).__name__}: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable")
