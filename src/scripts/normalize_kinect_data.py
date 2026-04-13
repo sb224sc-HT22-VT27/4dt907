@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 """normalize_kinect_data.py
 
-Normalizes Kinect CSV data files to use MediaPipe-compatible landmark names.
+Normalizes Kinect CSV data files to be compatible with MediaPipe world landmark
+data stored in the database after webcam/video/image uploads.
 
-Kinect → MediaPipe mapping
---------------------------
-  head       → nose
-  left_hand  → left_wrist
-  right_hand → right_wrist
-  left_foot  → left_ankle
-  right_foot → right_ankle
+Two normalizations are applied
+-------------------------------
+1. **Name normalization** — Kinect joint names are remapped to the MediaPipe
+   landmark vocabulary:
 
-All other joint names shared by both formats (left_shoulder, left_elbow,
-right_shoulder, right_elbow, left_hip, right_hip, left_knee, right_knee)
-are left unchanged.
+     head       → nose
+     left_hand  → left_wrist
+     right_hand → right_wrist
+     left_foot  → left_ankle
+     right_foot → right_ankle
+
+   All other joint names shared by both formats (left_shoulder, left_elbow,
+   right_shoulder, right_elbow, left_hip, right_hip, left_knee, right_knee)
+   are left unchanged.
+
+2. **Value normalization (hip-centering)** — MediaPipe world landmarks use the
+   hip midpoint as the coordinate origin (per the MediaPipe documentation).
+   Each frame's joint coordinates are shifted by the per-frame hip midpoint so
+   that the origin is consistently at the centre of the hips, exactly matching
+   MediaPipe's world-coordinate convention.
 
 Usage
 -----
@@ -77,8 +87,53 @@ def remap_column(col: str) -> str:
     return col
 
 
+def hip_center_normalize(df: pd.DataFrame) -> pd.DataFrame:
+    """Center all joint coordinates at the per-frame hip midpoint.
+
+    MediaPipe world landmarks use the hip midpoint as the coordinate origin
+    (per the MediaPipe Pose documentation).  This transform applies the same
+    convention to Kinect data so both sources share a common coordinate frame.
+
+    For each frame the midpoint of the left and right hip joints is computed
+    and subtracted from every joint's x, y, and z coordinates.  After the
+    transform the left and right hip joints are symmetric around (0, 0, 0).
+
+    Parameters
+    ----------
+    df:
+        DataFrame with columns like ``<joint>_x``, ``<joint>_y``,
+        ``<joint>_z``.  Must contain ``left_hip_x/y/z`` and
+        ``right_hip_x/y/z`` columns (i.e. column-name normalization has
+        already been applied).
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of *df* with all joint x/y/z values shifted so the hip midpoint
+        is at (0, 0, 0) for every frame.  Non-coordinate columns (e.g.
+        ``FrameNo``) are left unchanged.
+    """
+    df = df.copy()
+    for axis in ("x", "y", "z"):
+        left_col = f"left_hip_{axis}"
+        right_col = f"right_hip_{axis}"
+        if left_col not in df.columns or right_col not in df.columns:
+            continue
+        hip_mid = (df[left_col] + df[right_col]) / 2.0
+        axis_cols = [c for c in df.columns if c.endswith(f"_{axis}")]
+        for col in axis_cols:
+            df[col] = df[col] - hip_mid
+    return df
+
+
 def normalize_file(src: Path, dst: Path) -> None:
-    """Read a Kinect CSV file, rename columns, and write to *dst*.
+    """Read a Kinect CSV file, normalize names and values, and write to *dst*.
+
+    Applies both normalizations in sequence:
+
+    1. :func:`remap_column` — rename joints to the MediaPipe vocabulary.
+    2. :func:`hip_center_normalize` — shift coordinates so the hip midpoint is
+       the origin, matching MediaPipe world-landmark convention.
 
     Parameters
     ----------
@@ -90,6 +145,7 @@ def normalize_file(src: Path, dst: Path) -> None:
     """
     df = pd.read_csv(src)
     df.columns = [remap_column(c) for c in df.columns]
+    df = hip_center_normalize(df)
     dst.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(dst, index=False)
     logger.debug("Normalized %s → %s", src.name, dst)
