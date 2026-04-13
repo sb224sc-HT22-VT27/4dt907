@@ -30,59 +30,88 @@ const SQUAT_LANDMARK_NAMES = {
 
 // All 33 MediaPipe landmark names in index order.
 const ALL_LANDMARK_NAMES = [
-    "nose",            // 0
-    "left_eye_inner",  // 1
-    "left_eye",        // 2
-    "left_eye_outer",  // 3
+    "nose", // 0
+    "left_eye_inner", // 1
+    "left_eye", // 2
+    "left_eye_outer", // 3
     "right_eye_inner", // 4
-    "right_eye",       // 5
+    "right_eye", // 5
     "right_eye_outer", // 6
-    "left_ear",        // 7
-    "right_ear",       // 8
-    "mouth_left",      // 9
-    "mouth_right",     // 10
-    "left_shoulder",   // 11
-    "right_shoulder",  // 12
-    "left_elbow",      // 13
-    "right_elbow",     // 14
-    "left_wrist",      // 15
-    "right_wrist",     // 16
-    "left_pinky",      // 17
-    "right_pinky",     // 18
-    "left_index",      // 19
-    "right_index",     // 20
-    "left_thumb",      // 21
-    "right_thumb",     // 22
-    "left_hip",        // 23
-    "right_hip",       // 24
-    "left_knee",       // 25
-    "right_knee",      // 26
-    "left_ankle",      // 27
-    "right_ankle",     // 28
-    "left_heel",       // 29
-    "right_heel",      // 30
+    "left_ear", // 7
+    "right_ear", // 8
+    "mouth_left", // 9
+    "mouth_right", // 10
+    "left_shoulder", // 11
+    "right_shoulder", // 12
+    "left_elbow", // 13
+    "right_elbow", // 14
+    "left_wrist", // 15
+    "right_wrist", // 16
+    "left_pinky", // 17
+    "right_pinky", // 18
+    "left_index", // 19
+    "right_index", // 20
+    "left_thumb", // 21
+    "right_thumb", // 22
+    "left_hip", // 23
+    "right_hip", // 24
+    "left_knee", // 25
+    "right_knee", // 26
+    "left_ankle", // 27
+    "right_ankle", // 28
+    "left_heel", // 29
+    "right_heel", // 30
     "left_foot_index", // 31
-    "right_foot_index",// 32
+    "right_foot_index", // 32
 ];
 
 // Full body skeleton connections (MediaPipe BlazePose topology).
 const POSE_CONNECTIONS = [
-    [0, 1], [1, 2], [2, 3], [3, 7],
-    [0, 4], [4, 5], [5, 6], [6, 8],
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 7],
+    [0, 4],
+    [4, 5],
+    [5, 6],
+    [6, 8],
     [9, 10],
-    [11, 12], [11, 23], [12, 24], [23, 24],
-    [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
-    [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
-    [23, 25], [25, 27], [27, 29], [27, 31], [29, 31],
-    [24, 26], [26, 28], [28, 30], [28, 32], [30, 32],
+    [11, 12],
+    [11, 23],
+    [12, 24],
+    [23, 24],
+    [11, 13],
+    [13, 15],
+    [15, 17],
+    [15, 19],
+    [15, 21],
+    [17, 19],
+    [12, 14],
+    [14, 16],
+    [16, 18],
+    [16, 20],
+    [16, 22],
+    [18, 20],
+    [23, 25],
+    [25, 27],
+    [27, 29],
+    [27, 31],
+    [29, 31],
+    [24, 26],
+    [26, 28],
+    [28, 30],
+    [28, 32],
+    [30, 32],
 ];
 
 // Indices that are squat-relevant (highlighted brighter).
 // TODO: Take updated version from provided A11 .csv files
-const SQUAT_INDICES = new Set([11, 12, 13, 14, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]);
+const SQUAT_INDICES = new Set([
+    11, 12, 13, 14, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+]);
 
 const CLASSIFICATION_COLORS = {
-    Deep:    "text-green-600",
+    Deep: "text-green-600",
     Shallow: "text-amber-600",
     Invalid: "text-red-600",
 };
@@ -157,8 +186,10 @@ function drawSkeleton(canvas, w, h, detection, off = { x: 0, y: 0 }) {
         ctx.beginPath();
         ctx.moveTo(off.x + la.x * w, off.y + la.y * h);
         ctx.lineTo(off.x + lb.x * w, off.y + lb.y * h);
-        ctx.strokeStyle = isSquatBone ? "rgba(244,114,182,0.92)" : "rgba(148,163,184,0.55)";
-        ctx.lineWidth   = isSquatBone ? 3 : 1.5;
+        ctx.strokeStyle = isSquatBone
+            ? "rgba(244,114,182,0.92)"
+            : "rgba(148,163,184,0.55)";
+        ctx.lineWidth = isSquatBone ? 3 : 1.5;
         ctx.stroke();
     }
 
@@ -167,41 +198,50 @@ function drawSkeleton(canvas, w, h, detection, off = { x: 0, y: 0 }) {
         if (!lm) continue;
         const isSquat = SQUAT_INDICES.has(idx);
         ctx.beginPath();
-        ctx.arc(off.x + lm.x * w, off.y + lm.y * h, isSquat ? 6 : 3, 0, Math.PI * 2);
+        ctx.arc(
+            off.x + lm.x * w,
+            off.y + lm.y * h,
+            isSquat ? 6 : 3,
+            0,
+            Math.PI * 2,
+        );
         ctx.fillStyle = isSquat ? "#38bdf8" : "rgba(255,255,255,0.65)";
         ctx.fill();
     }
 }
 
 export default function SquatAnalyzer() {
-    const videoRef         = useRef(null);
-    const canvasRef        = useRef(null);
-    const fileInputRef     = useRef(null);
-    const imageInputRef    = useRef(null);
-    const landmarkerRef    = useRef(null);   // VIDEO-mode landmarker owned here
-    const rafRef           = useRef(null);
+    const videoRef = useRef(null);
+    const canvasRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const imageInputRef = useRef(null);
+    const landmarkerRef = useRef(null); // VIDEO-mode landmarker owned here
+    const rafRef = useRef(null);
     const lastTimestampRef = useRef(-1);
-    const videoBlobUrlRef  = useRef(null);
-    const lastDetectionRef = useRef(null);   // cached between rAF frames
-    const sessionLogRef    = useRef([]);     // readable inside async callbacks
+    const videoBlobUrlRef = useRef(null);
+    const lastDetectionRef = useRef(null); // cached between rAF frames
+    const sessionLogRef = useRef([]); // readable inside async callbacks
 
-    const [inputMode,        setInputMode]        = useState("webcam"); // webcam | upload | image
-    const [sessionName,      setSessionName]      = useState("");
-    const [status,           setStatus]           = useState("idle");   // idle | loading | running | error
-    const [result,           setResult]           = useState(null);
-    const [errorMsg,         setErrorMsg]         = useState("");
+    const [inputMode, setInputMode] = useState("webcam"); // webcam | upload | image
+    const [sessionName, setSessionName] = useState("");
+    const [status, setStatus] = useState("idle"); // idle | loading | running | error
+    const [result, setResult] = useState(null);
+    const [errorMsg, setErrorMsg] = useState("");
     const [uploadedFileName, setUploadedFileName] = useState("");
-    const [videoPaused,      setVideoPaused]      = useState(false);
-    const [allKeypoints,     setAllKeypoints]     = useState([]);
-    const [sessionLog,       setSessionLog]       = useState([]);
-    const [isSaving,         setIsSaving]         = useState(false);
+    const [videoPaused, setVideoPaused] = useState(false);
+    const [allKeypoints, setAllKeypoints] = useState([]);
+    const [sessionLog, setSessionLog] = useState([]);
+    const [isSaving, setIsSaving] = useState(false);
 
     // ── Preload VIDEO landmarker on mount; clean up on unmount ───────────────
     useEffect(() => {
         let cancelled = false;
         createVideoLandmarker()
             .then((lm) => {
-                if (cancelled) { lm.close?.(); return; }
+                if (cancelled) {
+                    lm.close?.();
+                    return;
+                }
                 landmarkerRef.current = lm;
             })
             .catch(() => {}); // CDN unavailable — will retry on first startCamera
@@ -252,7 +292,10 @@ export default function SquatAnalyzer() {
             setUploadedFileName("");
             setAllKeypoints([]);
             const canvas = canvasRef.current;
-            if (canvas) canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+            if (canvas)
+                canvas
+                    .getContext("2d")
+                    .clearRect(0, 0, canvas.width, canvas.height);
         },
         [stopAll],
     );
@@ -344,17 +387,24 @@ export default function SquatAnalyzer() {
 
                 const img = new Image();
                 img.src = blobUrl;
-                await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+                await new Promise((res, rej) => {
+                    img.onload = res;
+                    img.onerror = rej;
+                });
 
-                const DISPLAY_W = 640, DISPLAY_H = 480;
-                const scale   = Math.min(DISPLAY_W / img.naturalWidth, DISPLAY_H / img.naturalHeight);
-                const drawW   = img.naturalWidth  * scale;
-                const drawH   = img.naturalHeight * scale;
+                const DISPLAY_W = 640,
+                    DISPLAY_H = 480;
+                const scale = Math.min(
+                    DISPLAY_W / img.naturalWidth,
+                    DISPLAY_H / img.naturalHeight,
+                );
+                const drawW = img.naturalWidth * scale;
+                const drawH = img.naturalHeight * scale;
                 const offsetX = (DISPLAY_W - drawW) / 2;
                 const offsetY = (DISPLAY_H - drawH) / 2;
 
                 const canvas = canvasRef.current;
-                canvas.width  = DISPLAY_W;
+                canvas.width = DISPLAY_W;
                 canvas.height = DISPLAY_H;
                 const ctx = canvas.getContext("2d");
                 ctx.fillStyle = "#000";
@@ -364,15 +414,28 @@ export default function SquatAnalyzer() {
                 const detection = imageLandmarker.detect(img);
 
                 if (detection.landmarks?.length > 0) {
-                    drawSkeleton(canvas, drawW, drawH, detection, { x: offsetX, y: offsetY });
-                    setAllKeypoints(detection.landmarks[0].map((lm, i) => ({
-                        index: i,
-                        name:  ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
-                        x: lm.x, y: lm.y, z: lm.z ?? 0,
-                        visibility: lm.visibility ?? 0,
-                    })));
-                    const kp2d = filterSquatKeypoints(detection.landmarks[0], false);
-                    const kp3d = filterSquatKeypoints(detection.worldLandmarks?.[0] ?? [], true);
+                    drawSkeleton(canvas, drawW, drawH, detection, {
+                        x: offsetX,
+                        y: offsetY,
+                    });
+                    setAllKeypoints(
+                        detection.landmarks[0].map((lm, i) => ({
+                            index: i,
+                            name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
+                            x: lm.x,
+                            y: lm.y,
+                            z: lm.z ?? 0,
+                            visibility: lm.visibility ?? 0,
+                        })),
+                    );
+                    const kp2d = filterSquatKeypoints(
+                        detection.landmarks[0],
+                        false,
+                    );
+                    const kp3d = filterSquatKeypoints(
+                        detection.worldLandmarks?.[0] ?? [],
+                        true,
+                    );
                     sendFrame(kp2d, kp3d);
                 }
                 setStatus("idle");
@@ -391,8 +454,13 @@ export default function SquatAnalyzer() {
     const togglePlayPause = useCallback(() => {
         const video = videoRef.current;
         if (!video) return;
-        if (video.paused) { video.play(); setVideoPaused(false); }
-        else              { video.pause(); setVideoPaused(true); }
+        if (video.paused) {
+            video.play();
+            setVideoPaused(false);
+        } else {
+            video.pause();
+            setVideoPaused(true);
+        }
     }, []);
 
     // ── Detection loop ───────────────────────────────────────────────────────
@@ -405,13 +473,13 @@ export default function SquatAnalyzer() {
         if (status !== "running") return;
 
         let frameCounter = 0;
-        const DETECT_EVERY     = 3;  // ~20 Hz detection
-        const DEBUG_EVERY      = 6;  // ~10 Hz debug panel update
-        const BACKEND_EVERY    = 15; // ~2 Hz backend + session log
+        const DETECT_EVERY = 3; // ~20 Hz detection
+        const DEBUG_EVERY = 6; // ~10 Hz debug panel update
+        const BACKEND_EVERY = 15; // ~2 Hz backend + session log
 
         function detect(timestamp) {
-            const video      = videoRef.current;
-            const canvas     = canvasRef.current;
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
             const landmarker = landmarkerRef.current;
 
             if (!video || !canvas || !landmarker || video.readyState < 2) {
@@ -438,7 +506,10 @@ export default function SquatAnalyzer() {
             // ── Run detection at reduced rate ──
             if (frameCounter % DETECT_EVERY === 0) {
                 try {
-                    lastDetectionRef.current = landmarker.detectForVideo(video, timestamp);
+                    lastDetectionRef.current = landmarker.detectForVideo(
+                        video,
+                        timestamp,
+                    );
                 } catch {
                     // Transient GPU error — skip this detection, keep loop alive.
                 }
@@ -449,7 +520,7 @@ export default function SquatAnalyzer() {
             const vw = video.videoWidth;
             const vh = video.videoHeight;
             if (canvas.width !== vw || canvas.height !== vh) {
-                canvas.width  = vw;
+                canvas.width = vw;
                 canvas.height = vh;
             }
             canvas.getContext("2d").clearRect(0, 0, vw, vh);
@@ -458,21 +529,34 @@ export default function SquatAnalyzer() {
             // ── Debug panel (~10 Hz) ──
             if (frameCounter % DEBUG_EVERY === 0) {
                 if (detection?.landmarks?.length > 0) {
-                    setAllKeypoints(detection.landmarks[0].map((lm, i) => ({
-                        index: i,
-                        name:  ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
-                        x: lm.x, y: lm.y, z: lm.z ?? 0,
-                        visibility: lm.visibility ?? 0,
-                    })));
+                    setAllKeypoints(
+                        detection.landmarks[0].map((lm, i) => ({
+                            index: i,
+                            name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
+                            x: lm.x,
+                            y: lm.y,
+                            z: lm.z ?? 0,
+                            visibility: lm.visibility ?? 0,
+                        })),
+                    );
                 } else {
                     setAllKeypoints([]);
                 }
             }
 
             // ── Throttled backend call + session log (~2 Hz) ──
-            if (frameCounter % BACKEND_EVERY === 0 && detection?.landmarks?.length > 0) {
-                const kp2d = filterSquatKeypoints(detection.landmarks[0], false);
-                const kp3d = filterSquatKeypoints(detection.worldLandmarks?.[0] ?? [], true);
+            if (
+                frameCounter % BACKEND_EVERY === 0 &&
+                detection?.landmarks?.length > 0
+            ) {
+                const kp2d = filterSquatKeypoints(
+                    detection.landmarks[0],
+                    false,
+                );
+                const kp3d = filterSquatKeypoints(
+                    detection.worldLandmarks?.[0] ?? [],
+                    true,
+                );
                 sendFrame(kp2d, kp3d);
             }
 
@@ -491,19 +575,24 @@ export default function SquatAnalyzer() {
             const res = await fetch(apiUrl("/api/v1/squat/classify"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ keypoints_2d: keypoints2d, keypoints_3d: keypoints3d }),
+                body: JSON.stringify({
+                    keypoints_2d: keypoints2d,
+                    keypoints_3d: keypoints3d,
+                }),
             });
             if (res.ok) data = await res.json();
-        } catch { /* network errors silently ignored */ }
+        } catch {
+            /* network errors silently ignored */
+        }
 
         if (data) setResult(data);
 
         const entry = {
-            timestamp:        Date.now(),
-            classification:   data?.classification   ?? null,
-            left_knee_angle:  data?.left_knee_angle  ?? null,
-            right_knee_angle: data?.right_knee_angle ?? null,
-            confidence:       data?.confidence       ?? null,
+            timestamp: Date.now(),
+            classification: data?.classification ?? null,
+            // left_knee_angle:  data?.left_knee_angle  ?? null,
+            // right_knee_angle: data?.right_knee_angle ?? null,
+            confidence: data?.confidence ?? null,
             keypoints2d,
             keypoints3d,
         };
@@ -518,12 +607,12 @@ export default function SquatAnalyzer() {
         setIsSaving(true);
         const idName = sessionName.trim() || null;
         const rows = sessionLogRef.current.map((e) => ({
-            id_name:       idName,
+            id_name: idName,
             raw_keypoints: {
                 "2d": e.keypoints2d.map(({ x, y }) => [x, y]),
                 "3d": e.keypoints3d.map(({ x, y, z }) => [x, y, z ?? 0]),
             },
-            score:          e.confidence,
+            score: e.confidence,
             classification: e.classification,
         }));
         const { error } = await supabase.from("squat_keypoints").insert(rows);
@@ -541,30 +630,44 @@ export default function SquatAnalyzer() {
         const kp3dNames = log[0].keypoints3d.map((kp) => kp.name);
 
         const header = [
-            "timestamp_ms", "classification",
-            "left_knee_angle_deg", "right_knee_angle_deg", "confidence",
+            "timestamp_ms",
+            "classification",
+            // "left_knee_angle_deg",
+            // "right_knee_angle_deg",
+            "confidence",
             ...kp2dNames.flatMap((n) => [`${n}_x`, `${n}_y`]),
-            ...kp3dNames.flatMap((n) => [`${n}_3d_x`, `${n}_3d_y`, `${n}_3d_z`]),
+            ...kp3dNames.flatMap((n) => [
+                `${n}_3d_x`,
+                `${n}_3d_y`,
+                `${n}_3d_z`,
+            ]),
         ].join(",");
 
-        const csvRows = log.map((e) => [
-            e.timestamp,
-            e.classification   ?? "",
-            e.left_knee_angle?.toFixed(2)  ?? "",
-            e.right_knee_angle?.toFixed(2) ?? "",
-            e.confidence?.toFixed(3)       ?? "",
-            ...e.keypoints2d.flatMap(({ x, y }) => [x.toFixed(4), y.toFixed(4)]),
-            ...e.keypoints3d.flatMap(({ x, y, z }) => [
-                x.toFixed(4), y.toFixed(4), (z ?? 0).toFixed(4),
-            ]),
-        ].join(","));
+        const csvRows = log.map((e) =>
+            [
+                e.timestamp,
+                e.classification ?? "",
+                // e.left_knee_angle?.toFixed(2) ?? "",
+                // e.right_knee_angle?.toFixed(2) ?? "",
+                e.confidence?.toFixed(3) ?? "",
+                ...e.keypoints2d.flatMap(({ x, y }) => [
+                    x.toFixed(4),
+                    y.toFixed(4),
+                ]),
+                ...e.keypoints3d.flatMap(({ x, y, z }) => [
+                    x.toFixed(4),
+                    y.toFixed(4),
+                    (z ?? 0).toFixed(4),
+                ]),
+            ].join(","),
+        );
 
-        const csv  = [header, ...csvRows].join("\n");
+        const csv = [header, ...csvRows].join("\n");
         const blob = new Blob([csv], { type: "text/csv" });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement("a");
-        a.href     = url;
-        a.download = `squat_session_${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.csv`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `squat_session_keypoints_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -581,16 +684,22 @@ export default function SquatAnalyzer() {
         <div className="flex flex-col items-center gap-5 px-6 py-8 max-w-3xl mx-auto">
             {/* Header */}
             <div className="text-center">
-                <h2 className="text-2xl font-bold text-slate-800">Squat Analyzer</h2>
+                <h2 className="text-2xl font-bold text-slate-800">
+                    Squat Analyzer
+                </h2>
                 <p className="text-slate-500 text-sm mt-1">
-                    MediaPipe detects all 33 body landmarks. Squat depth is classified by the Python backend.
+                    MediaPipe detects all 33 body landmarks. Squat depth is
+                    classified by the Python backend.
                 </p>
             </div>
 
             {/* Session name */}
             {supabase && (
                 <div className="flex flex-col items-center gap-1">
-                    <label htmlFor="session-name" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <label
+                        htmlFor="session-name"
+                        className="text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                    >
                         Your name
                     </label>
                     <input
@@ -610,7 +719,7 @@ export default function SquatAnalyzer() {
                 {[
                     { id: "webcam", label: "Live Camera" },
                     { id: "upload", label: "Upload Video" },
-                    { id: "image",  label: "Upload Image" },
+                    { id: "image", label: "Upload Image" },
                 ].map(({ id, label }) => (
                     <button
                         key={id}
@@ -627,13 +736,19 @@ export default function SquatAnalyzer() {
             </div>
 
             {/* Video + canvas overlay */}
-            <div className="ios-card relative rounded-2xl overflow-hidden bg-black" style={{ width: 640, height: 480 }}>
+            <div
+                className="ios-card relative rounded-2xl overflow-hidden bg-black"
+                style={{ width: 640, height: 480 }}
+            >
                 <video
                     ref={videoRef}
                     className="block bg-black"
                     style={{
-                        width: 640, height: 480, objectFit: "contain",
-                        visibility: inputMode === "image" ? "hidden" : "visible",
+                        width: 640,
+                        height: 480,
+                        objectFit: "contain",
+                        visibility:
+                            inputMode === "image" ? "hidden" : "visible",
                     }}
                     muted
                     playsInline
@@ -657,7 +772,10 @@ export default function SquatAnalyzer() {
                             {status === "loading" ? "Loading…" : "Start Camera"}
                         </button>
                     ) : (
-                        <button onClick={stopAll} className="ios-btn px-6 py-2 rounded-full text-sm font-semibold text-red-600">
+                        <button
+                            onClick={stopAll}
+                            className="ios-btn px-6 py-2 rounded-full text-sm font-semibold text-red-600"
+                        >
                             Stop
                         </button>
                     )}
@@ -668,33 +786,57 @@ export default function SquatAnalyzer() {
             {inputMode === "upload" && (
                 <div className="flex flex-col items-center gap-2">
                     <div className="flex gap-3 items-center">
-                        <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoChange} />
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="video/*"
+                            className="hidden"
+                            onChange={handleVideoChange}
+                        />
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={status === "loading"}
                             className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
                         >
-                            {status === "loading" ? "Loading…" : "Choose Video…"}
+                            {status === "loading"
+                                ? "Loading…"
+                                : "Choose Video…"}
                         </button>
                         {status === "running" && (
                             <>
-                                <button onClick={togglePlayPause} className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-700">
+                                <button
+                                    onClick={togglePlayPause}
+                                    className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-700"
+                                >
                                     {videoPaused ? "▶ Play" : "⏸ Pause"}
                                 </button>
-                                <button onClick={stopAll} className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-red-600">
+                                <button
+                                    onClick={stopAll}
+                                    className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-red-600"
+                                >
                                     ✕ Stop
                                 </button>
                             </>
                         )}
                     </div>
-                    {uploadedFileName && <p className="text-slate-400 text-xs">{uploadedFileName}</p>}
+                    {uploadedFileName && (
+                        <p className="text-slate-400 text-xs">
+                            {uploadedFileName}
+                        </p>
+                    )}
                 </div>
             )}
 
             {/* Controls — image upload */}
             {inputMode === "image" && (
                 <div className="flex flex-col items-center gap-2">
-                    <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                    <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageChange}
+                    />
                     <button
                         onClick={() => imageInputRef.current?.click()}
                         disabled={status === "loading"}
@@ -702,33 +844,51 @@ export default function SquatAnalyzer() {
                     >
                         {status === "loading" ? "Analysing…" : "Choose Image…"}
                     </button>
-                    {uploadedFileName && <p className="text-slate-400 text-xs">{uploadedFileName}</p>}
+                    {uploadedFileName && (
+                        <p className="text-slate-400 text-xs">
+                            {uploadedFileName}
+                        </p>
+                    )}
                 </div>
             )}
 
             {/* Error */}
             {status === "error" && (
-                <p className="text-red-500 text-sm">{errorMsg || "An error occurred."}</p>
+                <p className="text-red-500 text-sm">
+                    {errorMsg || "An error occurred."}
+                </p>
             )}
 
             {/* Classification result */}
             {result && (
                 <div className="ios-card rounded-2xl p-5 text-center w-72">
-                    <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Classification</p>
-                    <p className={`text-4xl font-bold mb-4 ${colorClass}`}>{result.classification}</p>
+                    <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">
+                        Classification
+                    </p>
+                    <p className={`text-4xl font-bold mb-4 ${colorClass}`}>
+                        {result.classification}
+                    </p>
                     <div className="flex justify-around text-sm">
                         <div>
                             <p className="text-slate-400 text-xs">Left knee</p>
-                            <p className="font-mono text-slate-700 font-semibold">{result.left_knee_angle?.toFixed(1)}°</p>
+                            <p className="font-mono text-slate-700 font-semibold">
+                                {result.left_knee_angle?.toFixed(1)}°
+                            </p>
                         </div>
                         <div>
                             <p className="text-slate-400 text-xs">Right knee</p>
-                            <p className="font-mono text-slate-700 font-semibold">{result.right_knee_angle?.toFixed(1)}°</p>
+                            <p className="font-mono text-slate-700 font-semibold">
+                                {result.right_knee_angle?.toFixed(1)}°
+                            </p>
                         </div>
                         {result.confidence != null && (
                             <div>
-                                <p className="text-slate-400 text-xs">Confidence</p>
-                                <p className="font-mono text-slate-700 font-semibold">{(result.confidence * 100).toFixed(0)}%</p>
+                                <p className="text-slate-400 text-xs">
+                                    Confidence
+                                </p>
+                                <p className="font-mono text-slate-700 font-semibold">
+                                    {(result.confidence * 100).toFixed(0)}%
+                                </p>
                             </div>
                         )}
                     </div>
@@ -739,7 +899,8 @@ export default function SquatAnalyzer() {
             {sessionLog.length > 0 && (
                 <div className="flex flex-col items-center gap-2">
                     <p className="text-xs text-slate-400">
-                        {sessionLog.length} frame{sessionLog.length !== 1 ? "s" : ""} recorded
+                        {sessionLog.length} frame
+                        {sessionLog.length !== 1 ? "s" : ""} recorded
                     </p>
                     <div className="flex gap-3">
                         {supabase && (
@@ -751,7 +912,10 @@ export default function SquatAnalyzer() {
                                 {isSaving ? "Saving…" : "Save to Database"}
                             </button>
                         )}
-                        <button onClick={downloadCSV} className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-700">
+                        <button
+                            onClick={downloadCSV}
+                            className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-700"
+                        >
                             Download CSV
                         </button>
                     </div>
@@ -764,25 +928,41 @@ export default function SquatAnalyzer() {
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
                         All 33 Keypoints
                         {status === "running" && (
-                            <span className="ml-2 normal-case font-normal text-slate-300">— live</span>
+                            <span className="ml-2 normal-case font-normal text-slate-300">
+                                — live
+                            </span>
                         )}
                     </p>
                     {allKeypoints.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic">Waiting for pose detection…</p>
+                        <p className="text-xs text-slate-400 italic">
+                            Waiting for pose detection…
+                        </p>
                     ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-0.5 gap-x-4 text-xs font-mono max-h-56 overflow-y-auto pr-1">
                             {allKeypoints.map((kp) => (
                                 <div
                                     key={kp.index}
                                     className={`flex items-baseline gap-1.5 py-0.5 ${
-                                        SQUAT_INDICES.has(kp.index) ? "text-sky-600 font-bold" : "text-slate-400"
+                                        SQUAT_INDICES.has(kp.index)
+                                            ? "text-sky-600 font-bold"
+                                            : "text-slate-400"
                                     }`}
                                 >
-                                    <span className="w-5 text-right text-slate-300">{kp.index}</span>
-                                    <span className="w-28 truncate">{kp.name}</span>
-                                    <span className="tabular-nums">{kp.x.toFixed(3)}</span>
-                                    <span className="tabular-nums">{kp.y.toFixed(3)}</span>
-                                    <span className="text-slate-300 tabular-nums">{(kp.visibility * 100).toFixed(0)}%</span>
+                                    <span className="w-5 text-right text-slate-300">
+                                        {kp.index}
+                                    </span>
+                                    <span className="w-28 truncate">
+                                        {kp.name}
+                                    </span>
+                                    <span className="tabular-nums">
+                                        {kp.x.toFixed(3)}
+                                    </span>
+                                    <span className="tabular-nums">
+                                        {kp.y.toFixed(3)}
+                                    </span>
+                                    <span className="text-slate-300 tabular-nums">
+                                        {(kp.visibility * 100).toFixed(0)}%
+                                    </span>
                                 </div>
                             ))}
                         </div>
