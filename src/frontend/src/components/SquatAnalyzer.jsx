@@ -420,8 +420,7 @@ export default function SquatAnalyzer() {
         // id_name is nullable — send null when the user hasn't entered a name.
         const idName = sessionNameRef.current.trim() || null;
 
-        // Shape raw_keypoints: only 3D points as [x, y, z]; 2D data is
-        // used for classification only and is not persisted.
+        // Shape raw_keypoints: only 3D points as [x, y, z].
         const rawKeypoints = {
             "3d": keypoints3d.map(({ x, y, z }) => [x, y, z]),
         };

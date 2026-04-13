@@ -29,7 +29,7 @@ LABELS = ["Deep", "Shallow", "Invalid"]
 # Path where the trained model weights are expected to live.
 _MODEL_PATH = Path(__file__).parent.parent / "models" / "squat_model.pt"
 
-# Module-level cache for the loaded PyTorch model and normalisation tensors.
+# Module-level cache for the loaded PyTorch model and normalization tensors.
 # Populated on first successful load; None signals "not yet attempted".
 _cached_model = None
 _cached_feat_mean = None
@@ -129,7 +129,7 @@ def _pytorch_classify(left_angle: float, right_angle: float) -> Tuple[str, float
             checkpoint = torch.load(_MODEL_PATH, map_location="cpu", weights_only=True)
 
             # Checkpoint may be a plain state_dict or a dict with state_dict +
-            # normalisation constants saved by the notebook.
+            # normalization constants saved by the notebook.
             if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
                 model.load_state_dict(checkpoint["state_dict"])
                 feat_mean = torch.tensor(
@@ -140,7 +140,7 @@ def _pytorch_classify(left_angle: float, right_angle: float) -> Tuple[str, float
                 )
             else:
                 model.load_state_dict(checkpoint)
-                # No normalisation stored — identity transform (raw angles).
+                # No normalization stored — identity transform (raw angles).
                 feat_mean = torch.zeros(2)
                 feat_std = torch.ones(2)
 
