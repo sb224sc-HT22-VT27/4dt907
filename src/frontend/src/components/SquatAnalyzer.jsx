@@ -10,22 +10,21 @@ import supabase from "../supabaseClient";
 
 // MediaPipe keypoint indices used for squat analysis
 // https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker
+// Landmark set aligned with the normalized Kinect CSV files
 const SQUAT_LANDMARK_NAMES = {
-    // TODO: Take updated version from provided A11 .csv files
+    0: "nose",
     11: "left_shoulder",
     12: "right_shoulder",
     13: "left_elbow",
     14: "right_elbow",
+    15: "left_wrist",
+    16: "right_wrist",
     23: "left_hip",
     24: "right_hip",
     25: "left_knee",
     26: "right_knee",
     27: "left_ankle",
     28: "right_ankle",
-    29: "left_heel",
-    30: "right_heel",
-    31: "left_foot_index",
-    32: "right_foot_index",
 };
 
 // All 33 MediaPipe landmark names in index order.
@@ -105,9 +104,8 @@ const POSE_CONNECTIONS = [
 ];
 
 // Indices that are squat-relevant (highlighted brighter).
-// TODO: Take updated version from provided A11 .csv files
 const SQUAT_INDICES = new Set([
-    11, 12, 13, 14, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+    0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28,
 ]);
 
 const CLASSIFICATION_COLORS = {
@@ -152,16 +150,17 @@ async function createImageLandmarker() {
 }
 
 /**
- * Filter a MediaPipe landmarks array to only the joints needed for a squat.
+ * Filter a MediaPipe world-landmarks array to only the 3-D joints needed for a squat.
+ *
+ * @param {Array} landmarks - Full array of 33 world landmark objects from MediaPipe.
+ * @returns {Array} Filtered array of { name, x, y, z, score } objects.
  */
-function filterSquatKeypoints(landmarks, is3d = false) {
+function filterSquatKeypoints3d(landmarks) {
     if (!landmarks) return [];
     return Object.entries(SQUAT_LANDMARK_NAMES).flatMap(([idx, name]) => {
         const lm = landmarks[Number(idx)];
         if (!lm) return [];
-        const kp = { name, x: lm.x, y: lm.y, score: lm.visibility ?? null };
-        if (is3d) kp.z = lm.z ?? 0;
-        return [kp];
+        return [{ name, x: lm.x, y: lm.y, z: lm.z ?? 0, score: lm.visibility ?? null }];
     });
 }
 
@@ -549,15 +548,21 @@ export default function SquatAnalyzer() {
                 frameCounter % BACKEND_EVERY === 0 &&
                 detection?.landmarks?.length > 0
             ) {
-                const kp2d = filterSquatKeypoints(
-                    detection.landmarks[0],
-                    false,
-                );
-                const kp3d = filterSquatKeypoints(
+                const kp3d = filterSquatKeypoints3d(
                     detection.worldLandmarks?.[0] ?? [],
-                    true,
                 );
-                sendFrame(kp2d, kp3d);
+                sendFrame(kp3d);
+
+                // Collect all 33 landmarks for the debug panel.
+                const all = detection.landmarks[0].map((lm, i) => ({
+                    index: i,
+                    name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
+                    x: lm.x,
+                    y: lm.y,
+                    z: lm.z ?? 0,
+                    visibility: lm.visibility ?? 0,
+                }));
+                setAllKeypoints(all);
             }
 
             rafRef.current = requestAnimationFrame(detect);
@@ -569,14 +574,41 @@ export default function SquatAnalyzer() {
 
     // ── Backend + session log ────────────────────────────────────────────────
 
-    async function sendFrame(keypoints2d, keypoints3d) {
-        let data = null;
+    // Backend + Supabase — combined per-frame dispatch
+    //
+    // Flow:
+    //   1. POST 3-D keypoints to the Python backend for classification.
+    //   2. Update the UI with the result.
+    //   3. Insert one row to Supabase's public.squat_keypoints table using the
+    //      classification result from step 1.
+    //
+    // raw_keypoints shape stored in DB:
+    //   {
+    //     "3d": [ [x, y, z], … ] // one [x, y, z] triple per squat keypoint
+    //   }
+    // Keep the ref in sync so the async callback always sees the latest name.
+    sessionNameRef.current = sessionName;
+
+    /**
+     * Classification is handled by the Python backend (POST /api/v1/squat/classify).
+     * The backend attempts PyTorch inference using the trained SquatNet model first
+     * and automatically falls back to a rule-based threshold classifier when the
+     * model file is absent or torch is unavailable — so the endpoint is always
+     * responsive even without a trained checkpoint.
+     *
+     * Future work: train an improved model, publish it to DAGsHub / MLflow, and
+     * register it at a new versioned endpoint. The rule-based path will remain the
+     * fallback throughout.
+     */
+    async function sendFrame(keypoints3d) {
+        // --- 1. Backend classification ---
+        let classification = null;
+        let confidence = null;
         try {
             const res = await fetch(apiUrl("/api/v1/squat/classify"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    keypoints_2d: keypoints2d,
                     keypoints_3d: keypoints3d,
                 }),
             });
@@ -587,14 +619,9 @@ export default function SquatAnalyzer() {
 
         if (data) setResult(data);
 
-        const entry = {
-            timestamp: Date.now(),
-            classification: data?.classification ?? null,
-            // left_knee_angle:  data?.left_knee_angle  ?? null,
-            // right_knee_angle: data?.right_knee_angle ?? null,
-            confidence: data?.confidence ?? null,
-            keypoints2d,
-            keypoints3d,
+        // Shape raw_keypoints: only 3D points as [x, y, z].
+        const rawKeypoints = {
+            "3d": keypoints3d.map(({ x, y, z }) => [x, y, z]),
         };
         sessionLogRef.current = [...sessionLogRef.current, entry];
         setSessionLog(sessionLogRef.current);

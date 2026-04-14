@@ -19,10 +19,6 @@ def _make_kp3(name, x, y, z):
     return {"name": name, "x": x, "y": y, "z": z}
 
 
-def _make_kp2(name, x, y):
-    return {"name": name, "x": x, "y": y}
-
-
 def _deep_squat_payload():
     r = math.radians(80)
     kp3 = [
@@ -33,8 +29,7 @@ def _deep_squat_payload():
         _make_kp3("right_knee", 0, 0, 0),
         _make_kp3("right_ankle", math.sin(r), -math.cos(r), 0),
     ]
-    kp2 = [_make_kp2(k["name"], k["x"], k["y"]) for k in kp3]
-    return {"keypoints_3d": kp3, "keypoints_2d": kp2}
+    return {"keypoints_3d": kp3}
 
 
 def test_squat_classify_status_code():

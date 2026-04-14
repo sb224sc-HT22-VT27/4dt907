@@ -3,21 +3,12 @@
 Pydantic schemas for the squat analysis endpoints.
 
 These models define the request/response contract for the squat classification API.
-The frontend sends 2D and 3D keypoints captured by MediaPipe; the backend returns
+The frontend sends 3D keypoints captured by MediaPipe; the backend returns
 knee angles and a squat-depth classification.
 """
 from typing import List, Optional
 
 from pydantic import BaseModel
-
-
-class Keypoint2D(BaseModel):
-    """2D keypoint from MediaPipe pose detection."""
-
-    name: str
-    x: float
-    y: float
-    score: Optional[float] = None
 
 
 class Keypoint3D(BaseModel):
@@ -33,11 +24,10 @@ class Keypoint3D(BaseModel):
 class SquatRequest(BaseModel):
     """Request payload for squat classification.
 
-    Both arrays must include at minimum:
+    The array must include at minimum:
     left_hip, left_knee, left_ankle, right_hip, right_knee, right_ankle.
     """
 
-    keypoints_2d: List[Keypoint2D]
     keypoints_3d: List[Keypoint3D]
 
 

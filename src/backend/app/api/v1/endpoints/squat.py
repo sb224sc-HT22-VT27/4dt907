@@ -2,9 +2,9 @@
 
 Squat analysis endpoints (v1).
 
-Accepts 2-D and 3-D joint coordinates captured by the MediaPipe pose
-detector running in the React frontend, calculates knee angles, and returns
-a squat-depth classification.
+Accepts 3-D joint coordinates captured by the MediaPipe pose detector running
+in the React frontend, calculates knee angles, and returns a squat-depth
+classification.
 """
 import logging
 
@@ -19,10 +19,9 @@ router = APIRouter()
 
 @router.post("/squat/classify", response_model=SquatResponse)
 def squat_classify(req: SquatRequest):
-    """Classify squat depth from MediaPipe keypoints.
+    """Classify squat depth from MediaPipe 3-D keypoints.
 
-    The request must contain at minimum the following named keypoints in
-    both the 2-D and 3-D arrays:
+    The request must contain at minimum the following named keypoints:
     ``left_hip``, ``left_knee``, ``left_ankle``,
     ``right_hip``, ``right_knee``, ``right_ankle``.
 
@@ -31,9 +30,8 @@ def squat_classify(req: SquatRequest):
     """
     try:
         kp_3d = [kp.model_dump() for kp in req.keypoints_3d]
-        kp_2d = [kp.model_dump() for kp in req.keypoints_2d]
 
-        classification, left_angle, right_angle, confidence = classify_squat(kp_3d, kp_2d)
+        classification, left_angle, right_angle, confidence = classify_squat(kp_3d)
 
         return SquatResponse(
             classification=classification,
@@ -43,6 +41,6 @@ def squat_classify(req: SquatRequest):
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
+    except Exception:
         logger.exception("Squat classification failed")
-        raise HTTPException(status_code=503, detail=f"{type(e).__name__}: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable")
