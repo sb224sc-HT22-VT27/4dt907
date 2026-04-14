@@ -232,6 +232,9 @@ export default function SquatAnalyzer() {
     const [sessionLog, setSessionLog] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Mirror of sessionName state — readable inside async callbacks.
+    const sessionNameRef = useRef("");
+
     // ── Preload VIDEO landmarker on mount; clean up on unmount ───────────────
     useEffect(() => {
         let cancelled = false;
@@ -427,15 +430,10 @@ export default function SquatAnalyzer() {
                             visibility: lm.visibility ?? 0,
                         })),
                     );
-                    const kp2d = filterSquatKeypoints(
-                        detection.landmarks[0],
-                        false,
-                    );
-                    const kp3d = filterSquatKeypoints(
+                    const kp3d = filterSquatKeypoints3d(
                         detection.worldLandmarks?.[0] ?? [],
-                        true,
                     );
-                    sendFrame(kp2d, kp3d);
+                    sendFrame(kp3d);
                 }
                 setStatus("idle");
             } catch (err) {
@@ -602,8 +600,7 @@ export default function SquatAnalyzer() {
      */
     async function sendFrame(keypoints3d) {
         // --- 1. Backend classification ---
-        let classification = null;
-        let confidence = null;
+        let data = null;
         try {
             const res = await fetch(apiUrl("/api/v1/squat/classify"), {
                 method: "POST",
@@ -619,9 +616,11 @@ export default function SquatAnalyzer() {
 
         if (data) setResult(data);
 
-        // Shape raw_keypoints: only 3D points as [x, y, z].
-        const rawKeypoints = {
-            "3d": keypoints3d.map(({ x, y, z }) => [x, y, z]),
+        const entry = {
+            timestamp: Date.now(),
+            keypoints3d,
+            classification: data?.classification ?? null,
+            confidence: data?.confidence ?? null,
         };
         sessionLogRef.current = [...sessionLogRef.current, entry];
         setSessionLog(sessionLogRef.current);
@@ -636,7 +635,6 @@ export default function SquatAnalyzer() {
         const rows = sessionLogRef.current.map((e) => ({
             id_name: idName,
             raw_keypoints: {
-                "2d": e.keypoints2d.map(({ x, y }) => [x, y]),
                 "3d": e.keypoints3d.map(({ x, y, z }) => [x, y, z ?? 0]),
             },
             score: e.confidence,
@@ -653,7 +651,6 @@ export default function SquatAnalyzer() {
         const log = sessionLogRef.current;
         if (log.length === 0) return;
 
-        const kp2dNames = log[0].keypoints2d.map((kp) => kp.name);
         const kp3dNames = log[0].keypoints3d.map((kp) => kp.name);
 
         const header = [
@@ -662,7 +659,6 @@ export default function SquatAnalyzer() {
             // "left_knee_angle_deg",
             // "right_knee_angle_deg",
             "confidence",
-            ...kp2dNames.flatMap((n) => [`${n}_x`, `${n}_y`]),
             ...kp3dNames.flatMap((n) => [
                 `${n}_3d_x`,
                 `${n}_3d_y`,
@@ -677,10 +673,6 @@ export default function SquatAnalyzer() {
                 // e.left_knee_angle?.toFixed(2) ?? "",
                 // e.right_knee_angle?.toFixed(2) ?? "",
                 e.confidence?.toFixed(3) ?? "",
-                ...e.keypoints2d.flatMap(({ x, y }) => [
-                    x.toFixed(4),
-                    y.toFixed(4),
-                ]),
                 ...e.keypoints3d.flatMap(({ x, y, z }) => [
                     x.toFixed(4),
                     y.toFixed(4),
