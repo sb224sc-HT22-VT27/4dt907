@@ -99,6 +99,8 @@ services:
    | Variable | Value |
    | -------- | ----- |
    | `VITE_BACKEND_URL` | `https://<your-service>.onrender.com` |
+   | `VITE_SUPABASE_URL` | Your Supabase project URL (optional — enables keypoint storage) |
+   | `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key (optional — required when `VITE_SUPABASE_URL` is set) |
 
 3. Trigger a new deployment (or let Vercel deploy automatically on push).
    The static build will bake `VITE_BACKEND_URL` into the bundle so every API call
@@ -166,6 +168,8 @@ Set the following in the Vercel project settings under **Environment Variables**
 | `WEAKLINK_MODEL_URI_PROD` | Weakest-Link production model URI |
 | `WEAKLINK_MODEL_URI_DEV` | Weakest-Link development model URI |
 | `WEAKLINK_MODEL_URI_BACKUP` | Weakest-Link backup model URI |
+| `VITE_SUPABASE_URL` | Supabase project URL (optional — enables keypoint storage) |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key (optional — required when URL is set) |
 
 Leave `VITE_BACKEND_URL` empty – the frontend will use relative `/api/*` paths which
 Vercel rewrites to the serverless function.
