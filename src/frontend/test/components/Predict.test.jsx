@@ -21,9 +21,10 @@ async function waitForModelLoad() {
 // Setup / teardown
 // ---------------------------------------------------------------------------
 
+const fetchMock = vi.fn();
+
 beforeEach(() => {
-  // Default: model-info returns 41 features, predict returns a score
-  global.fetch = vi.fn((url) => {
+  fetchMock.mockImplementation((url) => {
     if (url.includes("model-info")) {
       return Promise.resolve({
         ok: true,
@@ -31,6 +32,7 @@ beforeEach(() => {
         json: () => Promise.resolve({ expected_features: 41 }),
       });
     }
+
     return Promise.resolve({
       ok: true,
       status: 200,
@@ -42,6 +44,8 @@ beforeEach(() => {
         }),
     });
   });
+
+  vi.stubGlobal("fetch", fetchMock);
 });
 
 afterEach(() => {
@@ -67,13 +71,13 @@ describe("Predict — rendering", () => {
 
   it("shows 'Loading model…' text in Predict button while model-info is loading", () => {
     // Never resolve so we stay in loading state
-    global.fetch = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
     render(<Predict />);
     expect(screen.getByRole("button", { name: /loading model/i })).toBeInTheDocument();
   });
 
   it("disables action buttons while model-info is loading", () => {
-    global.fetch = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
     render(<Predict />);
     expect(screen.getByRole("button", { name: /example/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /copy/i })).toBeDisabled();
@@ -101,13 +105,13 @@ describe("Predict — rendering", () => {
 
 describe("Predict — model-info error handling", () => {
   it("shows a warning when model-info returns a non-OK status", async () => {
-    global.fetch = vi.fn(() =>
+    vi.stubGlobal("fetch", vi.fn(() =>
       Promise.resolve({
         ok: false,
         status: 500,
         json: () => Promise.resolve({ detail: "Server exploded" }),
       })
-    );
+    ));
     render(<Predict />);
     await waitFor(() =>
       expect(screen.getByText(/model info warning/i)).toBeInTheDocument()
@@ -115,13 +119,13 @@ describe("Predict — model-info error handling", () => {
   });
 
   it("shows a warning when expected_features is missing from model-info response", async () => {
-    global.fetch = vi.fn(() =>
+    vi.stubGlobal("fetch", vi.fn(() =>
       Promise.resolve({
         ok: true,
         status: 200,
         json: () => Promise.resolve({}), // no expected_features
       })
-    );
+    ));
     render(<Predict />);
     await waitFor(() =>
       expect(screen.getByText(/model info warning/i)).toBeInTheDocument()
@@ -129,7 +133,7 @@ describe("Predict — model-info error handling", () => {
   });
 
   it("shows an error if Predict is clicked while model-info is still loading", async () => {
-    global.fetch = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
     render(<Predict />);
     // Predict button is disabled while loading, but simulate a direct click anyway
     const btn = screen.getByRole("button", { name: /loading model/i });
@@ -324,7 +328,7 @@ describe("Predict — prediction flow", () => {
     await userEvent.click(screen.getByRole("button", { name: /^predict$/i }));
 
     await waitFor(() =>
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchMock).toHaveBeenCalledWith(
         "/api/v1/predict/champion",
         expect.objectContaining({ method: "POST" })
       )
@@ -337,7 +341,7 @@ describe("Predict — prediction flow", () => {
     await userEvent.click(screen.getByRole("button", { name: /^predict$/i }));
 
     await waitFor(() => {
-      const call = global.fetch.mock.calls.find((c) =>
+      const call = fetchMock.mock.calls.find((c) =>
         c[0].includes("/predict/")
       );
       expect(call).toBeDefined();
@@ -369,7 +373,7 @@ describe("Predict — prediction flow", () => {
   });
 
   it("displays an error message when the API returns a non-OK status", async () => {
-    global.fetch = vi.fn((url) => {
+    vi.stubGlobal("fetch", vi.fn((url) => {
       if (url.includes("model-info"))
         return Promise.resolve({
           ok: true,
@@ -381,7 +385,7 @@ describe("Predict — prediction flow", () => {
         status: 422,
         json: () => Promise.resolve({ detail: "Unprocessable entity" }),
       });
-    });
+    }));
 
     render(<Predict />);
     await waitForModelLoad();
@@ -393,7 +397,7 @@ describe("Predict — prediction flow", () => {
   });
 
   it("displays a generic error when fetch throws (network failure)", async () => {
-    global.fetch = vi.fn((url) => {
+    vi.stubGlobal("fetch", vi.fn((url) => {
       if (url.includes("model-info"))
         return Promise.resolve({
           ok: true,
@@ -401,7 +405,7 @@ describe("Predict — prediction flow", () => {
           json: () => Promise.resolve({ expected_features: 41 }),
         });
       return Promise.reject(new Error("Network error"));
-    });
+    }));
 
     render(<Predict />);
     await waitForModelLoad();
@@ -415,7 +419,7 @@ describe("Predict — prediction flow", () => {
   it("shows 'Predicting…' in the button while loading", async () => {
     // Hold the predict fetch open
     let resolvePredict;
-    global.fetch = vi.fn((url) => {
+    vi.stubGlobal("fetch", vi.fn((url) => {
       if (url.includes("model-info"))
         return Promise.resolve({
           ok: true,
@@ -423,7 +427,7 @@ describe("Predict — prediction flow", () => {
           json: () => Promise.resolve({ expected_features: 41 }),
         });
       return new Promise((res) => { resolvePredict = res; });
-    });
+    }));
 
     render(<Predict />);
     await waitForModelLoad();
@@ -446,7 +450,7 @@ describe("Predict — prediction flow", () => {
   it("clears a previous error when Predict is clicked again", async () => {
     // First call fails
     let callCount = 0;
-    global.fetch = vi.fn((url) => {
+    vi.stubGlobal("fetch", vi.fn((url) => {
       if (url.includes("model-info"))
         return Promise.resolve({
           ok: true,
@@ -465,7 +469,7 @@ describe("Predict — prediction flow", () => {
         status: 200,
         json: () => Promise.resolve({ prediction: 0.9, model_uri: "", run_id: "" }),
       });
-    });
+    }));
 
     render(<Predict />);
     await waitForModelLoad();
