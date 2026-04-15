@@ -2,6 +2,8 @@
 
 import math
 
+import pytest
+
 from app.services.squat_service import calculate_knee_angle, classify_squat
 
 
@@ -55,6 +57,14 @@ def _bent_leg_kp3(side, knee_angle_deg):
 def _full_kp3(left_angle, right_angle):
     """Generate full left+right 3-D keypoints."""
     return _bent_leg_kp3("left", left_angle) + _bent_leg_kp3("right", right_angle)
+
+
+@pytest.fixture(autouse=True)
+def _mock_predict_z(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.squat_service.predict_z",
+        lambda _features, _variant="champion": (0.0, "models:/ZModel/1", "run_1"),
+    )
 
 
 def test_classify_squat_deep():
