@@ -87,6 +87,9 @@ services:
    | `WEAKLINK_MODEL_URI_PROD` | Weakest-Link production model URI |
    | `WEAKLINK_MODEL_URI_DEV` | Weakest-Link development model URI |
    | `WEAKLINK_MODEL_URI_BACKUP` | Weakest-Link backup model URI |
+   | `Z_MODEL_URI_PROD` | Z-predictor production model URI |
+   | `Z_MODEL_URI_DEV` | Z-predictor development model URI |
+   | `Z_MODEL_URI_BACKUP` | Z-predictor backup model URI |
    | `PRODUCTION_URL` | Your Vercel frontend URL (for CORS), e.g. `https://your-project.vercel.app` |
 
 4. Deploy the service and note the external URL (e.g. `https://4dt907-backend.onrender.com`).
@@ -168,6 +171,9 @@ Set the following in the Vercel project settings under **Environment Variables**
 | `WEAKLINK_MODEL_URI_PROD` | Weakest-Link production model URI |
 | `WEAKLINK_MODEL_URI_DEV` | Weakest-Link development model URI |
 | `WEAKLINK_MODEL_URI_BACKUP` | Weakest-Link backup model URI |
+| `Z_MODEL_URI_PROD` | Z-predictor production model URI |
+| `Z_MODEL_URI_DEV` | Z-predictor development model URI |
+| `Z_MODEL_URI_BACKUP` | Z-predictor backup model URI |
 | `VITE_SUPABASE_URL` | Supabase project URL (optional — enables keypoint storage) |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key (optional — required when URL is set) |
 

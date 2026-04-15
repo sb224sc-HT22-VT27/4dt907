@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] – 2026-04-15
+
+Assignment 9 – Deep learning z-predictor, MLflow integration, and squat classification improvements.
+
+### Added
+
+- **A9 deep learning notebooks** (`src/ml-research/a9/`) — training, evaluation and validation
+  notebooks for a z-axis predictor (GRU/LSTM variants). Includes cross-validation metrics,
+  per-joint evaluation CSV, and comparison figures.
+- **`POST /api/v1/z-predictor/champion`** and **`/latest`** FastAPI endpoints — expose the
+  MLflow-hosted z-predictor model via the standard `PredictRequest` / `PredictResponse` schema.
+- **`app/services/z_model_service.py`** — thread-safe MLflow model loader with `champion`,
+  `latest`, and `backup` variant resolution via `Z_MODEL_URI_PROD` / `Z_MODEL_URI_DEV` /
+  `Z_MODEL_URI_BACKUP` environment variables.
+- **`squat_model.pt`** — initial PyTorch checkpoint (`app/models/squat_model.pt`) produced by
+  A9 training, used as the local fallback for squat confidence scoring.
+- `Z_MODEL_URI_PROD`, `Z_MODEL_URI_DEV`, `Z_MODEL_URI_BACKUP` environment variables added to
+  `.env.example`.
+
+### Changed
+
+- **`squat_service.py`** — squat depth classification now calls the MLflow z-predictor service
+  to reconstruct missing z values from x/y before computing knee angles, improving accuracy on
+  2-D-only input.
+- **`SquatAnalyzer.jsx`** — frontend sends predicted z values from the backend z-predictor
+  debug display alongside the classification result.
+
+---
+
 ## [0.8.0] – 2026-04-14
 
 Assignment 8 – MediaPipe pose estimation, squat classification, and Supabase keypoint storage.

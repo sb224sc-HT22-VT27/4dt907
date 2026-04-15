@@ -110,6 +110,23 @@ black .
 - `POST /api/v1/predict/champion`
 - `POST /api/v1/predict/latest`
 
+#### Z-Predictor
+
+Predicts the z-axis (depth) value for a set of MediaPipe 2-D keypoints using an MLflow-hosted
+regression model. The squat classifier calls this internally to improve depth estimation.
+
+- `POST /api/v1/z-predictor/champion` — production z-predictor model
+- `POST /api/v1/z-predictor/latest` — development z-predictor model
+
+  **Request** — same schema as `/api/v1/predict/*` (a flat feature vector).
+
+  **Response**:
+  ```json
+  { "prediction": 0.042, "model_uri": "models:/…", "run_id": "abc123" }
+  ```
+
+  Requires `Z_MODEL_URI_PROD` (champion) or `Z_MODEL_URI_DEV` (latest) in the environment.
+
 ## Docker
 
 Use the docker compose file to build entire project which uses the local Dockerfile for the backend.
