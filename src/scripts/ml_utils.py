@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score
+import torch
 
 
 class mlutils:
@@ -32,8 +33,14 @@ class mlutils:
             # If no dev exists
             dev_score = -1
 
-        if new_score > dev_score:
-            print(f"New Best! {new_score} > {dev_score}. Updating models on DagsHub")
+
+        if metric_name=="Grand_Avg_Test_MAE_cm":
+            res = new_score < dev_score
+        else:
+            res = new_score > dev_score
+
+        if res:
+            print(f"New Best! {new_score}  {dev_score}. Updating models on DagsHub")
 
             # Delete current @backup
             self._delete_current_backup()
@@ -217,7 +224,10 @@ class mlutils:
                 plt.savefig("challenger_vs_prod_ttest.png")
                 plt.show()
 
-                return (d_bar > 0 and p_val < 0.05), p_val
+                if metric == "mae_cm":
+                    return (d_bar < 0 and p_val < 0.05), p_val
+                else:
+                    return (d_bar > 0 and p_val < 0.05), p_val
 
             return True, 1.0
 
@@ -230,6 +240,8 @@ class mlutils:
         Pulls exactly the version tied to each alias and runs a 5-Fold CV.
         Matches the backend's preference for concrete version loading.
         """
+
+        
         results = {}
         aliases = ["prod", "dev", "backup"]
         kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
@@ -326,4 +338,34 @@ class mlutils:
                 print(f"{alias:<10} | {'N/A':<10}     | {'N/A':<10}")
         print("="*50 + "\n")
 
+        return results
+    
+
+    def compare_pytorch_aliases(self, test_loader, joint_names):
+        """Pulls @prod, @dev, @backup PyTorch models and runs evaluation."""
+        results = {}
+        aliases = ["prod", "dev", "backup"]
+
+        for alias in aliases:
+            try:
+                # 1. Resolve alias to version
+                ver_entity = self.client.get_model_version_by_alias(self.model_name, alias)
+                model_uri = f"models:/{self.model_name}/{ver_entity.version}"
+
+                # 2. LOAD AS PYTORCH (Crucial Change!)
+                loaded_model = mlflow.pytorch.load_model(model_uri)
+                loaded_model.eval()
+
+                # 3. Run your 10-sequence evaluation loop
+                errors = []
+                with torch.no_grad():
+                    for inputs, targets in test_loader:
+                        preds = loaded_model(inputs)
+                        errors.append(torch.mean(torch.abs(preds - targets) * 100).item())
+                
+                results[alias] = np.array(errors)
+            except Exception as e:
+                results[alias] = None
+    
+        # Print your table (same logic as your sklearn version)
         return results
