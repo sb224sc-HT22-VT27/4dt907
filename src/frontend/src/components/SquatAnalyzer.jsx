@@ -231,9 +231,11 @@ export default function SquatAnalyzer() {
     const [allKeypoints, setAllKeypoints] = useState([]);
     const [sessionLog, setSessionLog] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [predictedZByName, setPredictedZByName] = useState({});
 
     // Mirror of sessionName state — readable inside async callbacks.
     const sessionNameRef = useRef("");
+    const predictedZByNameRef = useRef({});
 
     // ── Preload VIDEO landmarker on mount; clean up on unmount ───────────────
     useEffect(() => {
@@ -283,7 +285,47 @@ export default function SquatAnalyzer() {
         lastDetectionRef.current = null;
         setStatus("idle");
         setVideoPaused(false);
+        setPredictedZByName({});
+        predictedZByNameRef.current = {};
     }, []);
+
+    async function fetchPredictedZMap(keypoints) {
+        if (!Array.isArray(keypoints) || keypoints.length === 0) return {};
+        const squatKeypoints = keypoints.filter((kp) => SQUAT_INDICES.has(kp.index));
+        if (squatKeypoints.length === 0) return {};
+
+        const responses = await Promise.allSettled(
+            squatKeypoints.map(async (kp) => {
+                const res = await fetch(apiUrl("/api/v1/z-predictor/champion"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ features: [kp.x, kp.y] }),
+                });
+                if (!res.ok) throw new Error("z-predictor request failed");
+                const data = await res.json();
+                return [kp.name, Number(data?.prediction ?? 0)];
+            }),
+        );
+
+        return responses.reduce((acc, item) => {
+            if (item.status === "fulfilled") {
+                const [name, z] = item.value;
+                acc[name] = z;
+            }
+            return acc;
+        }, {});
+    }
+
+    function mapAllKeypoints(landmarks) {
+        return landmarks.map((lm, i) => ({
+            index: i,
+            name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
+            x: lm.x,
+            y: lm.y,
+            z: lm.z ?? 0,
+            predictedZ: predictedZByNameRef.current[ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`] ?? null,
+        }));
+    }
 
     const switchMode = useCallback(
         (newMode) => {
@@ -421,14 +463,7 @@ export default function SquatAnalyzer() {
                         y: offsetY,
                     });
                     setAllKeypoints(
-                        detection.landmarks[0].map((lm, i) => ({
-                            index: i,
-                            name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
-                            x: lm.x,
-                            y: lm.y,
-                            z: lm.z ?? 0,
-                            visibility: lm.visibility ?? 0,
-                        })),
+                        mapAllKeypoints(detection.landmarks[0]),
                     );
                     const kp3d = filterSquatKeypoints3d(
                         detection.worldLandmarks?.[0] ?? [],
@@ -527,14 +562,7 @@ export default function SquatAnalyzer() {
             if (frameCounter % DEBUG_EVERY === 0) {
                 if (detection?.landmarks?.length > 0) {
                     setAllKeypoints(
-                        detection.landmarks[0].map((lm, i) => ({
-                            index: i,
-                            name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
-                            x: lm.x,
-                            y: lm.y,
-                            z: lm.z ?? 0,
-                            visibility: lm.visibility ?? 0,
-                        })),
+                        mapAllKeypoints(detection.landmarks[0]),
                     );
                 } else {
                     setAllKeypoints([]);
@@ -552,15 +580,14 @@ export default function SquatAnalyzer() {
                 sendFrame(kp3d);
 
                 // Collect all 33 landmarks for the debug panel.
-                const all = detection.landmarks[0].map((lm, i) => ({
-                    index: i,
-                    name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
-                    x: lm.x,
-                    y: lm.y,
-                    z: lm.z ?? 0,
-                    visibility: lm.visibility ?? 0,
-                }));
+                const all = mapAllKeypoints(detection.landmarks[0]);
                 setAllKeypoints(all);
+                fetchPredictedZMap(all)
+                    .then((map) => {
+                        predictedZByNameRef.current = map;
+                        setPredictedZByName(map);
+                    })
+                    .catch(() => {});
             }
 
             rafRef.current = requestAnimationFrame(detect);
@@ -569,6 +596,10 @@ export default function SquatAnalyzer() {
         rafRef.current = requestAnimationFrame(detect);
         return () => cancelAnimationFrame(rafRef.current);
     }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        predictedZByNameRef.current = predictedZByName;
+    }, [predictedZByName]);
 
     // ── Backend + session log ────────────────────────────────────────────────
 
@@ -589,14 +620,8 @@ export default function SquatAnalyzer() {
 
     /**
      * Classification is handled by the Python backend (POST /api/v1/squat/classify).
-     * The backend attempts PyTorch inference using the trained SquatNet model first
-     * and automatically falls back to a rule-based threshold classifier when the
-     * model file is absent or torch is unavailable — so the endpoint is always
-     * responsive even without a trained checkpoint.
-     *
-     * Future work: train an improved model, publish it to DAGsHub / MLflow, and
-     * register it at a new versioned endpoint. The rule-based path will remain the
-     * fallback throughout.
+     * The backend reconstructs z from x/y via the MLflow-hosted z-predictor model
+     * and classifies squat depth from the resulting 3-D keypoints.
      */
     async function sendFrame(keypoints3d) {
         // --- 1. Backend classification ---
@@ -980,7 +1005,9 @@ export default function SquatAnalyzer() {
                                         {kp.y.toFixed(3)}
                                     </span>
                                     <span className="text-slate-300 tabular-nums">
-                                        {(kp.visibility * 100).toFixed(0)}%
+                                        {kp.predictedZ == null
+                                            ? ""
+                                            : kp.predictedZ.toFixed(3)}
                                     </span>
                                 </div>
                             ))}

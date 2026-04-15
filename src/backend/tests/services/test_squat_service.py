@@ -59,6 +59,14 @@ def _full_kp3(left_angle, right_angle):
     return _bent_leg_kp3("left", left_angle) + _bent_leg_kp3("right", right_angle)
 
 
+@pytest.fixture(autouse=True)
+def _mock_predict_z(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.squat_service.predict_z",
+        lambda _features, _variant="champion": (0.0, "models:/ZModel/1", "run_1"),
+    )
+
+
 def test_classify_squat_deep():
     kp3 = _full_kp3(80, 82)
     classification, left, right, confidence = classify_squat(kp3)
@@ -101,3 +109,16 @@ def test_classify_squat_returns_confidence():
     _, _, _, confidence = classify_squat(kp3)
     assert confidence is not None
     assert 0.0 <= confidence <= 1.0
+
+
+def test_classify_squat_uses_z_predictor(monkeypatch):
+    calls = {"count": 0}
+
+    def _fake_predict(features, variant):
+        calls["count"] += 1
+        return 0.0, "models:/ZModel/1", "run_1"
+
+    monkeypatch.setattr("app.services.squat_service.predict_z", _fake_predict)
+    kp3 = _full_kp3(85, 87)
+    classify_squat(kp3)
+    assert calls["count"] == 6
