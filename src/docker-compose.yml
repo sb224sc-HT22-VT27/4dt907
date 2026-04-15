@@ -13,6 +13,10 @@ services:
                 - WEAKLINK_MODEL_URI_PROD=${WEAKLINK_MODEL_URI_PROD}
                 - WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV}
                 - WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP}
+
+                - Z_MODEL_URI_PROD=${Z_MODEL_URI_PROD}
+                - Z_MODEL_URI_DEV=${Z_MODEL_URI_DEV}
+                - Z_MODEL_URI_BACKUP=${Z_MODEL_URI_BACKUP}
         container_name: 4dt907-backend
         environment:
             - BACKEND_PORT=${BACKEND_PORT}
@@ -25,6 +29,10 @@ services:
             - WEAKLINK_MODEL_URI_PROD=${WEAKLINK_MODEL_URI_PROD}
             - WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV}
             - WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP}
+
+            - Z_MODEL_URI_PROD=${Z_MODEL_URI_PROD}
+            - Z_MODEL_URI_DEV=${Z_MODEL_URI_DEV}
+            - Z_MODEL_URI_BACKUP=${Z_MODEL_URI_BACKUP}
         ports:
             - "${BACKEND_PORT}:${BACKEND_PORT}"
         volumes:

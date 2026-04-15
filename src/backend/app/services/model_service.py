@@ -11,6 +11,7 @@ Caching:
 - models are cached by their resolved URI to avoid repeated MLflow downloads
 - a thread lock protects cache access in concurrent API requests
 """
+
 import os
 import threading
 from typing import Dict, Tuple
@@ -122,7 +123,7 @@ def _init_mlflow() -> str:
     return uri
 
 
-# * Current "entry point"
+# TODO: Unused???
 def _model_name_for_variant(variant: str) -> str:
     v = (variant or "").lower().strip()
     if v in {"champion", "best"}:

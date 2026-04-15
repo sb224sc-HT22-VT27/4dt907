@@ -6,6 +6,7 @@ These routes expose provenance information (model URI, run_id, and
 expected feature count) for different model variants (latest/champion).
 They are intentionally read-only and should avoid heavy model calls where possible.
 """
+
 import logging
 from fastapi import APIRouter, HTTPException
 from app.services.model_service import get_model, expected_feature_count
@@ -57,7 +58,9 @@ def model_info_weakest_link_latest():
             "variant": "latest",
             "model_uri": uri,
             "run_id": run_id,
-            "expected_features": weaklink_model_service.expected_feature_count("latest"),
+            "expected_features": weaklink_model_service.expected_feature_count(
+                "latest"
+            ),
         }
     except Exception as e:
         logger.exception("Failed to load weakest-link latest model info")
@@ -73,7 +76,9 @@ def model_info_weakest_link_champion():
             "variant": "champion",
             "model_uri": uri,
             "run_id": run_id,
-            "expected_features": weaklink_model_service.expected_feature_count("champion"),
+            "expected_features": weaklink_model_service.expected_feature_count(
+                "champion"
+            ),
         }
     except Exception as e:
         logger.exception("Failed to load weakest-link champion model info")

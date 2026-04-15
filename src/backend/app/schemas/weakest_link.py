@@ -5,11 +5,13 @@ Pydantic schemas for weakest-link prediction endpoints.
 These models define the response contract for the weakest-link model API.
 Keep them stable to avoid breaking clients.
 """
+
 from pydantic import BaseModel
 
 
 class WeakestLinkResponse(BaseModel):
     """Response returned from a weakest-link prediction call"""
+
     prediction: str
     model_uri: str
     run_id: str | None = None

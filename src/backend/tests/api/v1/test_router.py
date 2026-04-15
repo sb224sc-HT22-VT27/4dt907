@@ -37,3 +37,15 @@ def test_v1_router_registers_expected_paths_weakest_link_champion():
 
 def test_v1_router_registers_expected_paths_weakest_link_latest():
     assert "/api/v1/weakest-link/latest" in paths
+
+
+def test_v1_router_registers_expected_paths_squat_classify():
+    assert "/api/v1/squat/classify" in paths
+
+
+def test_v1_router_registers_expected_paths_z_predictor_champion():
+    assert "/api/v1/z-predictor/champion" in paths
+
+
+def test_v1_router_registers_expected_paths_z_predictor_latest():
+    assert "/api/v1/z-predictor/latest" in paths

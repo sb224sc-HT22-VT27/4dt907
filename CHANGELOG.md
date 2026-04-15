@@ -9,6 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] – 2026-04-15
+
+Assignment 9 – Deep learning z-predictor, MLflow integration, and squat classification improvements.
+
+### Added
+
+- **A9 deep learning notebooks** (`src/ml-research/a9/`) — training, evaluation and validation
+  notebooks for a z-axis predictor (GRU/LSTM variants). Includes cross-validation metrics,
+  per-joint evaluation CSV, and comparison figures.
+- **`POST /api/v1/z-predictor/champion`** and **`/latest`** FastAPI endpoints — expose the
+  MLflow-hosted z-predictor model via the standard `PredictRequest` / `PredictResponse` schema.
+- **`app/services/z_model_service.py`** — thread-safe MLflow model loader with `champion`,
+  `latest`, and `backup` variant resolution via `Z_MODEL_URI_PROD` / `Z_MODEL_URI_DEV` /
+  `Z_MODEL_URI_BACKUP` environment variables.
+- **`squat_model.pt`** — initial PyTorch checkpoint (`app/models/squat_model.pt`) produced by
+  A9 training, used as the local fallback for squat confidence scoring.
+- `Z_MODEL_URI_PROD`, `Z_MODEL_URI_DEV`, `Z_MODEL_URI_BACKUP` environment variables added to
+  `.env.example`.
+
+### Changed
+
+- **`squat_service.py`** — squat depth classification now calls the MLflow z-predictor service
+  to reconstruct missing z values from x/y before computing knee angles, improving accuracy on
+  2-D-only input.
+- **`SquatAnalyzer.jsx`** — frontend sends predicted z values from the backend z-predictor
+  debug display alongside the classification result.
+
+---
+
+## [0.8.0] – 2026-04-08
+
+Assignment 8 – MediaPipe pose estimation, squat classification, and Supabase keypoint storage.
+
+### Added
+
+- **MediaPipe squat analyzer** — `SquatAnalyzer.jsx` React component supporting live webcam,
+  video upload, and static image modes. Detects 33 body landmarks in-browser via
+  `@mediapipe/tasks-vision` and sends 3-D world keypoints to the backend for classification.
+- **`POST /api/v1/squat/classify`** FastAPI endpoint — accepts MediaPipe 3-D keypoints,
+  calculates knee angles (law of cosines), and returns `Deep` / `Shallow` / `Invalid` with
+  an optional confidence score.
+- **PyTorch squat model** (`squat_service.py`) — uses a trained `SquatNet` checkpoint when
+  present (`app/models/squat_model.pt`); model and normalization tensors are cached at startup.
+  Falls back to a rule-based angle-threshold classifier so the endpoint is always responsive.
+- **Supabase integration** — frontend stores 3-D keypoint sessions in a `squat_keypoints`
+  table via the Supabase JS client. Requires `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+  Session recording is opt-in; users manually trigger "Save to Database" or "Download CSV".
+- **CSV export** — recorded sessions can be exported as a timestamped CSV containing
+  classification, confidence, and all 3-D joint coordinates per frame.
+- **Kinect data normalisation script** (`src/scripts/normalize_kinect_data.py`) — remaps
+  Kinect joint names to MediaPipe vocabulary and hip-centres coordinates to produce
+  MediaPipe-compatible training data for future DL models.
+- A8 research notebook documenting the MediaPipe integration and data analysis.
+
+### Changed
+
+- `SquatRequest` schema — `keypoints_2d` field and `Keypoint2D` class removed; only
+  `keypoints_3d` is accepted. `sendFrame` in `SquatAnalyzer.jsx` sends 3-D data only.
+- `.env.example` — added `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` documentation
+  and the SQL DDL for the `squat_keypoints` table; removed internal TODO notes.
+
+---
+
 ## [0.7.0] – 2026-03-26
 
 Assignment 7 – Unsupervised learning: PCA and clustering, plus split-deployment preparation.
