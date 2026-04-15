@@ -2,8 +2,6 @@
 
 import math
 
-import pytest
-
 from app.services.squat_service import calculate_knee_angle, classify_squat
 
 
@@ -101,3 +99,16 @@ def test_classify_squat_returns_confidence():
     _, _, _, confidence = classify_squat(kp3)
     assert confidence is not None
     assert 0.0 <= confidence <= 1.0
+
+
+def test_classify_squat_uses_z_predictor(monkeypatch):
+    calls = {"count": 0}
+
+    def _fake_predict(features, variant):
+        calls["count"] += 1
+        return 0.0, "models:/ZModel/1", "run_1"
+
+    monkeypatch.setattr("app.services.squat_service.predict_z", _fake_predict)
+    kp3 = _full_kp3(85, 87)
+    classify_squat(kp3)
+    assert calls["count"] == 6

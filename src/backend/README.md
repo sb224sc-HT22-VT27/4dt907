@@ -6,9 +6,10 @@ FastAPI backend service for 4dt907 ML data-intensive system.
 
 - **Squat classification** — `POST /api/v1/squat/classify` accepts MediaPipe 3-D keypoints,
   calculates knee angles (law of cosines) and returns `Deep` / `Shallow` / `Invalid` with a
-  confidence score. Uses a PyTorch model when available; falls back to rule-based thresholds.
+  confidence score. Uses the MLflow-hosted z-predictor model to reconstruct z from x/y.
 - **Expert-score prediction** — `POST /api/v1/predict/champion` and `/latest` (MLflow model)
-- **Weakest-link classification** — `POST /api/v1/weakest-link/classify` (MLflow model)
+- **Weakest-link classification** — `POST /api/v1/weakest-link/champion` and `/latest`
+- **Z-predictor** — `POST /api/v1/z-predictor/champion` and `/latest`
 
 ## Getting Started
 
@@ -117,19 +118,7 @@ Use the docker compose file to build entire project which uses the local Dockerf
 
 The `/api/v1/predict/*` and `/api/v1/weakest-link/*` endpoints load models from MLflow
 (DagsHub) at startup. Set `MLFLOW_TRACKING_URI` and the appropriate `MODEL_URI_*` / 
-`WEAKLINK_MODEL_URI_*` environment variables (see `.env.example`).
-
-## PyTorch Squat Model (optional)
-
-The squat classifier will use a trained PyTorch checkpoint if present at:
-
-```
-src/backend/app/models/squat_model.pt
-```
-
-The model is loaded **once at startup** and cached. If the file is missing or `torch` is not
-installed the endpoint automatically falls back to a rule-based angle-threshold classifier so
-the endpoint remains functional without a trained model.
+`WEAKLINK_MODEL_URI_*` / `Z_MODEL_URI_*` environment variables (see `.env.example`).
 
 ## Project Structure (Update as needed)
 
