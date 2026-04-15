@@ -7,6 +7,7 @@ These routes are HTTP wrappers around `weaklink_model_service.predict_one`:
 - call the service (variant = "champion" | "latest")
 - convert service exceptions into HTTP responses
 """
+
 import logging
 from fastapi import APIRouter, HTTPException
 

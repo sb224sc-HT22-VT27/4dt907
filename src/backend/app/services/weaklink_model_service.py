@@ -15,6 +15,7 @@ Caching:
 - models are cached by resolved URI to avoid repeated MLflow downloads
 - a thread lock protects cache access in concurrent API requests
 """
+
 import os
 import re
 import threading
@@ -59,7 +60,7 @@ def _direct_uri_for_variant(variant: str) -> str | None:
 
 
 def _init_mlflow() -> None:
-    """Validate that MLflow tracking is configured. """
+    """Validate that MLflow tracking is configured."""
     uri = os.getenv("MLFLOW_TRACKING_URI")
     if not uri:
         raise RuntimeError("MLFLOW_TRACKING_URI is not set")
@@ -213,7 +214,7 @@ def _expected_feature_count_from_model(model: object) -> int | None:
     if n is not None:
         return int(n)
 
-    # Fallback: infer from predict error message 
+    # Fallback: infer from predict error message
     try:
         model.predict(np.zeros((1, 1), dtype=float))
         return None
