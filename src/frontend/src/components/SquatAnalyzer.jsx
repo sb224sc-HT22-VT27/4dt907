@@ -1006,7 +1006,7 @@ export default function SquatAnalyzer() {
                                     </span>
                                     <span className="text-slate-300 tabular-nums">
                                         {kp.predictedZ == null
-                                            ? "—"
+                                            ? ""
                                             : kp.predictedZ.toFixed(3)}
                                     </span>
                                 </div>
