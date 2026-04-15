@@ -6,3 +6,7 @@ scikit-learn
 imbalanced-learn
 python-dotenv
 torch
+tqdm
+optree
+dill
+astunparse
