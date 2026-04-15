@@ -38,7 +38,7 @@ Assignment 9 – Deep learning z-predictor, MLflow integration, and squat classi
 
 ---
 
-## [0.8.0] – 2026-04-14
+## [0.8.0] – 2026-04-08
 
 Assignment 8 – MediaPipe pose estimation, squat classification, and Supabase keypoint storage.
 
