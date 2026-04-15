@@ -34,9 +34,9 @@ def calculate_knee_angle(hip: Dict, knee: Dict, ankle: Dict) -> float:
     float
         Angle in degrees (0–180).
     """
-    a = _dist3d(hip, knee)   # hip → knee
+    a = _dist3d(hip, knee)  # hip → knee
     b = _dist3d(knee, ankle)  # knee → ankle
-    c = _dist3d(hip, ankle)   # hip → ankle
+    c = _dist3d(hip, ankle)  # hip → ankle
 
     if a == 0 or b == 0:
         return 180.0
@@ -107,7 +107,9 @@ def classify_squat(
     kp3["right_knee"] = _with_predicted_z(kp3["right_knee"])
     kp3["right_ankle"] = _with_predicted_z(kp3["right_ankle"])
 
-    left_angle = calculate_knee_angle(kp3["left_hip"], kp3["left_knee"], kp3["left_ankle"])
+    left_angle = calculate_knee_angle(
+        kp3["left_hip"], kp3["left_knee"], kp3["left_ankle"]
+    )
     right_angle = calculate_knee_angle(
         kp3["right_hip"], kp3["right_knee"], kp3["right_ankle"]
     )

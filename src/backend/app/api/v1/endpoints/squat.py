@@ -6,6 +6,7 @@ Accepts 3-D joint coordinates captured by the MediaPipe pose detector running
 in the React frontend, calculates knee angles, and returns a squat-depth
 classification.
 """
+
 import logging
 
 from fastapi import APIRouter, HTTPException

@@ -2,6 +2,7 @@
 
 Z-predictor endpoints (v1).
 """
+
 import logging
 
 from fastapi import APIRouter, HTTPException

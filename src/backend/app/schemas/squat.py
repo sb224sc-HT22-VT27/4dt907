@@ -6,6 +6,7 @@ These models define the request/response contract for the squat classification A
 The frontend sends 3D keypoints captured by MediaPipe; the backend returns
 knee angles and a squat-depth classification.
 """
+
 from typing import List, Optional
 
 from pydantic import BaseModel

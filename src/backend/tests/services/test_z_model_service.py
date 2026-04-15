@@ -35,7 +35,9 @@ def test_predict_one_success(monkeypatch):
         "get_model",
         lambda variant="champion": (fake_model, "models:/ZModel/1", "run_1"),
     )
-    monkeypatch.setattr(z_model_service, "_expected_feature_count_from_model", lambda _m: 2)
+    monkeypatch.setattr(
+        z_model_service, "_expected_feature_count_from_model", lambda _m: 2
+    )
 
     pred, uri, run_id = z_model_service.predict_one([0.1, 0.2], "champion")
     assert pred == 0.42

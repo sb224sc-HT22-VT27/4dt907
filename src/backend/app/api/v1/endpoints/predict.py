@@ -7,6 +7,7 @@ These routes are HTTP wrappers around the model service layer:
 - call the service (`predict_one`)
 - translate service exceptions into HTTP responses
 """
+
 import logging
 from fastapi import APIRouter, HTTPException
 
@@ -19,7 +20,7 @@ router = APIRouter()
 
 
 @router.post("/predict/champion", response_model=PredictResponse)
-#Predict using champion registered model
+# Predict using champion registered model
 def predict_champion(req: PredictRequest):
     try:
         pred, uri, run_id = predict_one(req.features, "champion")
@@ -32,7 +33,7 @@ def predict_champion(req: PredictRequest):
 
 
 @router.post("/predict/latest", response_model=PredictResponse)
-#Predict using champion latest model
+# Predict using champion latest model
 def predict_latest(req: PredictRequest):
     try:
         pred, uri, run_id = predict_one(req.features, "latest")

@@ -6,6 +6,7 @@ This module collects all v1 endpoint routers into a single versioned router.
 Keep it declarative (imports + include_router calls) so it’s easy to scan and
 diff when endpoints are added/removed.
 """
+
 from fastapi import APIRouter
 from app.api.v1.endpoints.predict import router as predict_router
 from app.api.v1.endpoints.model_info import router as model_info_router
