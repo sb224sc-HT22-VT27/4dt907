@@ -7,7 +7,7 @@ Keep them stable to avoid breaking clients (frontend, scripts, etc.).
 """
 
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class PredictRequest(BaseModel):
@@ -21,4 +21,4 @@ class PredictResponse(BaseModel):
 
     prediction: float
     model_uri: str
-    run_id: str | None = None
+    run_id: Optional[str] = None

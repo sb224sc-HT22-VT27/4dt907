@@ -6,7 +6,7 @@ Model loading + prediction utilities for the z-predictor model.
 import os
 import re
 import threading
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import mlflow
 import numpy as np
@@ -14,10 +14,10 @@ from mlflow.exceptions import RestException
 from mlflow.tracking import MlflowClient
 
 _lock = threading.Lock()
-_cache: Dict[str, Tuple[object, str, str | None]] = {}
+_cache: Dict[str, Tuple[object, str, Optional[str]]] = {}
 
 
-def _clean_uri(value: str | None) -> str | None:
+def _clean_uri(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     return value.strip().strip('"').strip("'")
@@ -29,7 +29,7 @@ if _initial_tracking_uri:
     mlflow.set_registry_uri(_initial_tracking_uri)
 
 
-def _direct_uri_for_variant(variant: str) -> str | None:
+def _direct_uri_for_variant(variant: str) -> Optional[str]:
     v = (variant or "").lower().strip()
     if v in {"champion", "best", "prod", "production"}:
         return _clean_uri(os.getenv("Z_MODEL_URI_PROD"))
@@ -106,7 +106,7 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
         raise
 
 
-def _fetch_run_id(uri: str) -> str | None:
+def _fetch_run_id(uri: str) -> Optional[str]:
     if not uri:
         return None
 
@@ -145,7 +145,7 @@ def _fetch_run_id(uri: str) -> str | None:
     return None
 
 
-def get_model(variant: str = "champion") -> Tuple[object, str, str | None]:
+def get_model(variant: str = "champion") -> Tuple[object, str, Optional[str]]:
     _init_mlflow()
     direct_uri = _direct_uri_for_variant(variant)
     if not direct_uri:
@@ -163,7 +163,7 @@ def get_model(variant: str = "champion") -> Tuple[object, str, str | None]:
         return model, uri_used, run_id
 
 
-def _expected_feature_count_from_model(model: object) -> int | None:
+def _expected_feature_count_from_model(model: object) -> Optional[int]:
     impl = getattr(model, "_model_impl", None)
     sk_model = getattr(impl, "sklearn_model", None) if impl else None
     if sk_model is None and impl is not None:
@@ -189,14 +189,14 @@ def _expected_feature_count_from_model(model: object) -> int | None:
         return None
 
 
-def expected_feature_count(variant: str = "champion") -> int | None:
+def expected_feature_count(variant: str = "champion") -> Optional[int]:
     model, _uri, _run_id = get_model(variant)
     return _expected_feature_count_from_model(model)
 
 
 def predict_one(
     features: list[float], variant: str = "champion"
-) -> Tuple[float, str, str | None]:
+) -> Tuple[float, str, Optional[str]]:
     model, uri, run_id = get_model(variant)
 
     expected = _expected_feature_count_from_model(model)
