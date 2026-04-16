@@ -234,7 +234,7 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
         raise
 
 
-def get_model(variant: str = "champion") -> Tuple[object, str] | None:
+def get_model(variant: str = "champion") -> Tuple[object, str, str | None] | None:
     """Load (and cache) the model for a given variant."""
     _init_mlflow()
     try:
@@ -271,23 +271,29 @@ def _expected_feature_count_from_model(model: object) -> int | None:
 
 def expected_feature_count(variant: str = "champion") -> int | None:
     """Return the model's expected number of input features (if detectable)."""
-    model, _uri, _run_id = get_model(variant)
-    return _expected_feature_count_from_model(model)
+    if (result := get_model(variant)) is not None:
+        model, _uri, _run_id = result
+        return _expected_feature_count_from_model(model)
+    else:
+        raise ValueError(f"Could not find model for variant: {variant}")
 
 
 def predict_one(
     features: list[float], variant: str = "champion"
-) -> Tuple[float, str, str | None]:
+) -> Tuple[float, str, str | None] | None:
     """Predict a single row from a flat list of numeric features."""
-    model, uri, run_id = get_model(variant)
+    if (result := get_model(variant)) is not None:
+        model, uri, run_id = result
 
-    expected = _expected_feature_count_from_model(model)
-    if expected is not None and len(features) != expected:
-        raise ValueError(f"Model expects {expected} features, got {len(features)}")
+        expected = _expected_feature_count_from_model(model)
+        if expected is not None and len(features) != expected:
+            raise ValueError(f"Model expects {expected} features, got {len(features)}")
 
-    X = np.array([features], dtype=float)
-    y = model.predict(X)
-    return (float(y[0]) if hasattr(y, "__len__") else float(y)), uri, run_id
+        X = np.array([features], dtype=float)
+        y = model.predict(X)
+        return (float(y[0]) if hasattr(y, "__len__") else float(y)), uri, run_id
+    else:
+        raise ValueError(f"Could not find model for variant: {variant}")
 
 
 def clear_model_cache() -> None:
