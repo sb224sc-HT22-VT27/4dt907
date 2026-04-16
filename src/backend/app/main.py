@@ -69,11 +69,11 @@ if os.getenv("VERCEL_URL"):
 # Add it so the backend accepts requests from the Vercel frontend when the
 # frontend is configured to call this Render service directly.
 if os.getenv("RENDER_EXTERNAL_URL"):
-    ALLOWED_ORIGINS.append(os.getenv("RENDER_EXTERNAL_URL"))
+    ALLOWED_ORIGINS.append(os.getenv("RENDER_EXTERNAL_URL") or "")
 
 # Ensure (if set) include any custom production URL
 if os.getenv("PRODUCTION_URL"):
-    ALLOWED_ORIGINS.append(os.getenv("PRODUCTION_URL"))
+    ALLOWED_ORIGINS.append(os.getenv("PRODUCTION_URL") or "")
 
 
 HOST_PORT = int(os.getenv("BACKEND_PORT", "8080"))

@@ -7,6 +7,7 @@ Keep them stable to avoid breaking clients.
 """
 
 from pydantic import BaseModel
+from typing import Optional
 
 
 class WeakestLinkResponse(BaseModel):
@@ -14,4 +15,4 @@ class WeakestLinkResponse(BaseModel):
 
     prediction: str
     model_uri: str
-    run_id: str | None = None
+    run_id: Optional[str] = None

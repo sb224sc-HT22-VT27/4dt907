@@ -21,13 +21,14 @@ router = APIRouter()
 def model_info_latest():
     """Return metadata for the most recently registered primary model."""
     try:
-        _model, uri, run_id = get_model("latest")
-        return {
-            "variant": "latest",
-            "model_uri": uri,
-            "run_id": run_id,
-            "expected_features": expected_feature_count("latest"),
-        }
+        if (result := get_model("latest")) is not None:
+            _model, uri, run_id = result
+            return {
+                "variant": "latest",
+                "model_uri": uri,
+                "run_id": run_id,
+                "expected_features": expected_feature_count("latest"),
+            }
     except Exception as e:
         logger.exception("Failed to load primary latest model info")
         raise HTTPException(status_code=503, detail=f"{type(e).__name__}: {e}")
@@ -37,13 +38,14 @@ def model_info_latest():
 def model_info_champion():
     """Return metadata for the champion/best primary model."""
     try:
-        _model, uri, run_id = get_model("champion")
-        return {
-            "variant": "champion",
-            "model_uri": uri,
-            "run_id": run_id,
-            "expected_features": expected_feature_count("champion"),
-        }
+        if (result := get_model("champion")) is not None:
+            _model, uri, run_id = result
+            return {
+                "variant": "champion",
+                "model_uri": uri,
+                "run_id": run_id,
+                "expected_features": expected_feature_count("champion"),
+            }
     except Exception as e:
         logger.exception("Failed to load primary champion model info")
         raise HTTPException(status_code=503, detail=f"{type(e).__name__}: {e}")
