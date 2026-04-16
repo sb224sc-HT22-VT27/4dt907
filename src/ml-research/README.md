@@ -28,6 +28,11 @@ Models are tracked in MLflow on DagsHub using a utils file, ml_utils.py.
 
 ## Setup
 
+### Asignments
+A2 (Regression Model) - Regression model to predict aimoscore
+A3 (Weaklink Model) - Model that predicts th weakest link
+A9 (z Prediction Model) - Model that predicts z from x,y
+
 ### Prerequisites
 
 - Python 3.12.10
