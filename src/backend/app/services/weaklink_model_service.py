@@ -19,7 +19,7 @@ Caching:
 import os
 import re
 import threading
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import mlflow
 import numpy as np
@@ -29,12 +29,12 @@ from mlflow.tracking import MlflowClient
 # Thread-safe, process-local model cache:
 # key = direct URI, value = (loaded_model, uri_used, run_id)
 _lock = threading.Lock()
-_cache: Dict[str, Tuple[object, str, str | None]] = (
+_cache: Dict[str, Tuple[object, str, Optional[str]]] = (
     {}
 )  # cache_key -> (model, uri_used, run_id)
 
 
-def _clean_uri(value: str | None) -> str | None:
+def _clean_uri(value: Optional[str]) -> Optional[str]:
     """Normalize a URI coming from env vars (trim whitespace and wrapping quotes)."""
     if not value:
         return None
@@ -47,7 +47,7 @@ if _initial_tracking_uri:
     mlflow.set_registry_uri(_initial_tracking_uri)
 
 
-def _direct_uri_for_variant(variant: str) -> str | None:
+def _direct_uri_for_variant(variant: str) -> Optional[str]:
     """Map a variant name to a direct weakest-link model URI from environment variables."""
     v = (variant or "").lower().strip()
     if v in {"champion", "best", "prod", "production"}:
@@ -75,7 +75,7 @@ def _is_models_alias_uri(uri: str) -> bool:
     )
 
 
-def _parse_models_alias_uri(uri: str) -> tuple[str, str]:
+def _parse_models_alias_uri(uri: str) -> Tuple[str, str]:
     """Parse `models:/Name@alias` into (model_name, alias)."""
     tail = uri.replace("models:/", "", 1)
     name, alias = tail.split("@", 1)
@@ -135,7 +135,7 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
         raise
 
 
-def _fetch_run_id(uri: str) -> str | None:
+def _fetch_run_id(uri: str) -> Optional[str]:
     """Best-effort extraction of MLflow run_id from `runs:/...` or `models:/...` URIs."""
     if not uri:
         return None
@@ -180,7 +180,7 @@ def _fetch_run_id(uri: str) -> str | None:
     return None
 
 
-def get_model(variant: str = "champion") -> Tuple[object, str, str | None]:
+def get_model(variant: str = "champion") -> Tuple[object, str, Optional[str]]:
     """Load (and cache) the weakest-link model for a given variant."""
     _init_mlflow()
     direct_uri = _direct_uri_for_variant(variant)
@@ -199,7 +199,7 @@ def get_model(variant: str = "champion") -> Tuple[object, str, str | None]:
         return model, uri_used, run_id
 
 
-def _expected_feature_count_from_model(model: object) -> int | None:
+def _expected_feature_count_from_model(model: object) -> Optional[int]:
     """Best-effort extraction of expected feature count from a loaded sklearn model."""
     impl = getattr(model, "_model_impl", None)
     # Try standard sklearn pyfunc path first, then fall back to impl itself
@@ -229,7 +229,7 @@ def _expected_feature_count_from_model(model: object) -> int | None:
         return None
 
 
-def expected_feature_count(variant: str = "champion") -> int | None:
+def expected_feature_count(variant: str = "champion") -> Optional[int]:
     """Return the model's expected number of input features (if detectable)."""
     model, _uri, _run_id = get_model(variant)
     return _expected_feature_count_from_model(model)
@@ -237,7 +237,7 @@ def expected_feature_count(variant: str = "champion") -> int | None:
 
 def predict_one(
     features: list[float], variant: str = "champion"
-) -> Tuple[str, str, str | None]:
+) -> Tuple[str, str, Optional[str]]:
     """Predict a single row from a flat list of numeric features."""
     model, uri, run_id = get_model(variant)
 

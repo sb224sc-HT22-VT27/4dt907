@@ -14,7 +14,7 @@ Caching:
 
 import os
 import threading
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import mlflow
 import numpy as np
@@ -24,10 +24,10 @@ from mlflow.exceptions import RestException
 # Thread-safe, process-local model cache:
 # key = model URI, value = (loaded_model, uri_used, run_id)
 _lock = threading.Lock()
-_cache: Dict[str, Tuple[object, str, str | None]] = {}
+_cache: Dict[str, Tuple[object, str, Optional[str]]] = {}
 
 
-def _fetch_run_id(uri: str) -> str | None:
+def _fetch_run_id(uri: str) -> Optional[str]:
     """Extract a MLflow run_id from a model URI (runs:/... or models:/...)."""
     if not uri:
         return None
@@ -41,13 +41,13 @@ def _fetch_run_id(uri: str) -> str | None:
     return None
 
 
-def _parse_runs_uri(uri: str) -> str | None:
+def _parse_runs_uri(uri: str) -> Optional[str]:
     """Parse run_id from a `runs:/<run_id>/...` URI."""
     tail = uri[len("runs:/") :]
     return tail.split("/", 1)[0] if tail else None
 
 
-def _parse_models_uri(uri: str) -> str | None:
+def _parse_models_uri(uri: str) -> Optional[str]:
     """Resolve a run_id for a `models:/...` URI (version, stage, or alias)."""
     client = MlflowClient()
     tail = uri[len("models:/") :]
@@ -84,7 +84,7 @@ def _parse_models_uri(uri: str) -> str | None:
     return getattr(chosen, "run_id", None)
 
 
-def _clean_uri(value: str | None) -> str | None:
+def _clean_uri(value: Optional[str]) -> Optional[str]:
     """Normalize a URI coming from env vars (trim whitespace and wrapping quotes)."""
     if not value:
         return None
@@ -102,7 +102,7 @@ if _initial_tracking_uri:
 
 
 # * Expected "entry point"
-def _direct_uri_for_variant(variant: str) -> str | None:
+def _direct_uri_for_variant(variant: str) -> Optional[str]:
     """Map a variant name to a direct model URI provided via env vars."""
     v = (variant or "").lower().strip()
     if v in {"champion", "best", "prod", "production"}:
@@ -234,7 +234,7 @@ def _load_model_with_alias_fallback(uri: str) -> Tuple[object, str]:
         raise
 
 
-def get_model(variant: str = "champion") -> Tuple[object, str, str | None] | None:
+def get_model(variant: str = "champion") -> Optional[Tuple[object, str, Optional[str]]]:
     """Load (and cache) the model for a given variant."""
     _init_mlflow()
     try:
@@ -254,7 +254,7 @@ def get_model(variant: str = "champion") -> Tuple[object, str, str | None] | Non
         return None
 
 
-def _expected_feature_count_from_model(model: object) -> int | None:
+def _expected_feature_count_from_model(model: object) -> Optional[int]:
     """Best-effort extraction of expected feature count from a loaded sklearn model."""
     impl = getattr(model, "_model_impl", None)
     # Try standard sklearn pyfunc path first, then fall back to impl itself
@@ -269,7 +269,7 @@ def _expected_feature_count_from_model(model: object) -> int | None:
     return int(n) if n is not None else None
 
 
-def expected_feature_count(variant: str = "champion") -> int | None:
+def expected_feature_count(variant: str = "champion") -> Optional[int]:
     """Return the model's expected number of input features (if detectable)."""
     if (result := get_model(variant)) is not None:
         model, _uri, _run_id = result
@@ -280,7 +280,7 @@ def expected_feature_count(variant: str = "champion") -> int | None:
 
 def predict_one(
     features: list[float], variant: str = "champion"
-) -> Tuple[float, str, str | None] | None:
+) -> Optional[Tuple[float, str, Optional[str]]]:
     """Predict a single row from a flat list of numeric features."""
     if (result := get_model(variant)) is not None:
         model, uri, run_id = result
