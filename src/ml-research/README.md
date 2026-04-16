@@ -12,10 +12,10 @@ Jupyter notebooks for ML experiments and assignment reporting. Each assignment h
 | $A4$ | Comparison of models and improving A2 | Implemented t-test to compare models into utils file aswell as improving A2 using Lasso. |
 | $A5$ | Ensemble implementation in A2 and A3 | Implemented stacking ensembles to bothe A2 and A3 to whcih improved results |
 | $A5b$ | Hyperparameter tuning | Tested different hyperparameters to try and improve results |
-| $A6$ | - | - |
-| $A7$ | - | - |
-| $A8$ | - | - |
-| $A9$ | - | - |
+| $A6$ | SVM grid optimization | A3 level0 implementation of new optimized parameters |
+| $A7$ | PCA and Clustering | Did PCA and clustering on weak link data |
+| $A8$ | Preparation for DL | Prepared for DL by reading docs and tutorials |
+| $A9$ | DeepLearning model to predict z | Using kinectdata transformed to mediapipe to train a model to predict z form x,y |
 | $A10$ | - | - |
 | $A11$ | - | - |
 | $A12$ | - | - |
