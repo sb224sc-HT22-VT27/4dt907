@@ -243,7 +243,8 @@ function project3D(x, y, z, rxDeg, ryDeg, scale, cx, cy) {
     const x2 = x1;
     const y2 = y1 * Math.cos(rx) - z1 * Math.sin(rx);
     const z2 = y1 * Math.sin(rx) + z1 * Math.cos(rx);
-    return { px: cx + x2 * scale, py: cy - y2 * scale, depth: z2 };
+    // MediaPipe world y is positive-down, so map directly (not negated).
+    return { px: cx + x2 * scale, py: cy + y2 * scale, depth: z2 };
 }
 
 function Skeleton3DViewer({ frames }) {
@@ -531,7 +532,13 @@ export default function SquatAnalyzer() {
         lastDetectionRef.current = null;
         frameBufferRef.current = [];
         sessionLogRef.current = [];
+        // Clear the skeleton overlay so it doesn't linger after stopping.
+        const canvas = canvasRef.current;
+        if (canvas) {
+            canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+        }
         setSessionLog([]);
+        setAllKeypoints([]);
         setStatus("idle");
         setVideoPaused(false);
         setPredictedZByName({});
