@@ -194,6 +194,47 @@ def expected_feature_count(variant: str = "champion") -> Optional[int]:
     return _expected_feature_count_from_model(model)
 
 
+def predict_sequence(
+    sequence: list, variant: str = "champion"
+) -> Tuple[list, str, Optional[str]]:
+    """Predict z coordinates from a multi-frame (x, y) sequence.
+
+    Parameters
+    ----------
+    sequence:
+        2-D list of shape ``(n_frames, n_joints * 2)``.  Typically
+        ``(30, 26)`` for 13 joints over 30 frames.
+    variant:
+        Model variant alias (``"champion"``, ``"latest"``, …).
+
+    Returns
+    -------
+    Tuple of ``(predictions, model_uri, run_id)`` where *predictions* is a
+    flat list of z values, one per joint.
+    """
+    model, uri, run_id = get_model(variant)
+    # shape (1, n_frames, n_features_per_frame)
+    X = np.array([sequence], dtype=float)
+    y = model.predict(X)
+    y = np.asarray(y, dtype=float)
+
+    # Normalise to a flat 1-D array of per-joint z predictions.
+    # Possible output shapes from the pyfunc wrapper:
+    #   (1, n_frames, n_joints) — sequence output, take last frame
+    #   (1, n_joints)           — direct per-joint output
+    #   (n_joints,)             — already flat
+    if y.ndim == 3:
+        preds = y[0, -1, :]
+    elif y.ndim == 2 and y.shape[0] == 1:
+        preds = y[0]
+    elif y.ndim == 2:
+        preds = y[-1]
+    else:
+        preds = y.flatten()
+
+    return [float(p) for p in preds], uri, run_id
+
+
 def predict_one(
     features: list[float], variant: str = "champion"
 ) -> Tuple[float, str, Optional[str]]:
