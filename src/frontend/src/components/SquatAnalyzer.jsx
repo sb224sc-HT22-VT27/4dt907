@@ -549,7 +549,8 @@ export default function SquatAnalyzer() {
         }
     }
 
-    const stopAll = useCallback(() => {
+    // Stops camera/detection and clears live UI, but keeps accumulated session data.
+    const stopCapture = useCallback((nextStatus = "idle") => {
         cancelAnimationFrame(rafRef.current);
         const video = videoRef.current;
         if (video) {
@@ -565,21 +566,36 @@ export default function SquatAnalyzer() {
         lastTimestampRef.current = -1;
         lastDetectionRef.current = null;
         frameBufferRef.current = [];
-        sessionLogRef.current = [];
-        // Clear the skeleton overlay so it doesn't linger after stopping.
         const canvas = canvasRef.current;
         if (canvas) {
             canvas
                 .getContext("2d")
                 .clearRect(0, 0, canvas.width, canvas.height);
         }
-        setSessionLog([]);
         setAllKeypoints([]);
-        setStatus("idle");
+        setResult(null);
         setVideoPaused(false);
         setPredictedZByName({});
         predictedZByNameRef.current = {};
+        setStatus(nextStatus);
     }, []);
+
+    // Discards accumulated session data (call explicitly for "new session").
+    const clearSession = useCallback(() => {
+        sessionLogRef.current = [];
+        setSessionLog([]);
+        setUploadedFileName("");
+        setErrorMsg("");
+    }, []);
+
+    // Full reset: stop capture + discard data (used when switching modes).
+    const stopAll = useCallback(() => {
+        stopCapture("idle");
+        sessionLogRef.current = [];
+        setSessionLog([]);
+        setUploadedFileName("");
+        setErrorMsg("");
+    }, [stopCapture]);
 
     /**
      * Call the sequence-based z-predictor with the accumulated frame buffer.
@@ -647,6 +663,17 @@ export default function SquatAnalyzer() {
         },
         [stopAll],
     );
+
+    // ── Video-ended auto-finish ──────────────────────────────────────────────
+
+    useEffect(() => {
+        if (status !== "running" || inputMode !== "upload") return;
+        const video = videoRef.current;
+        if (!video) return;
+        const handleEnded = () => stopCapture("finished");
+        video.addEventListener("ended", handleEnded);
+        return () => video.removeEventListener("ended", handleEnded);
+    }, [status, inputMode, stopCapture]);
 
     // ── Webcam ───────────────────────────────────────────────────────────────
 
@@ -1154,7 +1181,7 @@ export default function SquatAnalyzer() {
                         </button>
                     ) : (
                         <button
-                            onClick={stopAll}
+                            onClick={() => stopCapture("idle")}
                             className="ios-btn px-6 py-2 rounded-full text-sm font-semibold text-red-600"
                         >
                             Stop
@@ -1192,14 +1219,27 @@ export default function SquatAnalyzer() {
                                     {videoPaused ? "▶ Play" : "⏸ Pause"}
                                 </button>
                                 <button
-                                    onClick={stopAll}
+                                    onClick={() => stopCapture("idle")}
                                     className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-red-600"
                                 >
                                     ✕ Stop
                                 </button>
                             </>
+                        ) : (
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={status === "loading"}
+                                className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
+                            >
+                                {status === "loading" ? "Loading…" : "Choose Video…"}
+                            </button>
                         )}
                     </div>
+                    {status === "finished" && (
+                        <p className="text-green-600 text-sm font-semibold">
+                            ✓ Analysis complete — review results below
+                        </p>
+                    )}
                     {uploadedFileName && (
                         <p className="text-slate-400 text-xs">
                             {uploadedFileName}
@@ -1283,7 +1323,7 @@ export default function SquatAnalyzer() {
                         {sessionLog.length} frame
                         {sessionLog.length !== 1 ? "s" : ""} recorded
                     </p>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap justify-center">
                         {supabase && (
                             <button
                                 onClick={handleSave}
@@ -1298,6 +1338,13 @@ export default function SquatAnalyzer() {
                             className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-700"
                         >
                             Download CSV
+                        </button>
+                        <button
+                            onClick={clearSession}
+                            disabled={status === "running"}
+                            className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-400 disabled:opacity-40"
+                        >
+                            New Session
                         </button>
                     </div>
                 </div>
