@@ -4,4 +4,12 @@ dist
 .git
 __pycache__
 *.pyc
+*.pyo
 .venv
+venv/
+*.md
+.env
+.env.*
+ml-research/
+data/
+scripts/

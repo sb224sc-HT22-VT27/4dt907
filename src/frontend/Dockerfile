@@ -1,8 +1,11 @@
-FROM node:22-slim AS builder
+FROM node:22-slim AS deps
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --quiet
+RUN npm ci --quiet && \
+    printf 'const http = require("http");\nhttp.get("http://localhost:" + (process.env.FRONTEND_PORT || 3030), function(r){ process.exit(r.statusCode < 400 ? 0 : 1); }).on("error", function(){ process.exit(1); });\n' > /healthcheck.js
+
+FROM deps AS builder
 
 COPY . .
 RUN npm run build
@@ -33,7 +36,6 @@ USER nginx
 EXPOSE ${FRONTEND_PORT}
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:${FRONTEND_PORT}/ || exit 1
-
+    CMD wget -qO- http://localhost:${FRONTEND_PORT}/ > /dev/null || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
