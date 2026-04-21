@@ -4,6 +4,19 @@ services:
             context: ./backend
             args:
                 - BACKEND_PORT=${BACKEND_PORT:-8080}
+                - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+
+                - MODEL_URI_PROD=${MODEL_URI_PROD}
+                - MODEL_URI_DEV=${MODEL_URI_DEV}
+                - MODEL_URI_BACKUP=${MODEL_URI_BACKUP}
+
+                - WEAKLINK_MODEL_URI_PROD=${WEAKLINK_MODEL_URI_PROD}
+                - WEAKLINK_MODEL_URI_DEV=${WEAKLINK_MODEL_URI_DEV}
+                - WEAKLINK_MODEL_URI_BACKUP=${WEAKLINK_MODEL_URI_BACKUP}
+
+                - Z_MODEL_URI_PROD=${Z_MODEL_URI_PROD}
+                - Z_MODEL_URI_DEV=${Z_MODEL_URI_DEV}
+                - Z_MODEL_URI_BACKUP=${Z_MODEL_URI_BACKUP}
         container_name: 4dt907-backend
         environment:
             - BACKEND_PORT=${BACKEND_PORT:-8080}
@@ -48,18 +61,14 @@ services:
     frontend:
         build:
             context: ./frontend
-            target: deps
+            args:
+                - BACKEND_PORT=${BACKEND_PORT:-8080}
+                - FRONTEND_PORT=${FRONTEND_PORT:-3030}
         container_name: 4dt907-frontend
-        command: npm run dev
         environment:
-            - BACKEND_PORT=${BACKEND_PORT:-8080}
-            - BACKEND_URL=http://backend:${BACKEND_PORT:-8080}
             - FRONTEND_PORT=${FRONTEND_PORT:-3030}
         ports:
             - "${FRONTEND_PORT:-3030}:${FRONTEND_PORT:-3030}"
-        volumes:
-            - ./frontend:/app
-            - frontend_node_modules:/app/node_modules
         depends_on:
             backend:
                 condition: service_healthy
@@ -67,11 +76,11 @@ services:
         networks:
             - app-network
         healthcheck:
-            test: ["CMD", "node", "/healthcheck.js"]
+            test: ["CMD-SHELL", "wget -qO- http://localhost:${FRONTEND_PORT:-3030}/ > /dev/null || exit 1"]
             interval: 30s
-            timeout: 10s
+            timeout: 3s
             retries: 3
-            start_period: 15s
+            start_period: 10s
         deploy:
             resources:
                 limits:
@@ -88,4 +97,3 @@ networks:
 volumes:
     backend_pycache:
     backend_venv:
-    frontend_node_modules:

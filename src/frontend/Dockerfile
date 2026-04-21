@@ -2,8 +2,9 @@ FROM node:22-slim AS deps
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --quiet && \
-    printf 'const http = require("http");\nhttp.get("http://localhost:" + (process.env.FRONTEND_PORT || 3030), function(r){ process.exit(r.statusCode < 400 ? 0 : 1); }).on("error", function(){ process.exit(1); });\n' > /healthcheck.js
+RUN npm ci --quiet
+
+COPY healthcheck.js /healthcheck.js
 
 FROM deps AS builder
 
