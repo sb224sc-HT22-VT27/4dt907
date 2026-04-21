@@ -9,7 +9,7 @@ script reports how far off the MediaPipe-estimated distances are on a per-pair
 basis.
 
 The CSV must follow the format produced by the SquatAnalyzer's "Download CSV"
-button, whose columns are::
+button, whose columns are:
 
     timestamp_ms, classification, confidence,
     <joint>_3d_x, <joint>_3d_y, <joint>_3d_z, ...
@@ -20,7 +20,7 @@ with the ground truth.
 
 Usage examples
 --------------
-Compare the hip-to-knee and knee-to-ankle segment lengths::
+Compare the hip-to-knee and knee-to-ankle segment lengths:
 
     python mediapipe_accuracy.py session.csv \\
         --pair left_hip left_knee 42.0 \\
@@ -33,7 +33,7 @@ You can also provide ground-truth distances via a JSON file::
     python mediapipe_accuracy.py session.csv \\
         --ground-truth-json ground_truth.json
 
-where ``ground_truth.json`` is a list of objects::
+where ``ground_truth.json`` is a list of objects:
 
     [
       {"kp1": "left_hip",  "kp2": "left_knee",  "distance_cm": 42.0},
@@ -68,6 +68,7 @@ import pandas as pd
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 class GroundTruthPair(NamedTuple):
     kp1: str
     kp2: str
@@ -89,6 +90,7 @@ class PairStats(NamedTuple):
 # ---------------------------------------------------------------------------
 # Core helpers
 # ---------------------------------------------------------------------------
+
 
 def euclidean_3d_cm(row: "pd.Series", kp1: str, kp2: str) -> float | None:
     """Return the 3-D Euclidean distance between *kp1* and *kp2* in centimetres.
@@ -201,9 +203,7 @@ def load_ground_truth_json(path: Path) -> list[GroundTruthPair]:
                 )
             )
         except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError(
-                f"Invalid entry at index {i} in {path}: {exc}"
-            ) from exc
+            raise ValueError(f"Invalid entry at index {i} in {path}: {exc}") from exc
     return pairs
 
 
@@ -265,6 +265,7 @@ def print_results(stats_list: list[PairStats]) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mediapipe_accuracy.py",
@@ -297,7 +298,7 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="JSON_FILE",
         help=(
             "JSON file containing ground-truth distances. "
-            "Format: [{\"kp1\": \"...\", \"kp2\": \"...\", \"distance_cm\": 42.0}, ...]"
+            'Format: [{"kp1": "...", "kp2": "...", "distance_cm": 42.0}, ...]'
         ),
     )
     return parser
