@@ -60,13 +60,7 @@ import math
 import sys
 from pathlib import Path
 from typing import NamedTuple
-
 import pandas as pd
-
-
-# ---------------------------------------------------------------------------
-# Data structures
-# ---------------------------------------------------------------------------
 
 
 class GroundTruthPair(NamedTuple):
@@ -85,11 +79,6 @@ class PairStats(NamedTuple):
     min_error_cm: float
     max_error_cm: float
     n_frames: int
-
-
-# ---------------------------------------------------------------------------
-# Core helpers
-# ---------------------------------------------------------------------------
 
 
 def euclidean_3d_cm(row: "pd.Series", kp1: str, kp2: str) -> float | None:
@@ -174,7 +163,7 @@ def load_ground_truth_json(path: Path) -> list[GroundTruthPair]:
     """Load ground-truth pairs from a JSON file.
 
     The JSON file must be a list of objects with keys ``kp1``, ``kp2``, and
-    ``distance_cm``::
+    ``distance_cm``:
 
         [
           {"kp1": "left_hip", "kp2": "left_knee", "distance_cm": 42.0}
@@ -256,14 +245,9 @@ def print_results(stats_list: list[PairStats]) -> None:
 
     print(separator)
     print(
-        "\nNote: error = MediaPipe estimate − ground truth. "
-        "Negative → underestimate; positive → overestimate."
+        "\nNote: error = MediaPipe estimate - ground truth. "
+        "Negative -> underestimate; positive -> overestimate."
     )
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -320,7 +304,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    # Load CSV
     csv_path: Path = args.csv
     if not csv_path.is_file():
         print(f"ERROR: CSV file not found: {csv_path}", file=sys.stderr)
@@ -336,7 +319,6 @@ def main(argv: list[str] | None = None) -> int:
         print("ERROR: CSV file contains no data rows.", file=sys.stderr)
         return 1
 
-    # Build ground-truth pairs
     ground_truth: list[GroundTruthPair]
     if args.ground_truth_json is not None:
         try:
@@ -367,7 +349,6 @@ def main(argv: list[str] | None = None) -> int:
         print("ERROR: No ground-truth pairs provided.", file=sys.stderr)
         return 1
 
-    # Compute statistics for each pair
     results: list[PairStats] = []
     has_error = False
     for pair in ground_truth:
@@ -387,7 +368,7 @@ def main(argv: list[str] | None = None) -> int:
         print("ERROR: Could not compute statistics for any pair.", file=sys.stderr)
         return 1
 
-    print(f"\nMediaPipe Accuracy Report")
+    print("\nMediaPipe Accuracy Report")
     print(f"CSV: {csv_path.resolve()}")
     print(f"Frames analyzed: {len(df)}\n")
     print_results(results)
