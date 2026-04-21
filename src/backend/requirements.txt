@@ -5,6 +5,7 @@ pandas
 scikit-learn
 imbalanced-learn
 python-dotenv
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch
 tqdm
 optree
