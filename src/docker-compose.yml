@@ -44,7 +44,12 @@ services:
             - app-network
         healthcheck:
             test:
-                ["CMD", "curl", "-f", "http://localhost:${BACKEND_PORT:-8080}/health"]
+                [
+                    "CMD",
+                    "curl",
+                    "-f",
+                    "http://localhost:${BACKEND_PORT:-8080}/health",
+                ]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -76,11 +81,15 @@ services:
         networks:
             - app-network
         healthcheck:
-            test: ["CMD-SHELL", "wget -qO- http://localhost:${FRONTEND_PORT:-3030}/ > /dev/null || exit 1"]
-            interval: 30s
-            timeout: 3s
-            retries: 3
-            start_period: 10s
+            test:
+                [
+                    "CMD-SHELL",
+                    "curl -fsS http://localhost:${FRONTEND_PORT:-3030}/ >/dev/null",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 12
+            start_period: 60s
         deploy:
             resources:
                 limits:
