@@ -8,7 +8,6 @@ __pycache__
 .venv
 venv/
 *.md
-.env
 .env.*
 ml-research/
 data/
