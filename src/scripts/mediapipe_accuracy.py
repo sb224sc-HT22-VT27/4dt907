@@ -143,20 +143,27 @@ def compute_pair_stats(
     PairStats | None
         Populated statistics object, or ``None`` if no valid frames were found.
     """
-    distances = []
-    for _, row in df.iterrows():
-        d = euclidean_3d_cm(row, pair.kp1, pair.kp2)
-        if d is not None:
-            distances.append(d)
-
-    if not distances:
+    cols_needed = [
+        f"{kp}_{ax}"
+        for kp in (pair.kp1, pair.kp2)
+        for ax in ("3d_x", "3d_y", "3d_z")
+    ]
+    if any(col not in df.columns for col in cols_needed):
         return None
 
-    errors = [d - pair.distance_cm for d in distances]
-    mean_est = sum(distances) / len(distances)
-    mean_err = sum(errors) / len(errors)
-    variance = sum((e - mean_err) ** 2 for e in errors) / len(errors)
-    std_err = math.sqrt(variance)
+    valid = df[cols_needed].dropna()
+    if valid.empty:
+        return None
+
+    dx = valid[f"{pair.kp2}_3d_x"] - valid[f"{pair.kp1}_3d_x"]
+    dy = valid[f"{pair.kp2}_3d_y"] - valid[f"{pair.kp1}_3d_y"]
+    dz = valid[f"{pair.kp2}_3d_z"] - valid[f"{pair.kp1}_3d_z"]
+    distances = ((dx ** 2 + dy ** 2 + dz ** 2) ** 0.5) * 100.0
+
+    errors = distances - pair.distance_cm
+    mean_est = float(distances.mean())
+    mean_err = float(errors.mean())
+    std_err = float(errors.std(ddof=0))
     return PairStats(
         kp1=pair.kp1,
         kp2=pair.kp2,
