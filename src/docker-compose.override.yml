@@ -1,0 +1,48 @@
+# docker-compose.override.yml – local development overrides
+#
+# Docker Compose automatically merges this file with docker-compose.yml
+# when you run `docker compose up` from the src/ directory.
+#
+# CI explicitly specifies `-f docker-compose.yml` so this file is NOT applied
+# there; CI always tests against the production Nginx frontend build.
+#
+# Changes from the production config:
+#   backend  – uvicorn runs with --reload for instant hot-reload on file changes
+#   frontend – Vite dev server replaces the production Nginx image:
+#                * build target: deps (skips the static build step)
+#                * source code bind-mounted so edits reload immediately
+#                * BACKEND_URL set to the Docker service hostname so Vite's
+#                  proxy correctly forwards /api/* to the backend container
+
+services:
+    backend:
+        command:
+            - uvicorn
+            - app.main:app
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "${BACKEND_PORT:-8080}"
+            - --reload
+
+    frontend:
+        build:
+            context: ./frontend
+            target: deps
+        command: npm run dev
+        environment:
+            - BACKEND_PORT=${BACKEND_PORT:-8080}
+            - BACKEND_URL=http://backend:${BACKEND_PORT:-8080}
+            - FRONTEND_PORT=${FRONTEND_PORT:-3030}
+        volumes:
+            - ./frontend:/app
+            - frontend_node_modules:/app/node_modules
+        healthcheck:
+            test: ["CMD", "node", "/healthcheck.js"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 15s
+
+volumes:
+    frontend_node_modules:
