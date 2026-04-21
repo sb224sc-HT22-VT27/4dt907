@@ -388,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"\nMediaPipe Accuracy Report")
     print(f"CSV: {csv_path.resolve()}")
-    print(f"Frames analysed: {len(df)}\n")
+    print(f"Frames analyzed: {len(df)}\n")
     print_results(results)
 
     return 1 if has_error else 0
