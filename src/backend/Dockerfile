@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM python:3.9.12-slim
 
 ARG BACKEND_PORT
@@ -31,7 +32,6 @@ ENV BACKEND_PORT=${BACKEND_PORT:-8080} \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/backend_app/.venv/bin:$PATH" \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
@@ -39,8 +39,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
     python -m venv /backend_app/.venv
 
 COPY requirements.txt .
-RUN pip install --upgrade pip~=25.3 && \
-    pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip~=25.3 && \
+    pip install -r requirements.txt
 
 RUN useradd -m appuser && chown -R appuser /backend_app /backend_app/.venv
 
