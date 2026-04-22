@@ -1,6 +1,5 @@
 // src/frontend/test/components/FeatureBuilder.test.jsx
 
-// src/frontend/test/components/test_FeatureBuilder.jsx
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -103,19 +102,16 @@ describe("FeatureBuilder — tab switching", () => {
         );
 
         const tabs = screen.getAllByRole("button");
-        if (tabs.length < 2) return; // skip if only one tab exists
+        if (tabs.length < 2) return;
 
         const initialKnobCount = screen.getAllByRole("slider").length;
 
         await userEvent.click(tabs[1]);
 
-        // After switching tabs the knob count might differ — just verify it re-renders
         const newKnobs = screen.getAllByRole("slider");
         expect(newKnobs.length).toBeGreaterThan(0);
-        // Not the same group (counts may differ) or same (both are populated)
         expect(typeof newKnobs.length).toBe("number");
 
-        // Suppress the unused-variable warning from the line above
         void initialKnobCount;
     });
 
@@ -131,13 +127,11 @@ describe("FeatureBuilder — tab switching", () => {
         const tabs = screen.getAllByRole("button");
         if (tabs.length < 2) return;
 
-        // Click the second tab and verify it receives the active class
         await userEvent.click(tabs[1]);
         expect(tabs[1].className).toContain("bg-white/80");
     });
 
     it("does not show tabs for groups that have no features (due to maxFeatures cap)", () => {
-        // With maxFeatures=1 only the first feature group should be present
         render(
             <FeatureBuilder
                 values={buildValues(1)}
@@ -147,7 +141,6 @@ describe("FeatureBuilder — tab switching", () => {
         );
 
         const tabs = screen.getAllByRole("button");
-        // We expect exactly one tab group to remain visible
         expect(tabs.length).toBe(1);
     });
 });
@@ -167,7 +160,6 @@ describe("FeatureBuilder — maxFeatures cap", () => {
             />,
         );
 
-        // Count sliders across every tab
         const tabs = screen.getAllByRole("button");
         let total = 0;
 
@@ -217,7 +209,6 @@ describe("FeatureBuilder — maxFeatures cap", () => {
 describe("FeatureBuilder — Knob value display", () => {
     it("numeric inputs reflect the current feature values", () => {
         const values = buildValues(41);
-        // Set the first key to a known value
         const firstKey = Object.keys(values)[0];
         values[firstKey] = 0.75;
 
@@ -257,7 +248,7 @@ describe("FeatureBuilder — Knob value display", () => {
     it("displays 0 for undefined/missing feature keys", () => {
         render(
             <FeatureBuilder
-                values={{}} // empty — all features missing
+                values={{}}
                 setValues={NOOP_SET}
                 maxFeatures={41}
             />,
@@ -292,26 +283,6 @@ describe("FeatureBuilder — numeric input interaction", () => {
         expect(setValues).toHaveBeenCalled();
     });
 
-    //it("does not call setValues for non-numeric input", async () => {
-    //  const setValues = vi.fn();
-    //  const values = buildValues(41);
-    //
-    //  render(
-    //    <FeatureBuilder
-    //      values={values}
-    //      setValues={setValues}
-    //      maxFeatures={41}
-    //    />
-    //  );
-    //
-    //  const inputs = screen.getAllByRole("spinbutton");
-    //  // Clear and type a letter — the onChange guard should reject NaN
-    //  fireEvent.change(inputs[0], { target: { value: "abc" } });
-    //
-    //  // setValues should NOT have been called because Number("abc") is NaN
-    //  expect(setValues).not.toHaveBeenCalled();
-    //});
-
     it("clamps values to [0, 1] range via the numeric input", async () => {
         const setValues = vi.fn();
         const values = buildValues(41);
@@ -329,7 +300,6 @@ describe("FeatureBuilder — numeric input interaction", () => {
 
         expect(setValues).toHaveBeenCalledWith(expect.any(Function));
 
-        // Invoke the updater to inspect the clamped value
         const updater =
             setValues.mock.calls[setValues.mock.calls.length - 1][0];
         const nextValues = updater(values);
@@ -356,7 +326,6 @@ describe("FeatureBuilder — Knob drag interaction", () => {
         const knobs = screen.getAllByRole("slider");
         const knob = knobs[0];
 
-        // Simulate a drag gesture
         fireEvent.pointerDown(knob, { clientX: 50, clientY: 50, pointerId: 1 });
         fireEvent.pointerMove(knob, { clientX: 70, clientY: 30, pointerId: 1 });
         fireEvent.pointerUp(knob, { pointerId: 1 });
@@ -375,7 +344,6 @@ describe("FeatureBuilder — Knob drag interaction", () => {
         );
 
         const knobs = screen.getAllByRole("slider");
-        // PointerMove without a preceding PointerDown + capture
         fireEvent.pointerMove(knobs[0], {
             clientX: 70,
             clientY: 30,

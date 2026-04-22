@@ -77,7 +77,6 @@ describe("Predict — rendering", () => {
     });
 
     it("shows 'Loading model…' text in Predict button while model-info is loading", () => {
-        // Never resolve so we stay in loading state
         vi.stubGlobal(
             "fetch",
             vi.fn(() => new Promise(() => {})),
@@ -145,7 +144,7 @@ describe("Predict — model-info error handling", () => {
                 Promise.resolve({
                     ok: true,
                     status: 200,
-                    json: () => Promise.resolve({}), // no expected_features
+                    json: () => Promise.resolve({}),
                 }),
             ),
         );
@@ -161,84 +160,10 @@ describe("Predict — model-info error handling", () => {
             vi.fn(() => new Promise(() => {})),
         );
         render(<Predict />);
-        // Predict button is disabled while loading, but simulate a direct click anyway
         const btn = screen.getByRole("button", { name: /loading model/i });
-        expect(btn).toBeDisabled(); // guard assertion
+        expect(btn).toBeDisabled();
     });
 });
-
-// ---------------------------------------------------------------------------
-// Task / variant selects & endpoint
-// ---------------------------------------------------------------------------
-
-//describe("Predict — task / variant switching", () => {
-//it("switches endpoint to weakest-link when task changes", async () => {
-//  render(<Predict />);
-//  await waitForModelLoad();
-//
-//  await userEvent.selectOptions(
-//    screen.getByRole("combobox", { name: /task/i }),
-//    "weakest"
-//  );
-//
-//  await waitFor(() =>
-//    expect(
-//      screen.getByText(/\/api\/v1\/weakest-link\/champion/)
-//    ).toBeInTheDocument()
-//  );
-//});
-
-//it("switches endpoint to latest when model variant changes", async () => {
-//  render(<Predict />);
-//  await waitForModelLoad();
-//
-//  await userEvent.selectOptions(
-//    screen.getByRole("combobox", { name: /model/i }),
-//    "latest"
-//  );
-//
-//  await waitFor(() =>
-//    expect(
-//      screen.getByText(/\/api\/v1\/predict\/latest/)
-//    ).toBeInTheDocument()
-//  );
-//});
-
-//it("uses the weakest-link model-info URL when task is 'weakest'", async () => {
-//  render(<Predict />);
-//  await waitForModelLoad();
-//
-//  await userEvent.selectOptions(
-//    screen.getByRole("combobox", { name: /task/i }),
-//    "weakest"
-//  );
-//
-//  await waitFor(() =>
-//    expect(global.fetch).toHaveBeenCalledWith(
-//      expect.stringContaining("/model-info/weakest-link/"),
-//      expect.anything()
-//    )
-//  );
-//});
-
-//it("clears prediction result when task changes", async () => {
-//  render(<Predict />);
-//  await waitForModelLoad();
-//
-//  // Get a prediction first
-//  await userEvent.click(screen.getByRole("button", { name: /^predict$/i }));
-//  await waitFor(() =>
-//    expect(screen.getByText(/prediction:/i)).toBeInTheDocument()
-//  );
-//
-//  // Switch task — result should clear
-//  await userEvent.selectOptions(
-//    screen.getByRole("combobox", { name: /task/i }),
-//    "weakest"
-//  );
-//  expect(screen.queryByText(/prediction:/i)).not.toBeInTheDocument();
-//});
-//});
 
 // ---------------------------------------------------------------------------
 // Example / Zero buttons
@@ -342,7 +267,7 @@ describe("Predict — Import modal", () => {
         await userEvent.clear(textarea);
         await userEvent.type(textarea, values);
         await userEvent.click(screen.getByRole("button", { name: /apply/i }));
-        // Should succeed (truncate to 41) rather than error
+
         await waitFor(() =>
             expect(
                 screen.queryByText(/import values/i),
@@ -472,7 +397,6 @@ describe("Predict — prediction flow", () => {
     });
 
     it("shows 'Predicting…' in the button while loading", async () => {
-        // Hold the predict fetch open
         let resolvePredict;
         vi.stubGlobal(
             "fetch",
@@ -499,7 +423,6 @@ describe("Predict — prediction flow", () => {
             screen.getByRole("button", { name: /predicting/i }),
         ).toBeInTheDocument();
 
-        // Clean up
         act(() => {
             resolvePredict({
                 ok: true,
@@ -515,7 +438,6 @@ describe("Predict — prediction flow", () => {
     });
 
     it("clears a previous error when Predict is clicked again", async () => {
-        // First call fails
         let callCount = 0;
         vi.stubGlobal(
             "fetch",
