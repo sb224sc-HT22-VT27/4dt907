@@ -133,9 +133,7 @@ def compute_pair_stats(
         Populated statistics object, or ``None`` if no valid frames were found.
     """
     cols_needed = [
-        f"{kp}_{ax}"
-        for kp in (pair.kp1, pair.kp2)
-        for ax in ("3d_x", "3d_y", "3d_z")
+        f"{kp}_{ax}" for kp in (pair.kp1, pair.kp2) for ax in ("3d_x", "3d_y", "3d_z")
     ]
     if any(col not in df.columns for col in cols_needed):
         return None
@@ -147,7 +145,7 @@ def compute_pair_stats(
     dx = valid[f"{pair.kp2}_3d_x"] - valid[f"{pair.kp1}_3d_x"]
     dy = valid[f"{pair.kp2}_3d_y"] - valid[f"{pair.kp1}_3d_y"]
     dz = valid[f"{pair.kp2}_3d_z"] - valid[f"{pair.kp1}_3d_z"]
-    distances = ((dx ** 2 + dy ** 2 + dz ** 2) ** 0.5) * 100.0
+    distances = ((dx**2 + dy**2 + dz**2) ** 0.5) * 100.0
 
     errors = distances - pair.distance_cm
     mean_est = float(distances.mean())
@@ -363,7 +361,7 @@ def main(argv: list[str] | None = None) -> int:
         if stats is None:
             print(
                 f"WARNING: No valid frames found for pair "
-                f"{pair.kp1!r} → {pair.kp2!r}. "
+                f"{pair.kp1!r} -> {pair.kp2!r}. "
                 f"Check that these keypoint names exist in the CSV.",
                 file=sys.stderr,
             )
