@@ -31,13 +31,18 @@ class mlutils:
             )
         except Exception:
             # If no dev exists
-            dev_score = -1
+            if metric_name=="Grand_Avg_Test_MAE_cm":
+                dev_score = 20
+            else:
+                dev_score = -1
 
 
         if metric_name=="Grand_Avg_Test_MAE_cm":
             res = new_score < dev_score
+            print(f"Comparing {new_score} < {dev_score}")
         else:
             res = new_score > dev_score
+            print(f"Comparing {new_score} > {dev_score}")
 
         if res:
             print(f"New Best! {new_score}  {dev_score}. Updating models on DagsHub")
