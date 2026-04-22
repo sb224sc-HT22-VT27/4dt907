@@ -287,11 +287,6 @@ function Skeleton3DViewer({ frames }) {
         return () => clearInterval(playTimerRef.current);
     }, [playing, frames.length]);
 
-    // Draw whenever frameIdx, rotation or zoom changes
-    useEffect(() => {
-        drawFrame(frames[frameIdx]);
-    }); // run on every render — canvas state is imperative
-
     function drawFrame(frameData) {
         const canvas = canvasRef.current;
         if (!canvas || !frameData) return;
@@ -367,6 +362,11 @@ function Skeleton3DViewer({ frames }) {
         ctx.textAlign = "right";
         ctx.fillText(`${frameIdx + 1} / ${frames.length}`, W - 6, H - 6);
     }
+
+    // Draw whenever frameIdx, rotation or zoom changes
+    useEffect(() => {
+        drawFrame(frames[frameIdx]);
+    }); // run on every render — canvas state is imperative
 
     // ── Drag to rotate ───────────────────────────────────────────────────────
 
@@ -560,43 +560,6 @@ export default function SquatAnalyzer() {
         setUploadedFileName("");
         setErrorMsg("");
     }, [stopCapture]);
-
-    /**
-     * Call the sequence-based z-predictor with the accumulated frame buffer.
-     * Returns a map { jointName: predictedZ }.
-     */
-    async function fetchPredictedZSequence(worldLandmarks) {
-        const frame = buildFrameFeatures(worldLandmarks);
-        // Update ring buffer
-        const buf = frameBufferRef.current;
-        buf.push(frame);
-        if (buf.length > SEQ_LEN) buf.shift();
-
-        if (buf.length === 0) return {};
-
-        const sequence = padOrSlice(buf, SEQ_LEN);
-        try {
-            const res = await fetch(
-                apiUrl("/api/v1/z-predictor/predict-sequence"),
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sequence }),
-                },
-            );
-            if (!res.ok) return {};
-            const data = await res.json();
-            const preds = data?.predictions ?? [];
-            return Object.fromEntries(
-                SQUAT_JOINT_ORDER.map(({ name }, i) => [
-                    name,
-                    Number(preds[i] ?? 0),
-                ]),
-            );
-        } catch {
-            return {};
-        }
-    }
 
     function mapAllKeypoints(landmarks) {
         return landmarks.map((lm, i) => ({
