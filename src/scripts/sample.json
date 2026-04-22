@@ -1,0 +1,12 @@
+[
+    {
+        "kp1": "left_hip",
+        "kp2": "left_knee",
+        "distance_cm": 42.0
+    },
+    {
+        "kp1": "right_hip",
+        "kp2": "right_knee",
+        "distance_cm": 42.0
+    }
+]
