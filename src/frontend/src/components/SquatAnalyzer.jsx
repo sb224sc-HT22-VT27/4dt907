@@ -68,32 +68,59 @@ const ALL_LANDMARK_NAMES = [
 // column order after normalisation). Each entry is { name, idx }.
 // Features per frame: [j0_x, j0_y, j1_x, j1_y, … ] → 13 × 2 = 26 floats.
 const SQUAT_JOINT_ORDER = [
-    { name: "nose",            idx: 0  },
-    { name: "left_shoulder",   idx: 11 },
-    { name: "left_elbow",      idx: 13 },
-    { name: "right_shoulder",  idx: 12 },
-    { name: "right_elbow",     idx: 14 },
-    { name: "left_wrist",      idx: 15 },
-    { name: "right_wrist",     idx: 16 },
-    { name: "left_hip",        idx: 23 },
-    { name: "right_hip",       idx: 24 },
-    { name: "left_knee",       idx: 25 },
-    { name: "right_knee",      idx: 26 },
-    { name: "left_ankle",      idx: 27 },
-    { name: "right_ankle",     idx: 28 },
+    { name: "nose", idx: 0 },
+    { name: "left_shoulder", idx: 11 },
+    { name: "left_elbow", idx: 13 },
+    { name: "right_shoulder", idx: 12 },
+    { name: "right_elbow", idx: 14 },
+    { name: "left_wrist", idx: 15 },
+    { name: "right_wrist", idx: 16 },
+    { name: "left_hip", idx: 23 },
+    { name: "right_hip", idx: 24 },
+    { name: "left_knee", idx: 25 },
+    { name: "right_knee", idx: 26 },
+    { name: "left_ankle", idx: 27 },
+    { name: "right_ankle", idx: 28 },
 ];
 const SQUAT_JOINT_NAMES_SET = new Set(SQUAT_JOINT_ORDER.map((j) => j.name));
 
 // Full body skeleton connections (MediaPipe BlazePose topology).
 const POSE_CONNECTIONS = [
-    [0, 1], [1, 2], [2, 3], [3, 7],
-    [0, 4], [4, 5], [5, 6], [6, 8],
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 7],
+    [0, 4],
+    [4, 5],
+    [5, 6],
+    [6, 8],
     [9, 10],
-    [11, 12], [11, 23], [12, 24], [23, 24],
-    [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
-    [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
-    [23, 25], [25, 27], [27, 29], [27, 31], [29, 31],
-    [24, 26], [26, 28], [28, 30], [28, 32], [30, 32],
+    [11, 12],
+    [11, 23],
+    [12, 24],
+    [23, 24],
+    [11, 13],
+    [13, 15],
+    [15, 17],
+    [15, 19],
+    [15, 21],
+    [17, 19],
+    [12, 14],
+    [14, 16],
+    [16, 18],
+    [16, 20],
+    [16, 22],
+    [18, 20],
+    [23, 25],
+    [25, 27],
+    [27, 29],
+    [27, 31],
+    [29, 31],
+    [24, 26],
+    [26, 28],
+    [28, 30],
+    [28, 32],
+    [30, 32],
 ];
 
 // Indices that are squat-relevant (highlighted brighter).
@@ -104,10 +131,11 @@ const SQUAT_INDICES = new Set([
 // Skeleton connections between squat joints only (for 3-D viewer).
 // Derived from POSE_CONNECTIONS filtered to SQUAT_INDICES and mapped to names.
 const _IDX_TO_SQUAT_NAME = Object.fromEntries(
-    SQUAT_JOINT_ORDER.map(({ name, idx }) => [idx, name])
+    SQUAT_JOINT_ORDER.map(({ name, idx }) => [idx, name]),
 );
-const SQUAT_CONNECTIONS_BY_NAME = POSE_CONNECTIONS
-    .filter(([a, b]) => SQUAT_INDICES.has(a) && SQUAT_INDICES.has(b))
+const SQUAT_CONNECTIONS_BY_NAME = POSE_CONNECTIONS.filter(
+    ([a, b]) => SQUAT_INDICES.has(a) && SQUAT_INDICES.has(b),
+)
     .map(([a, b]) => [_IDX_TO_SQUAT_NAME[a], _IDX_TO_SQUAT_NAME[b]])
     .filter(([a, b]) => a && b);
 
@@ -256,18 +284,16 @@ function Skeleton3DViewer({ frames }) {
     const zoomRef = useRef(260);
     const playTimerRef = useRef(null);
     const frameIdxRef = useRef(0);
+    const displayedFrameIdx = useMemo(() => {
+        if (frames.length === 0) return 0;
+        if (!playing) return frames.length - 1; // follow latest when not replaying
+        return Math.min(frameIdx, frames.length - 1); // clamp while replaying
+    }, [frames.length, playing, frameIdx]);
 
     // Keep ref in sync with state for rAF callbacks
     useEffect(() => {
-        frameIdxRef.current = frameIdx;
-    }, [frameIdx]);
-
-    // Always show latest frame when new frames arrive (unless replaying)
-    useEffect(() => {
-        if (!playing && frames.length > 0) {
-            setFrameIdx(frames.length - 1);
-        }
-    }, [frames.length, playing]);
+        frameIdxRef.current = displayedFrameIdx;
+    }, [displayedFrameIdx]);
 
     // Play timer
     useEffect(() => {
@@ -360,12 +386,16 @@ function Skeleton3DViewer({ frames }) {
         ctx.font = "11px system-ui, sans-serif";
         ctx.fillStyle = "rgba(148,163,184,0.8)";
         ctx.textAlign = "right";
-        ctx.fillText(`${frameIdx + 1} / ${frames.length}`, W - 6, H - 6);
+        ctx.fillText(
+            `${displayedFrameIdx + 1} / ${frames.length}`,
+            W - 6,
+            H - 6,
+        );
     }
 
     // Draw whenever frameIdx, rotation or zoom changes
     useEffect(() => {
-        drawFrame(frames[frameIdx]);
+        drawFrame(frames[displayedFrameIdx]);
     }); // run on every render — canvas state is imperative
 
     // ── Drag to rotate ───────────────────────────────────────────────────────
@@ -391,7 +421,10 @@ function Skeleton3DViewer({ frames }) {
 
     function onWheel(e) {
         e.preventDefault();
-        zoomRef.current = Math.max(80, Math.min(600, zoomRef.current - e.deltaY * 0.3));
+        zoomRef.current = Math.max(
+            80,
+            Math.min(600, zoomRef.current - e.deltaY * 0.3),
+        );
         drawFrame(frames[frameIdxRef.current]);
     }
 
@@ -442,7 +475,7 @@ function Skeleton3DViewer({ frames }) {
                     type="range"
                     min={0}
                     max={frames.length - 1}
-                    value={frameIdx}
+                    value={displayedFrameIdx}
                     onChange={(e) => {
                         setPlaying(false);
                         setFrameIdx(Number(e.target.value));
@@ -494,7 +527,10 @@ export default function SquatAnalyzer() {
         let cancelled = false;
         createVideoLandmarker()
             .then((lm) => {
-                if (cancelled) { lm.close?.(); return; }
+                if (cancelled) {
+                    lm.close?.();
+                    return;
+                }
                 landmarkerRef.current = lm;
             })
             .catch(() => {});
@@ -534,7 +570,9 @@ export default function SquatAnalyzer() {
         frameBufferRef.current = [];
         const canvas = canvasRef.current;
         if (canvas) {
-            canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+            canvas
+                .getContext("2d")
+                .clearRect(0, 0, canvas.width, canvas.height);
         }
         setAllKeypoints([]);
         setResult(null);
@@ -584,7 +622,9 @@ export default function SquatAnalyzer() {
             setAllKeypoints([]);
             const canvas = canvasRef.current;
             if (canvas)
-                canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+                canvas
+                    .getContext("2d")
+                    .clearRect(0, 0, canvas.width, canvas.height);
         },
         [stopAll],
     );
@@ -691,7 +731,8 @@ export default function SquatAnalyzer() {
                     img.onerror = rej;
                 });
 
-                const DISPLAY_W = 640, DISPLAY_H = 480;
+                const DISPLAY_W = 640,
+                    DISPLAY_H = 480;
                 const scale = Math.min(
                     DISPLAY_W / img.naturalWidth,
                     DISPLAY_H / img.naturalHeight,
@@ -732,7 +773,7 @@ export default function SquatAnalyzer() {
                 if (imageInputRef.current) imageInputRef.current.value = "";
             }
         },
-        [stopAll], // eslint-disable-line react-hooks/exhaustive-deps
+        [stopAll],
     );
 
     const togglePlayPause = useCallback(() => {
@@ -757,8 +798,8 @@ export default function SquatAnalyzer() {
         if (status !== "running") return;
 
         let frameCounter = 0;
-        const DETECT_EVERY = 3;   // ~20 Hz detection
-        const DEBUG_EVERY = 6;    // ~10 Hz debug panel update
+        const DETECT_EVERY = 3; // ~20 Hz detection
+        const DEBUG_EVERY = 6; // ~10 Hz debug panel update
         const BACKEND_EVERY = 15; // ~2 Hz backend + z-prediction
 
         function detect(timestamp) {
@@ -872,7 +913,7 @@ export default function SquatAnalyzer() {
 
         rafRef.current = requestAnimationFrame(detect);
         return () => cancelAnimationFrame(rafRef.current);
-    }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [status]);
 
     useEffect(() => {
         predictedZByNameRef.current = predictedZByName;
@@ -981,7 +1022,9 @@ export default function SquatAnalyzer() {
         () =>
             sessionLog.map((entry) => {
                 const kpMap = {};
-                entry.keypoints3d.forEach((kp) => { kpMap[kp.name] = kp; });
+                entry.keypoints3d.forEach((kp) => {
+                    kpMap[kp.name] = kp;
+                });
                 const joints = {};
                 for (const { name } of SQUAT_JOINT_ORDER) {
                     const kp = kpMap[name];
@@ -1042,7 +1085,7 @@ export default function SquatAnalyzer() {
                 {[
                     { id: "webcam", label: "Live Camera" },
                     { id: "upload", label: "Upload Video" },
-                    { id: "image",  label: "Upload Image" },
+                    { id: "image", label: "Upload Image" },
                 ].map(({ id, label }) => (
                     <button
                         key={id}
@@ -1144,7 +1187,9 @@ export default function SquatAnalyzer() {
                                 disabled={status === "loading"}
                                 className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
                             >
-                                {status === "loading" ? "Loading…" : "Choose Video…"}
+                                {status === "loading"
+                                    ? "Loading…"
+                                    : "Choose Video…"}
                             </button>
                         )}
                     </div>
@@ -1154,7 +1199,9 @@ export default function SquatAnalyzer() {
                         </p>
                     )}
                     {uploadedFileName && (
-                        <p className="text-slate-400 text-xs">{uploadedFileName}</p>
+                        <p className="text-slate-400 text-xs">
+                            {uploadedFileName}
+                        </p>
                     )}
                 </div>
             )}
@@ -1177,7 +1224,9 @@ export default function SquatAnalyzer() {
                         {status === "loading" ? "Analysing…" : "Choose Image…"}
                     </button>
                     {uploadedFileName && (
-                        <p className="text-slate-400 text-xs">{uploadedFileName}</p>
+                        <p className="text-slate-400 text-xs">
+                            {uploadedFileName}
+                        </p>
                     )}
                 </div>
             )}
@@ -1213,7 +1262,9 @@ export default function SquatAnalyzer() {
                         </div>
                         {result.confidence != null && (
                             <div>
-                                <p className="text-slate-400 text-xs">Confidence</p>
+                                <p className="text-slate-400 text-xs">
+                                    Confidence
+                                </p>
                                 <p className="font-mono text-slate-700 font-semibold">
                                     {(result.confidence * 100).toFixed(0)}%
                                 </p>
