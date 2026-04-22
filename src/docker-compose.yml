@@ -3,7 +3,7 @@ services:
         build:
             context: ./backend
             args:
-                - BACKEND_PORT=${BACKEND_PORT}
+                - BACKEND_PORT=${BACKEND_PORT:-8080}
                 - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
 
                 - MODEL_URI_PROD=${MODEL_URI_PROD}
@@ -19,7 +19,7 @@ services:
                 - Z_MODEL_URI_BACKUP=${Z_MODEL_URI_BACKUP}
         container_name: 4dt907-backend
         environment:
-            - BACKEND_PORT=${BACKEND_PORT}
+            - BACKEND_PORT=${BACKEND_PORT:-8080}
             - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
 
             - MODEL_URI_PROD=${MODEL_URI_PROD}
@@ -34,17 +34,22 @@ services:
             - Z_MODEL_URI_DEV=${Z_MODEL_URI_DEV}
             - Z_MODEL_URI_BACKUP=${Z_MODEL_URI_BACKUP}
         ports:
-            - "${BACKEND_PORT}:${BACKEND_PORT}"
+            - "${BACKEND_PORT:-8080}:${BACKEND_PORT:-8080}"
         volumes:
             - ./backend:/backend_app
-            - /backend_app/__pycache__
-            - /backend_app/.venv
+            - backend_pycache:/backend_app/__pycache__
+            - backend_venv:/backend_app/.venv
         restart: unless-stopped
         networks:
             - app-network
         healthcheck:
             test:
-                ["CMD", "curl", "-f", "http://localhost:${BACKEND_PORT}/health"]
+                [
+                    "CMD",
+                    "curl",
+                    "-f",
+                    "http://localhost:${BACKEND_PORT:-8080}/health",
+                ]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -62,20 +67,13 @@ services:
         build:
             context: ./frontend
             args:
-                - BACKEND_PORT=${BACKEND_PORT}
-                - BACKEND_URL=${BACKEND_URL}
-                - FRONTEND_PORT=${FRONTEND_PORT}
+                - BACKEND_PORT=${BACKEND_PORT:-8080}
+                - FRONTEND_PORT=${FRONTEND_PORT:-3030}
         container_name: 4dt907-frontend
         environment:
-            - BACKEND_PORT=${BACKEND_PORT}
-            - BACKEND_URL=${BACKEND_URL}
-            - FRONTEND_PORT=${FRONTEND_PORT}
+            - FRONTEND_PORT=${FRONTEND_PORT:-3030}
         ports:
-            - "${FRONTEND_PORT}:${FRONTEND_PORT}"
-        volumes:
-            - ./frontend:/app
-            - /app/node_modules
-            - /app/dist
+            - "${FRONTEND_PORT:-3030}:${FRONTEND_PORT:-3030}"
         depends_on:
             backend:
                 condition: service_healthy
@@ -83,11 +81,15 @@ services:
         networks:
             - app-network
         healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:${FRONTEND_PORT}/"]
-            interval: 30s
-            timeout: 3s
-            retries: 3
-            start_period: 10s
+            test:
+                [
+                    "CMD-SHELL",
+                    "curl -fsS http://localhost:${FRONTEND_PORT:-3030}/ >/dev/null",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 12
+            start_period: 60s
         deploy:
             resources:
                 limits:
@@ -100,3 +102,7 @@ services:
 networks:
     app-network:
         driver: bridge
+
+volumes:
+    backend_pycache:
+    backend_venv:

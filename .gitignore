@@ -5,6 +5,7 @@
 *.pdf
 outputs/
 *.pt
+*.pth
 
 # Node.js
 node_modules/
