@@ -1158,24 +1158,15 @@ export default function SquatAnalyzer() {
             {/* Controls — video upload */}
             {inputMode === "upload" && (
                 <div className="flex flex-col items-center gap-2">
-                    <div className="flex gap-3 items-center">
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="video/*"
-                            className="hidden"
-                            onChange={handleVideoChange}
-                        />
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={status === "loading"}
-                            className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
-                        >
-                            {status === "loading"
-                                ? "Loading…"
-                                : "Choose Video…"}
-                        </button>
-                        {status === "running" && (
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        onChange={handleVideoChange}
+                    />
+                    <div className="flex gap-3 items-center flex-wrap justify-center">
+                        {status === "running" ? (
                             <>
                                 <button
                                     onClick={togglePlayPause}
@@ -1205,6 +1196,11 @@ export default function SquatAnalyzer() {
                     {status === "finished" && (
                         <p className="text-green-600 text-sm font-semibold">
                             ✓ Analysis complete — review results below
+                        </p>
+                    )}
+                    {uploadedFileName && (
+                        <p className="text-slate-400 text-xs">
+                            {uploadedFileName}
                         </p>
                     )}
                     {uploadedFileName && (
