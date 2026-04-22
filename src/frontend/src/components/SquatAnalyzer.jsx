@@ -284,18 +284,16 @@ function Skeleton3DViewer({ frames }) {
     const zoomRef = useRef(260);
     const playTimerRef = useRef(null);
     const frameIdxRef = useRef(0);
+    const displayedFrameIdx = useMemo(() => {
+        if (frames.length === 0) return 0;
+        if (!playing) return frames.length - 1; // follow latest when not replaying
+        return Math.min(frameIdx, frames.length - 1); // clamp while replaying
+    }, [frames.length, playing, frameIdx]);
 
     // Keep ref in sync with state for rAF callbacks
     useEffect(() => {
-        frameIdxRef.current = frameIdx;
-    }, [frameIdx]);
-
-    // Always show latest frame when new frames arrive (unless replaying)
-    useEffect(() => {
-        if (!playing && frames.length > 0) {
-            setFrameIdx(frames.length - 1);
-        }
-    }, [frames.length, playing]);
+        frameIdxRef.current = displayedFrameIdx;
+    }, [displayedFrameIdx]);
 
     // Play timer
     useEffect(() => {
@@ -388,12 +386,16 @@ function Skeleton3DViewer({ frames }) {
         ctx.font = "11px system-ui, sans-serif";
         ctx.fillStyle = "rgba(148,163,184,0.8)";
         ctx.textAlign = "right";
-        ctx.fillText(`${frameIdx + 1} / ${frames.length}`, W - 6, H - 6);
+        ctx.fillText(
+            `${displayedFrameIdx + 1} / ${frames.length}`,
+            W - 6,
+            H - 6,
+        );
     }
 
     // Draw whenever frameIdx, rotation or zoom changes
     useEffect(() => {
-        drawFrame(frames[frameIdx]);
+        drawFrame(frames[displayedFrameIdx]);
     }); // run on every render — canvas state is imperative
 
     // ── Drag to rotate ───────────────────────────────────────────────────────
@@ -473,7 +475,7 @@ function Skeleton3DViewer({ frames }) {
                     type="range"
                     min={0}
                     max={frames.length - 1}
-                    value={frameIdx}
+                    value={displayedFrameIdx}
                     onChange={(e) => {
                         setPlaying(false);
                         setFrameIdx(Number(e.target.value));
@@ -771,7 +773,7 @@ export default function SquatAnalyzer() {
                 if (imageInputRef.current) imageInputRef.current.value = "";
             }
         },
-        [stopAll], // eslint-disable-line react-hooks/exhaustive-deps
+        [stopAll],
     );
 
     const togglePlayPause = useCallback(() => {
@@ -911,7 +913,7 @@ export default function SquatAnalyzer() {
 
         rafRef.current = requestAnimationFrame(detect);
         return () => cancelAnimationFrame(rafRef.current);
-    }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [status]);
 
     useEffect(() => {
         predictedZByNameRef.current = predictedZByName;
@@ -1194,7 +1196,9 @@ export default function SquatAnalyzer() {
                                 disabled={status === "loading"}
                                 className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
                             >
-                                {status === "loading" ? "Loading…" : "Choose Video…"}
+                                {status === "loading"
+                                    ? "Loading…"
+                                    : "Choose Video…"}
                             </button>
                         )}
                     </div>
