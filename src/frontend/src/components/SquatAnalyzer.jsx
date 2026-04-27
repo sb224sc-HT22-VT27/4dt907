@@ -216,6 +216,8 @@ function filterSquatKeypoints3d(landmarks) {
 
 /**
  * Draw the full-body skeleton on a canvas.
+ * Landmark coordinates are already in display space (MediaPipe received an
+ * orientation-corrected frame via the capture canvas).
  */
 function drawSkeleton(canvas, w, h, detection, off = { x: 0, y: 0 }) {
     if (!detection?.landmarks?.length) return;
@@ -279,16 +281,30 @@ function Skeleton3DViewer({ frames }) {
     const canvasRef = useRef(null);
     const [playing, setPlaying] = useState(false);
     const [frameIdx, setFrameIdx] = useState(0);
+    // true = always show the newest frame (live follow); false = user has control
+    const [liveMode, setLiveMode] = useState(true);
     const rotation = useRef({ x: 15, y: 25 });
     const dragRef = useRef(null);
     const zoomRef = useRef(260);
     const playTimerRef = useRef(null);
     const frameIdxRef = useRef(0);
+
+    // While in live mode (not scrubbing / replaying), follow the latest frame.
+    useEffect(() => {
+        if (liveMode && !playing && frames.length > 0) {
+            setFrameIdx(frames.length - 1);
+        }
+    }, [frames.length, liveMode, playing]);
+
+    // Reset to live mode when frames are cleared (new session).
+    useEffect(() => {
+        if (frames.length === 0) setLiveMode(true);
+    }, [frames.length]);
+
     const displayedFrameIdx = useMemo(() => {
         if (frames.length === 0) return 0;
-        if (!playing) return frames.length - 1; // follow latest when not replaying
-        return Math.min(frameIdx, frames.length - 1); // clamp while replaying
-    }, [frames.length, playing, frameIdx]);
+        return Math.min(frameIdx, frames.length - 1);
+    }, [frames.length, frameIdx]);
 
     // Keep ref in sync with state for rAF callbacks
     useEffect(() => {
@@ -456,6 +472,7 @@ function Skeleton3DViewer({ frames }) {
             <div className="flex items-center gap-3 w-full">
                 <button
                     onClick={() => {
+                        setLiveMode(false);
                         setFrameIdx(0);
                         setPlaying(true);
                     }}
@@ -478,6 +495,7 @@ function Skeleton3DViewer({ frames }) {
                     value={displayedFrameIdx}
                     onChange={(e) => {
                         setPlaying(false);
+                        setLiveMode(false);
                         setFrameIdx(Number(e.target.value));
                     }}
                     className="flex-1 accent-sky-400"
@@ -485,7 +503,7 @@ function Skeleton3DViewer({ frames }) {
             </div>
 
             <p className="text-xs text-slate-400 self-start">
-                Frame {frameIdx + 1} of {frames.length} · z from DL model
+                Frame {displayedFrameIdx + 1} of {frames.length} · z from DL model
             </p>
         </div>
     );
@@ -506,6 +524,8 @@ export default function SquatAnalyzer() {
     const sessionLogRef = useRef([]);
     // Ring buffer: array of 26-float feature vectors, oldest → newest
     const frameBufferRef = useRef([]);
+    // Offscreen canvas used to feed orientation-corrected frames to MediaPipe
+    const captureCanvasRef = useRef(null);
 
     const [inputMode, setInputMode] = useState("webcam");
     const [sessionName, setSessionName] = useState("");
@@ -826,13 +846,27 @@ export default function SquatAnalyzer() {
             lastTimestampRef.current = timestamp;
             frameCounter++;
 
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+
             // ── Run MediaPipe detection ──
+            // We draw the video into an intermediate canvas first so the browser
+            // applies the video's rotation metadata (portrait iPhones store frames
+            // as landscape). MediaPipe then receives correctly-oriented pixels and
+            // returns landmarks in display space — no manual rotation needed.
             if (frameCounter % DETECT_EVERY === 0) {
                 try {
-                    lastDetectionRef.current = landmarker.detectForVideo(
-                        video,
-                        timestamp,
-                    );
+                    const cap = captureCanvasRef.current;
+                    if (cap && vw > 0 && vh > 0) {
+                        if (cap.width !== vw || cap.height !== vh) {
+                            cap.width = vw;
+                            cap.height = vh;
+                        }
+                        cap.getContext("2d").drawImage(video, 0, 0, vw, vh);
+                        lastDetectionRef.current = landmarker.detectForVideo(cap, timestamp);
+                    } else {
+                        lastDetectionRef.current = landmarker.detectForVideo(video, timestamp);
+                    }
                 } catch {
                     // Transient error — skip detection, keep loop alive.
                 }
@@ -849,14 +883,21 @@ export default function SquatAnalyzer() {
 
             // ── Redraw canvas at full rAF rate ──
             const detection = lastDetectionRef.current;
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-            if (canvas.width !== vw || canvas.height !== vh) {
-                canvas.width = vw;
-                canvas.height = vh;
+            const DISPLAY_W = 640;
+            const DISPLAY_H = 480;
+            if (canvas.width !== DISPLAY_W || canvas.height !== DISPLAY_H) {
+                canvas.width = DISPLAY_W;
+                canvas.height = DISPLAY_H;
             }
-            canvas.getContext("2d").clearRect(0, 0, vw, vh);
-            if (detection) drawSkeleton(canvas, vw, vh, detection);
+
+            // Scale skeleton overlay to match the video element's objectFit:contain layout
+            const scale = vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
+            const drawW = vw * scale;
+            const drawH = vh * scale;
+            const offsetX = (DISPLAY_W - drawW) / 2;
+            const offsetY = (DISPLAY_H - drawH) / 2;
+            canvas.getContext("2d").clearRect(0, 0, DISPLAY_W, DISPLAY_H);
+            if (detection) drawSkeleton(canvas, drawW, drawH, detection, { x: offsetX, y: offsetY });
 
             // ── Debug panel (~10 Hz) ──
             if (frameCounter % DEBUG_EVERY === 0) {
@@ -1100,6 +1141,10 @@ export default function SquatAnalyzer() {
                     </button>
                 ))}
             </div>
+
+            {/* Hidden capture canvas — receives video frames so the browser
+                applies rotation metadata before MediaPipe processes them */}
+            <canvas ref={captureCanvasRef} style={{ display: "none" }} />
 
             {/* Video + canvas overlay */}
             <div
