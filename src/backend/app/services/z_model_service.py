@@ -214,9 +214,9 @@ def predict_sequence(
     """
     model, uri, run_id = get_model(variant)
     # shape (1, n_frames, n_features_per_frame)
-    X = np.array([sequence], dtype=float)
+    X = np.array([sequence], dtype=np.float32)
     y = model.predict(X)
-    y = np.asarray(y, dtype=float)
+    y = np.asarray(y, dtype=np.float32)
 
     # Normalise to a flat 1-D array of per-joint z predictions.
     # Possible output shapes from the pyfunc wrapper:
