@@ -4,13 +4,13 @@
 // classification (Deep / Shallow / Invalid).
 // Accumulated frames can be saved to Supabase or exported as CSV on demand.
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { apiUrl } from "../apiBase";
 import supabase from "../supabaseClient";
 
 // MediaPipe keypoint indices used for squat analysis
 // https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker
-// Landmark set aligned with the normalized Kinect CSV files
+// Landmark set aligned with the normalised Kinect CSV files
 const SQUAT_LANDMARK_NAMES = {
     0: "nose",
     11: "left_shoulder",
@@ -64,6 +64,46 @@ const ALL_LANDMARK_NAMES = [
     "right_foot_index", // 32
 ];
 
+// Canonical joint order used by the GRU z-predictor model.
+// MUST match the alphabetically-sorted column order produced by the training
+// notebook: sorted([c for c in cols if c.endswith('_x') or c.endswith('_y')])
+// and sorted([c for c in cols if c.endswith('_z')]).
+// Features per frame: [j0_x, j0_y, j1_x, j1_y, … ] → 13 × 2 = 26 floats.
+// z output: [j0_z, j1_z, … ] → 13 floats (same alphabetical order).
+const MODEL_JOINT_ORDER = [
+    { name: "left_ankle",     idx: 27 },
+    { name: "left_elbow",     idx: 13 },
+    { name: "left_hip",       idx: 23 },
+    { name: "left_knee",      idx: 25 },
+    { name: "left_shoulder",  idx: 11 },
+    { name: "left_wrist",     idx: 15 },
+    { name: "nose",           idx: 0  },
+    { name: "right_ankle",    idx: 28 },
+    { name: "right_elbow",    idx: 14 },
+    { name: "right_hip",      idx: 24 },
+    { name: "right_knee",     idx: 26 },
+    { name: "right_shoulder", idx: 12 },
+    { name: "right_wrist",    idx: 16 },
+];
+
+// Display/viewer joint order (used only for 3-D skeleton rendering).
+const SQUAT_JOINT_ORDER = [
+    { name: "nose",           idx: 0  },
+    { name: "left_shoulder",  idx: 11 },
+    { name: "left_elbow",     idx: 13 },
+    { name: "right_shoulder", idx: 12 },
+    { name: "right_elbow",    idx: 14 },
+    { name: "left_wrist",     idx: 15 },
+    { name: "right_wrist",    idx: 16 },
+    { name: "left_hip",       idx: 23 },
+    { name: "right_hip",      idx: 24 },
+    { name: "left_knee",      idx: 25 },
+    { name: "right_knee",     idx: 26 },
+    { name: "left_ankle",     idx: 27 },
+    { name: "right_ankle",    idx: 28 },
+];
+const SQUAT_JOINT_NAMES_SET = new Set(SQUAT_JOINT_ORDER.map((j) => j.name));
+
 // Full body skeleton connections (MediaPipe BlazePose topology).
 const POSE_CONNECTIONS = [
     [0, 1],
@@ -108,6 +148,17 @@ const SQUAT_INDICES = new Set([
     0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28,
 ]);
 
+// Skeleton connections between squat joints only (for 3-D viewer).
+// Derived from POSE_CONNECTIONS filtered to SQUAT_INDICES and mapped to names.
+const _IDX_TO_SQUAT_NAME = Object.fromEntries(
+    SQUAT_JOINT_ORDER.map(({ name, idx }) => [idx, name]),
+);
+const SQUAT_CONNECTIONS_BY_NAME = POSE_CONNECTIONS.filter(
+    ([a, b]) => SQUAT_INDICES.has(a) && SQUAT_INDICES.has(b),
+)
+    .map(([a, b]) => [_IDX_TO_SQUAT_NAME[a], _IDX_TO_SQUAT_NAME[b]])
+    .filter(([a, b]) => a && b);
+
 const CLASSIFICATION_COLORS = {
     Deep: "text-green-600",
     Shallow: "text-amber-600",
@@ -121,9 +172,33 @@ const WASM_URL =
 const ESM_URL =
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
 
+// Number of frames the GRU model expects as a sequence window.
+const SEQ_LEN = 30;
+
+/**
+ * Build a 26-float feature vector for one frame from MediaPipe world landmarks.
+ * Columns: [j0_x, j0_y, j1_x, j1_y, …] in MODEL_JOINT_ORDER (alphabetical),
+ * matching the sorted() column order used during training.
+ */
+function buildFrameFeatures(worldLandmarks) {
+    return MODEL_JOINT_ORDER.flatMap(({ idx }) => {
+        const lm = worldLandmarks?.[idx];
+        return lm ? [lm.x, lm.y] : [0, 0];
+    });
+}
+
+/**
+ * Pad a frame buffer to exactly targetLen by repeating the first frame,
+ * or slice the last targetLen frames if the buffer is too long.
+ */
+function padOrSlice(buffer, targetLen) {
+    if (buffer.length >= targetLen) return buffer.slice(-targetLen);
+    const pad = buffer[0] ?? Array(SQUAT_JOINT_ORDER.length * 2).fill(0);
+    return [...Array(targetLen - buffer.length).fill(pad), ...buffer];
+}
+
 /**
  * Create a new PoseLandmarker for continuous video/webcam detection.
- * No module-level caching — instances are owned and cleaned up by the component.
  */
 async function createVideoLandmarker() {
     const { PoseLandmarker, FilesetResolver } = await import(ESM_URL);
@@ -137,7 +212,6 @@ async function createVideoLandmarker() {
 
 /**
  * Create a one-shot PoseLandmarker for static image detection.
- * Caller is responsible for calling .close() immediately after use.
  */
 async function createImageLandmarker() {
     const { PoseLandmarker, FilesetResolver } = await import(ESM_URL);
@@ -151,26 +225,20 @@ async function createImageLandmarker() {
 
 /**
  * Filter a MediaPipe world-landmarks array to only the 3-D joints needed for a squat.
- *
- * @param {Array} landmarks - Full array of 33 world landmark objects from MediaPipe.
- * @returns {Array} Filtered array of { name, x, y, z, score } objects.
  */
 function filterSquatKeypoints3d(landmarks) {
     if (!landmarks) return [];
     return Object.entries(SQUAT_LANDMARK_NAMES).flatMap(([idx, name]) => {
         const lm = landmarks[Number(idx)];
         if (!lm) return [];
-        return [{ name, x: lm.x, y: lm.y, z: lm.z ?? 0, score: lm.visibility ?? null }];
+        return [{ name, x: lm.x, y: lm.y, z: lm.z ?? 0 }];
     });
 }
 
 /**
  * Draw the full-body skeleton on a canvas.
- * @param {HTMLCanvasElement} canvas
- * @param {number}  w        - Draw-area width in pixels.
- * @param {number}  h        - Draw-area height in pixels.
- * @param {object}  detection - MediaPipe detection result.
- * @param {{ x: number, y: number }} [off] - Top-left offset for letterboxed images.
+ * Landmark coordinates are already in display space (MediaPipe received an
+ * orientation-corrected frame via the capture canvas).
  */
 function drawSkeleton(canvas, w, h, detection, off = { x: 0, y: 0 }) {
     if (!detection?.landmarks?.length) return;
@@ -209,21 +277,279 @@ function drawSkeleton(canvas, w, h, detection, off = { x: 0, y: 0 }) {
     }
 }
 
+// ── 3-D Skeleton Viewer ──────────────────────────────────────────────────────
+
+/**
+ * Rotate a 3-D point by yaw (ry, around Y) then pitch (rx, around X).
+ * Returns projected (px, py) and depth for optional sorting.
+ */
+function project3D(x, y, z, rxDeg, ryDeg, scale, cx, cy) {
+    const rx = (rxDeg * Math.PI) / 180;
+    const ry = (ryDeg * Math.PI) / 180;
+    // Yaw
+    const x1 = x * Math.cos(ry) + z * Math.sin(ry);
+    const y1 = y;
+    const z1 = -x * Math.sin(ry) + z * Math.cos(ry);
+    // Pitch
+    const x2 = x1;
+    const y2 = y1 * Math.cos(rx) - z1 * Math.sin(rx);
+    const z2 = y1 * Math.sin(rx) + z1 * Math.cos(rx);
+    // MediaPipe world y is positive-down, so map directly (not negated).
+    return { px: cx + x2 * scale, py: cy + y2 * scale, depth: z2 };
+}
+
+function Skeleton3DViewer({ frames, liveFrame }) {
+    const canvasRef = useRef(null);
+    const [playing, setPlaying] = useState(false);
+    const [frameIdx, setFrameIdx] = useState(0);
+    // true = always show the newest frame (live follow); false = user has control
+    const [liveMode, setLiveMode] = useState(true);
+    const [prevFramesLength, setPrevFramesLength] = useState(frames.length);
+    const rotation = useRef({ x: 15, y: 25 });
+    const dragRef = useRef(null);
+    const zoomRef = useRef(260);
+    const playTimerRef = useRef(null);
+    const frameIdxRef = useRef(0);
+
+    // Derived state updates during render (avoids setState-in-effect lint error).
+    if (prevFramesLength !== frames.length) {
+        setPrevFramesLength(frames.length);
+        if (frames.length === 0) {
+            setLiveMode(true);
+        } else if (liveMode && !playing) {
+            setFrameIdx(frames.length - 1);
+        }
+    }
+
+    const displayedFrameIdx = useMemo(() => {
+        if (frames.length === 0) return 0;
+        return Math.min(frameIdx, frames.length - 1);
+    }, [frames.length, frameIdx]);
+
+    // Keep ref in sync with state for rAF callbacks
+    useEffect(() => {
+        frameIdxRef.current = displayedFrameIdx;
+    }, [displayedFrameIdx]);
+
+    // Play timer
+    useEffect(() => {
+        if (playing) {
+            playTimerRef.current = setInterval(() => {
+                setFrameIdx((i) => {
+                    if (i >= frames.length - 1) {
+                        setPlaying(false);
+                        return frames.length - 1;
+                    }
+                    return i + 1;
+                });
+            }, 150); // ~6 fps replay
+        } else {
+            clearInterval(playTimerRef.current);
+        }
+        return () => clearInterval(playTimerRef.current);
+    }, [playing, frames.length]);
+
+    function drawFrame(frameData, isLive = false) {
+        const canvas = canvasRef.current;
+        if (!canvas || !frameData) return;
+        const ctx = canvas.getContext("2d");
+        const W = canvas.width;
+        const H = canvas.height;
+        ctx.clearRect(0, 0, W, H);
+
+        const rx = rotation.current.x;
+        const ry = rotation.current.y;
+        const scale = zoomRef.current;
+        const cx = W / 2;
+        const cy = H / 2 + 20;
+
+        // Project all joints
+        const pos = {};
+        for (const { name } of SQUAT_JOINT_ORDER) {
+            const j = frameData.joints?.[name];
+            if (!j) continue;
+            pos[name] = project3D(j.x, j.y, j.z, rx, ry, scale, cx, cy);
+        }
+
+        // Draw bones
+        for (const [aName, bName] of SQUAT_CONNECTIONS_BY_NAME) {
+            const pa = pos[aName];
+            const pb = pos[bName];
+            if (!pa || !pb) continue;
+            ctx.beginPath();
+            ctx.moveTo(pa.px, pa.py);
+            ctx.lineTo(pb.px, pb.py);
+            const isLeft = aName.includes("left") || bName.includes("left");
+            ctx.strokeStyle = isLeft
+                ? "rgba(56,189,248,0.85)"
+                : "rgba(244,114,182,0.85)";
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+        }
+
+        // Draw joints
+        for (const { name } of SQUAT_JOINT_ORDER) {
+            const p = pos[name];
+            if (!p) continue;
+            const isLeg = ["knee", "hip", "ankle"].some((k) =>
+                name.includes(k),
+            );
+            ctx.beginPath();
+            ctx.arc(p.px, p.py, isLeg ? 6 : 4, 0, Math.PI * 2);
+            ctx.fillStyle = name.includes("left")
+                ? "#38bdf8"
+                : name.includes("right")
+                  ? "#f472b6"
+                  : "#a3e635";
+            ctx.fill();
+        }
+
+        // Classification label
+        if (frameData.classification) {
+            ctx.font = "bold 14px system-ui, sans-serif";
+            const cls = frameData.classification;
+            ctx.fillStyle =
+                cls === "Deep"
+                    ? "#16a34a"
+                    : cls === "Shallow"
+                      ? "#d97706"
+                      : "#dc2626";
+            ctx.textAlign = "center";
+            ctx.fillText(cls, cx, 18);
+        }
+
+        // Frame counter / live indicator
+        ctx.font = "11px system-ui, sans-serif";
+        ctx.fillStyle = "rgba(148,163,184,0.8)";
+        ctx.textAlign = "right";
+        ctx.fillText(
+            isLive ? "● LIVE" : `${displayedFrameIdx + 1} / ${frames.length}`,
+            W - 6,
+            H - 6,
+        );
+    }
+
+    // Draw whenever frameIdx, rotation, zoom, or liveFrame changes
+    useEffect(() => {
+        drawFrame(liveFrame ?? frames[displayedFrameIdx], !!liveFrame);
+    }); // run on every render — canvas state is imperative
+
+    // ── Drag to rotate ───────────────────────────────────────────────────────
+
+    function onPointerDown(e) {
+        dragRef.current = { x: e.clientX, y: e.clientY };
+        canvasRef.current?.setPointerCapture(e.pointerId);
+    }
+
+    function onPointerMove(e) {
+        if (!dragRef.current) return;
+        const dx = e.clientX - dragRef.current.x;
+        const dy = e.clientY - dragRef.current.y;
+        rotation.current.y += dx * 0.4;
+        rotation.current.x += dy * 0.4;
+        dragRef.current = { x: e.clientX, y: e.clientY };
+        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+    }
+
+    function onPointerUp() {
+        dragRef.current = null;
+    }
+
+    function onWheel(e) {
+        e.preventDefault();
+        zoomRef.current = Math.max(
+            80,
+            Math.min(600, zoomRef.current - e.deltaY * 0.3),
+        );
+        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+    }
+
+    if (frames.length === 0 && !liveFrame) return null;
+
+    return (
+        <div className="ios-card rounded-2xl p-4 w-full flex flex-col items-center gap-3">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider self-start">
+                3-D Skeleton Replay
+                <span className="ml-2 normal-case font-normal text-slate-300">
+                    — drag to rotate · scroll to zoom
+                </span>
+            </p>
+
+            <canvas
+                ref={canvasRef}
+                width={520}
+                height={400}
+                className="rounded-xl bg-slate-950 cursor-grab active:cursor-grabbing touch-none"
+                style={{ maxWidth: "100%" }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerLeave={onPointerUp}
+                onWheel={onWheel}
+            />
+
+            {/* Controls */}
+            <div className="flex items-center gap-3 w-full">
+                <button
+                    onClick={() => {
+                        setLiveMode(false);
+                        setFrameIdx(0);
+                        setPlaying(true);
+                    }}
+                    className="ios-btn ios-btn-primary px-4 py-1.5 rounded-full text-xs font-semibold"
+                >
+                    ▶ Replay
+                </button>
+                {playing && (
+                    <button
+                        onClick={() => setPlaying(false)}
+                        className="ios-btn px-4 py-1.5 rounded-full text-xs font-semibold text-slate-600"
+                    >
+                        ⏸ Pause
+                    </button>
+                )}
+                <input
+                    type="range"
+                    min={0}
+                    max={frames.length - 1}
+                    value={displayedFrameIdx}
+                    onChange={(e) => {
+                        setPlaying(false);
+                        setLiveMode(false);
+                        setFrameIdx(Number(e.target.value));
+                    }}
+                    className="flex-1 accent-sky-400"
+                />
+            </div>
+
+            <p className="text-xs text-slate-400 self-start">
+                Frame {displayedFrameIdx + 1} of {frames.length} · z from DL model
+            </p>
+        </div>
+    );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function SquatAnalyzer() {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const fileInputRef = useRef(null);
     const imageInputRef = useRef(null);
-    const landmarkerRef = useRef(null); // VIDEO-mode landmarker owned here
+    const landmarkerRef = useRef(null);
     const rafRef = useRef(null);
     const lastTimestampRef = useRef(-1);
     const videoBlobUrlRef = useRef(null);
-    const lastDetectionRef = useRef(null); // cached between rAF frames
-    const sessionLogRef = useRef([]); // readable inside async callbacks
+    const lastDetectionRef = useRef(null);
+    const sessionLogRef = useRef([]);
+    // Ring buffer: array of 26-float feature vectors, oldest → newest
+    const frameBufferRef = useRef([]);
+    // Offscreen canvas used to feed orientation-corrected frames to MediaPipe
+    const captureCanvasRef = useRef(null);
 
-    const [inputMode, setInputMode] = useState("webcam"); // webcam | upload | image
+    const [inputMode, setInputMode] = useState("webcam");
     const [sessionName, setSessionName] = useState("");
-    const [status, setStatus] = useState("idle"); // idle | loading | running | error
+    const [status, setStatus] = useState("idle");
     const [result, setResult] = useState(null);
     const [errorMsg, setErrorMsg] = useState("");
     const [uploadedFileName, setUploadedFileName] = useState("");
@@ -232,12 +558,12 @@ export default function SquatAnalyzer() {
     const [sessionLog, setSessionLog] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [predictedZByName, setPredictedZByName] = useState({});
+    const [liveFrame3d, setLiveFrame3d] = useState(null);
 
-    // Mirror of sessionName state — readable inside async callbacks.
     const sessionNameRef = useRef("");
     const predictedZByNameRef = useRef({});
 
-    // ── Preload VIDEO landmarker on mount; clean up on unmount ───────────────
+    // ── Preload VIDEO landmarker on mount ────────────────────────────────────
     useEffect(() => {
         let cancelled = false;
         createVideoLandmarker()
@@ -248,14 +574,12 @@ export default function SquatAnalyzer() {
                 }
                 landmarkerRef.current = lm;
             })
-            .catch(() => {}); // CDN unavailable — will retry on first startCamera
+            .catch(() => {});
 
         return () => {
             cancelled = true;
-            if (landmarkerRef.current) {
-                landmarkerRef.current.close?.();
-                landmarkerRef.current = null;
-            }
+            landmarkerRef.current?.close?.();
+            landmarkerRef.current = null;
         };
     }, []);
 
@@ -268,7 +592,8 @@ export default function SquatAnalyzer() {
         }
     }
 
-    const stopAll = useCallback(() => {
+    // Stops camera/detection and clears live UI, but keeps accumulated session data.
+    const stopCapture = useCallback((nextStatus = "idle") => {
         cancelAnimationFrame(rafRef.current);
         const video = videoRef.current;
         if (video) {
@@ -283,38 +608,38 @@ export default function SquatAnalyzer() {
         revokeBlobUrl();
         lastTimestampRef.current = -1;
         lastDetectionRef.current = null;
-        setStatus("idle");
+        frameBufferRef.current = [];
+        const canvas = canvasRef.current;
+        if (canvas) {
+            canvas
+                .getContext("2d")
+                .clearRect(0, 0, canvas.width, canvas.height);
+        }
+        setAllKeypoints([]);
+        setResult(null);
         setVideoPaused(false);
         setPredictedZByName({});
         predictedZByNameRef.current = {};
+        setLiveFrame3d(null);
+        setStatus(nextStatus);
     }, []);
 
-    async function fetchPredictedZMap(keypoints) {
-        if (!Array.isArray(keypoints) || keypoints.length === 0) return {};
-        const squatKeypoints = keypoints.filter((kp) => SQUAT_INDICES.has(kp.index));
-        if (squatKeypoints.length === 0) return {};
+    // Discards accumulated session data (call explicitly for "new session").
+    const clearSession = useCallback(() => {
+        sessionLogRef.current = [];
+        setSessionLog([]);
+        setUploadedFileName("");
+        setErrorMsg("");
+    }, []);
 
-        const responses = await Promise.allSettled(
-            squatKeypoints.map(async (kp) => {
-                const res = await fetch(apiUrl("/api/v1/z-predictor/champion"), {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ features: [kp.x, kp.y] }),
-                });
-                if (!res.ok) throw new Error("z-predictor request failed");
-                const data = await res.json();
-                return [kp.name, Number(data?.prediction ?? 0)];
-            }),
-        );
-
-        return responses.reduce((acc, item) => {
-            if (item.status === "fulfilled") {
-                const [name, z] = item.value;
-                acc[name] = z;
-            }
-            return acc;
-        }, {});
-    }
+    // Full reset: stop capture + discard data (used when switching modes).
+    const stopAll = useCallback(() => {
+        stopCapture("idle");
+        sessionLogRef.current = [];
+        setSessionLog([]);
+        setUploadedFileName("");
+        setErrorMsg("");
+    }, [stopCapture]);
 
     function mapAllKeypoints(landmarks) {
         return landmarks.map((lm, i) => ({
@@ -322,8 +647,10 @@ export default function SquatAnalyzer() {
             name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
             x: lm.x,
             y: lm.y,
-            z: lm.z ?? 0,
-            predictedZ: predictedZByNameRef.current[ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`] ?? null,
+            predictedZ:
+                predictedZByNameRef.current[
+                    ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`
+                ] ?? null,
         }));
     }
 
@@ -343,6 +670,17 @@ export default function SquatAnalyzer() {
         },
         [stopAll],
     );
+
+    // ── Video-ended auto-finish ──────────────────────────────────────────────
+
+    useEffect(() => {
+        if (status !== "running" || inputMode !== "upload") return;
+        const video = videoRef.current;
+        if (!video) return;
+        const handleEnded = () => stopCapture("finished");
+        video.addEventListener("ended", handleEnded);
+        return () => video.removeEventListener("ended", handleEnded);
+    }, [status, inputMode, stopCapture]);
 
     // ── Webcam ───────────────────────────────────────────────────────────────
 
@@ -399,6 +737,8 @@ export default function SquatAnalyzer() {
                 setStatus("error");
                 setErrorMsg(String(err));
             }
+            // Reset file input so re-uploading same file triggers onChange
+            if (fileInputRef.current) fileInputRef.current.value = "";
         },
         [stopAll],
     );
@@ -424,9 +764,6 @@ export default function SquatAnalyzer() {
             const blobUrl = URL.createObjectURL(file);
             let imageLandmarker = null;
             try {
-                // Create a temporary IMAGE-mode landmarker, use it, then close it.
-                // Never reuse the VIDEO landmarker for image mode — setOptions
-                // switching corrupts the inference graph.
                 imageLandmarker = await createImageLandmarker();
 
                 const img = new Image();
@@ -462,9 +799,7 @@ export default function SquatAnalyzer() {
                         x: offsetX,
                         y: offsetY,
                     });
-                    setAllKeypoints(
-                        mapAllKeypoints(detection.landmarks[0]),
-                    );
+                    setAllKeypoints(mapAllKeypoints(detection.landmarks[0]));
                     const kp3d = filterSquatKeypoints3d(
                         detection.worldLandmarks?.[0] ?? [],
                     );
@@ -475,12 +810,12 @@ export default function SquatAnalyzer() {
                 setStatus("error");
                 setErrorMsg(String(err));
             } finally {
-                imageLandmarker?.close?.(); // release GPU resources immediately
+                imageLandmarker?.close?.();
                 URL.revokeObjectURL(blobUrl);
                 if (imageInputRef.current) imageInputRef.current.value = "";
             }
         },
-        [stopAll], // eslint-disable-line react-hooks/exhaustive-deps
+        [stopAll],
     );
 
     const togglePlayPause = useCallback(() => {
@@ -497,17 +832,26 @@ export default function SquatAnalyzer() {
 
     // ── Detection loop ───────────────────────────────────────────────────────
     //
-    // Detection rate is capped at ~20 fps (every 3 rAF frames) so the CPU
-    // inference doesn't starve the main thread. The canvas is redrawn on every
-    // rAF using the last cached detection result, keeping lines smooth.
+    // Uploaded video: MediaPipe runs once per video frame (currentTime gating).
+    // Webcam: MediaPipe throttled to ~20 Hz (every 3 rAF frames).
+    // Backend + z-prediction: every 15 detections (~1–2 Hz).
+    // Overlay canvas: always redrawn at full rAF rate from latest detection.
 
     useEffect(() => {
         if (status !== "running") return;
 
+        // frameCounter: every rAF tick.
+        // detectionCounter: every time MediaPipe actually runs.
+        // lastDetectedVideoTime: used to gate detection to one-per-video-frame for uploads.
         let frameCounter = 0;
-        const DETECT_EVERY = 3; // ~20 Hz detection
-        const DEBUG_EVERY = 6; // ~10 Hz debug panel update
-        const BACKEND_EVERY = 15; // ~2 Hz backend + session log
+        let detectionCounter = 0;
+        let lastDetectedVideoTime = -1;
+
+        // Webcam: throttle MediaPipe to ~20 Hz (rAF runs at ~60 Hz).
+        // Video upload: detect once per video frame via currentTime gating instead.
+        const DETECT_EVERY = 3;
+        // Backend + z-prediction: every 15 detections (~1–2 Hz depending on mode).
+        const BACKEND_EVERY = 15;
 
         function detect(timestamp) {
             const video = videoRef.current;
@@ -522,7 +866,6 @@ export default function SquatAnalyzer() {
                 rafRef.current = requestAnimationFrame(detect);
                 return;
             }
-            // Guard: MediaPipe crashes when video dimensions are 0.
             if (video.videoWidth === 0 || video.videoHeight === 0) {
                 rafRef.current = requestAnimationFrame(detect);
                 return;
@@ -532,70 +875,144 @@ export default function SquatAnalyzer() {
                 return;
             }
             lastTimestampRef.current = timestamp;
-
             frameCounter++;
 
-            // ── Run detection at reduced rate ──
-            if (frameCounter % DETECT_EVERY === 0) {
-                try {
-                    lastDetectionRef.current = landmarker.detectForVideo(
-                        video,
-                        timestamp,
-                    );
-                } catch {
-                    // Transient GPU error — skip this detection, keep loop alive.
-                }
-            }
-
-            // ── Always redraw canvas at full rAF rate for smooth lines ──
-            const detection = lastDetectionRef.current;
             const vw = video.videoWidth;
             const vh = video.videoHeight;
-            if (canvas.width !== vw || canvas.height !== vh) {
-                canvas.width = vw;
-                canvas.height = vh;
-            }
-            canvas.getContext("2d").clearRect(0, 0, vw, vh);
-            if (detection) drawSkeleton(canvas, vw, vh, detection);
 
-            // ── Debug panel (~10 Hz) ──
-            if (frameCounter % DEBUG_EVERY === 0) {
-                if (detection?.landmarks?.length > 0) {
-                    setAllKeypoints(
-                        mapAllKeypoints(detection.landmarks[0]),
-                    );
-                } else {
-                    setAllKeypoints([]);
+            // ── Gate detection ──
+            // Uploaded video: detect exactly once per video frame by watching
+            // currentTime. This keeps the overlay perfectly in sync without
+            // running MediaPipe on duplicate frames (which wastes CPU and causes
+            // playback stutters).
+            // Webcam: fall back to the rAF-based throttle.
+            const isVideoUpload = inputMode === "upload";
+            const videoTime = video.currentTime;
+            const shouldDetect = isVideoUpload
+                ? videoTime !== lastDetectedVideoTime
+                : frameCounter % DETECT_EVERY === 0;
+
+            if (shouldDetect) {
+                if (isVideoUpload) lastDetectedVideoTime = videoTime;
+                detectionCounter++;
+
+                // Draw the current frame into an intermediate canvas so the browser
+                // applies any rotation metadata before MediaPipe sees the pixels.
+                try {
+                    const cap = captureCanvasRef.current;
+                    if (cap && vw > 0 && vh > 0) {
+                        if (cap.width !== vw || cap.height !== vh) {
+                            cap.width = vw;
+                            cap.height = vh;
+                        }
+                        cap.getContext("2d").drawImage(video, 0, 0, vw, vh);
+                        lastDetectionRef.current = landmarker.detectForVideo(cap, timestamp);
+                    } else {
+                        lastDetectionRef.current = landmarker.detectForVideo(video, timestamp);
+                    }
+                } catch {
+                    // Transient error — skip this frame, keep loop alive.
+                }
+
+                // Update ring buffer and live 3-D skeleton on every detection
+                const det = lastDetectionRef.current;
+                if (det?.worldLandmarks?.length > 0) {
+                    const frame = buildFrameFeatures(det.worldLandmarks[0]);
+                    const buf = frameBufferRef.current;
+                    buf.push(frame);
+                    if (buf.length > SEQ_LEN) buf.shift();
+
+                    // Live 3-D frame: update on every detection tick
+                    const joints = {};
+                    for (const { name, idx } of SQUAT_JOINT_ORDER) {
+                        const lm = det.worldLandmarks[0][idx];
+                        if (!lm) continue;
+                        joints[name] = {
+                            x: lm.x,
+                            y: lm.y,
+                            z: predictedZByNameRef.current[name] ?? lm.z ?? 0,
+                        };
+                    }
+                    setLiveFrame3d({ classification: null, joints });
+                }
+
+                // ── Debug panel (every 3 detections ≈ 7–10 Hz) ──
+                if (detectionCounter % 3 === 0) {
+                    const det2 = lastDetectionRef.current;
+                    if (det2?.landmarks?.length > 0) {
+                        setAllKeypoints(mapAllKeypoints(det2.landmarks[0]));
+                    } else {
+                        setAllKeypoints([]);
+                    }
+                }
+
+                // ── Backend call + z-prediction (every BACKEND_EVERY detections) ──
+                if (detectionCounter % BACKEND_EVERY === 0) {
+                    const det2 = lastDetectionRef.current;
+                    if (det2?.landmarks?.length > 0) {
+                        const kp3d = filterSquatKeypoints3d(
+                            det2.worldLandmarks?.[0] ?? [],
+                        );
+                        sendFrame(kp3d);
+                        setAllKeypoints(mapAllKeypoints(det2.landmarks[0]));
+
+                        // Sequence-based z prediction
+                        const worldLms = det2.worldLandmarks?.[0];
+                        if (worldLms) {
+                            const buf = frameBufferRef.current;
+                            if (buf.length > 0) {
+                                const sequence = padOrSlice(buf, SEQ_LEN);
+                                fetch(apiUrl("/api/v1/z-predictor/predict-sequence"), {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ sequence }),
+                                })
+                                    .then((r) => (r.ok ? r.json() : null))
+                                    .then((data) => {
+                                        if (!data) return;
+                                        const preds = data?.predictions ?? [];
+                                        // Use MODEL_JOINT_ORDER (alphabetical) — matches
+                                        // the sorted() column order from training.
+                                        const map = Object.fromEntries(
+                                            MODEL_JOINT_ORDER.map(({ name }, i) => [
+                                                name,
+                                                Number(preds[i] ?? 0),
+                                            ]),
+                                        );
+                                        predictedZByNameRef.current = map;
+                                        setPredictedZByName(map);
+                                    })
+                                    .catch(() => {});
+                            }
+                        }
+                    }
                 }
             }
 
-            // ── Throttled backend call + session log (~2 Hz) ──
-            if (
-                frameCounter % BACKEND_EVERY === 0 &&
-                detection?.landmarks?.length > 0
-            ) {
-                const kp3d = filterSquatKeypoints3d(
-                    detection.worldLandmarks?.[0] ?? [],
-                );
-                sendFrame(kp3d);
-
-                // Collect all 33 landmarks for the debug panel.
-                const all = mapAllKeypoints(detection.landmarks[0]);
-                setAllKeypoints(all);
-                fetchPredictedZMap(all)
-                    .then((map) => {
-                        predictedZByNameRef.current = map;
-                        setPredictedZByName(map);
-                    })
-                    .catch(() => {});
+            // ── Redraw skeleton overlay at full rAF rate ──
+            // Always uses the freshest detection result, so the overlay never
+            // drifts behind the video even if detection ran on a previous tick.
+            const detection = lastDetectionRef.current;
+            const DISPLAY_W = 640;
+            const DISPLAY_H = 480;
+            if (canvas.width !== DISPLAY_W || canvas.height !== DISPLAY_H) {
+                canvas.width = DISPLAY_W;
+                canvas.height = DISPLAY_H;
             }
+            const scale = vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
+            const drawW = vw * scale;
+            const drawH = vh * scale;
+            const offsetX = (DISPLAY_W - drawW) / 2;
+            const offsetY = (DISPLAY_H - drawH) / 2;
+            canvas.getContext("2d").clearRect(0, 0, DISPLAY_W, DISPLAY_H);
+            if (detection) drawSkeleton(canvas, drawW, drawH, detection, { x: offsetX, y: offsetY });
 
             rafRef.current = requestAnimationFrame(detect);
         }
 
         rafRef.current = requestAnimationFrame(detect);
         return () => cancelAnimationFrame(rafRef.current);
-    }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [status]);
 
     useEffect(() => {
         predictedZByNameRef.current = predictedZByName;
@@ -603,36 +1020,15 @@ export default function SquatAnalyzer() {
 
     // ── Backend + session log ────────────────────────────────────────────────
 
-    // Backend + Supabase — combined per-frame dispatch
-    //
-    // Flow:
-    //   1. POST 3-D keypoints to the Python backend for classification.
-    //   2. Update the UI with the result.
-    //   3. Insert one row to Supabase's public.squat_keypoints table using the
-    //      classification result from step 1.
-    //
-    // raw_keypoints shape stored in DB:
-    //   {
-    //     "3d": [ [x, y, z], … ] // one [x, y, z] triple per squat keypoint
-    //   }
-    // Keep the ref in sync so the async callback always sees the latest name.
     sessionNameRef.current = sessionName;
 
-    /**
-     * Classification is handled by the Python backend (POST /api/v1/squat/classify).
-     * The backend reconstructs z from x/y via the MLflow-hosted z-predictor model
-     * and classifies squat depth from the resulting 3-D keypoints.
-     */
     async function sendFrame(keypoints3d) {
-        // --- 1. Backend classification ---
         let data = null;
         try {
             const res = await fetch(apiUrl("/api/v1/squat/classify"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    keypoints_3d: keypoints3d,
-                }),
+                body: JSON.stringify({ keypoints_3d: keypoints3d }),
             });
             if (res.ok) data = await res.json();
         } catch {
@@ -644,6 +1040,7 @@ export default function SquatAnalyzer() {
         const entry = {
             timestamp: Date.now(),
             keypoints3d,
+            predictedZ: { ...predictedZByNameRef.current },
             classification: data?.classification ?? null,
             confidence: data?.confidence ?? null,
         };
@@ -681,13 +1078,12 @@ export default function SquatAnalyzer() {
         const header = [
             "timestamp_ms",
             "classification",
-            // "left_knee_angle_deg",
-            // "right_knee_angle_deg",
             "confidence",
             ...kp3dNames.flatMap((n) => [
                 `${n}_3d_x`,
                 `${n}_3d_y`,
                 `${n}_3d_z`,
+                `${n}_pred_z`,
             ]),
         ].join(",");
 
@@ -695,13 +1091,12 @@ export default function SquatAnalyzer() {
             [
                 e.timestamp,
                 e.classification ?? "",
-                // e.left_knee_angle?.toFixed(2) ?? "",
-                // e.right_knee_angle?.toFixed(2) ?? "",
                 e.confidence?.toFixed(3) ?? "",
-                ...e.keypoints3d.flatMap(({ x, y, z }) => [
+                ...e.keypoints3d.flatMap(({ name, x, y, z }) => [
                     x.toFixed(4),
                     y.toFixed(4),
                     (z ?? 0).toFixed(4),
+                    (e.predictedZ?.[name] ?? "").toString(),
                 ]),
             ].join(","),
         );
@@ -711,12 +1106,38 @@ export default function SquatAnalyzer() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `squat_session_keypoints_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`;
+        a.download = `squat_session_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
+
+    // ── Viewer frames (memoised) ──────────────────────────────────────────────
+    // Builds the 3-D viewer data from session log: x/y from MediaPipe world coords,
+    // z from DL model prediction (falls back to MediaPipe world z if unavailable).
+
+    const viewerFrames = useMemo(
+        () =>
+            sessionLog.map((entry) => {
+                const kpMap = {};
+                entry.keypoints3d.forEach((kp) => {
+                    kpMap[kp.name] = kp;
+                });
+                const joints = {};
+                for (const { name } of SQUAT_JOINT_ORDER) {
+                    const kp = kpMap[name];
+                    if (!kp) continue;
+                    joints[name] = {
+                        x: kp.x,
+                        y: kp.y,
+                        z: entry.predictedZ?.[name] ?? kp.z ?? 0,
+                    };
+                }
+                return { classification: entry.classification, joints };
+            }),
+        [sessionLog],
+    );
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -779,6 +1200,10 @@ export default function SquatAnalyzer() {
                 ))}
             </div>
 
+            {/* Hidden capture canvas — receives video frames so the browser
+                applies rotation metadata before MediaPipe processes them */}
+            <canvas ref={captureCanvasRef} style={{ display: "none" }} />
+
             {/* Video + canvas overlay */}
             <div
                 className="ios-card relative rounded-2xl overflow-hidden bg-black"
@@ -802,6 +1227,13 @@ export default function SquatAnalyzer() {
                     className="absolute inset-0 pointer-events-none"
                     style={{ width: 640, height: 480 }}
                 />
+                {status === "loading" && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                        <p className="text-white text-sm font-semibold animate-pulse">
+                            Loading MediaPipe model…
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Controls — webcam */}
@@ -817,7 +1249,7 @@ export default function SquatAnalyzer() {
                         </button>
                     ) : (
                         <button
-                            onClick={stopAll}
+                            onClick={() => stopCapture("idle")}
                             className="ios-btn px-6 py-2 rounded-full text-sm font-semibold text-red-600"
                         >
                             Stop
@@ -829,24 +1261,15 @@ export default function SquatAnalyzer() {
             {/* Controls — video upload */}
             {inputMode === "upload" && (
                 <div className="flex flex-col items-center gap-2">
-                    <div className="flex gap-3 items-center">
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="video/*"
-                            className="hidden"
-                            onChange={handleVideoChange}
-                        />
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={status === "loading"}
-                            className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
-                        >
-                            {status === "loading"
-                                ? "Loading…"
-                                : "Choose Video…"}
-                        </button>
-                        {status === "running" && (
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        onChange={handleVideoChange}
+                    />
+                    <div className="flex gap-3 items-center flex-wrap justify-center">
+                        {status === "running" ? (
                             <>
                                 <button
                                     onClick={togglePlayPause}
@@ -855,14 +1278,34 @@ export default function SquatAnalyzer() {
                                     {videoPaused ? "▶ Play" : "⏸ Pause"}
                                 </button>
                                 <button
-                                    onClick={stopAll}
+                                    onClick={() => stopCapture("idle")}
                                     className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-red-600"
                                 >
                                     ✕ Stop
                                 </button>
                             </>
+                        ) : (
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={status === "loading"}
+                                className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
+                            >
+                                {status === "loading"
+                                    ? "Loading…"
+                                    : "Choose Video…"}
+                            </button>
                         )}
                     </div>
+                    {status === "finished" && (
+                        <p className="text-green-600 text-sm font-semibold">
+                            ✓ Analysis complete — review results below
+                        </p>
+                    )}
+                    {uploadedFileName && (
+                        <p className="text-slate-400 text-xs">
+                            {uploadedFileName}
+                        </p>
+                    )}
                     {uploadedFileName && (
                         <p className="text-slate-400 text-xs">
                             {uploadedFileName}
@@ -946,7 +1389,7 @@ export default function SquatAnalyzer() {
                         {sessionLog.length} frame
                         {sessionLog.length !== 1 ? "s" : ""} recorded
                     </p>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap justify-center">
                         {supabase && (
                             <button
                                 onClick={handleSave}
@@ -962,20 +1405,33 @@ export default function SquatAnalyzer() {
                         >
                             Download CSV
                         </button>
+                        <button
+                            onClick={clearSession}
+                            disabled={status === "running"}
+                            className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-slate-400 disabled:opacity-40"
+                        >
+                            New Session
+                        </button>
                     </div>
                 </div>
             )}
 
-            {/* Debug panel */}
+            {/* Debug panel — 33 keypoints with x/y (MediaPipe) + predicted z (DL) */}
             {(status === "running" || allKeypoints.length > 0) && (
                 <div className="ios-card rounded-2xl p-4 w-full">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                        All 33 Keypoints
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                        Keypoints
                         {status === "running" && (
                             <span className="ml-2 normal-case font-normal text-slate-300">
                                 — live
                             </span>
                         )}
+                    </p>
+                    <p className="text-xs text-slate-300 mb-3">
+                        x · y from MediaPipe &nbsp;·&nbsp; z from DL model
+                        <span className="ml-2 text-sky-400 font-semibold">
+                            (squat joints highlighted)
+                        </span>
                     </p>
                     {allKeypoints.length === 0 ? (
                         <p className="text-xs text-slate-400 italic">
@@ -983,38 +1439,55 @@ export default function SquatAnalyzer() {
                         </p>
                     ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-0.5 gap-x-4 text-xs font-mono max-h-56 overflow-y-auto pr-1">
-                            {allKeypoints.map((kp) => (
-                                <div
-                                    key={kp.index}
-                                    className={`flex items-baseline gap-1.5 py-0.5 ${
-                                        SQUAT_INDICES.has(kp.index)
-                                            ? "text-sky-600 font-bold"
-                                            : "text-slate-400"
-                                    }`}
-                                >
-                                    <span className="w-5 text-right text-slate-300">
-                                        {kp.index}
-                                    </span>
-                                    <span className="w-28 truncate">
-                                        {kp.name}
-                                    </span>
-                                    <span className="tabular-nums">
-                                        {kp.x.toFixed(3)}
-                                    </span>
-                                    <span className="tabular-nums">
-                                        {kp.y.toFixed(3)}
-                                    </span>
-                                    <span className="text-slate-300 tabular-nums">
-                                        {kp.predictedZ == null
-                                            ? ""
-                                            : kp.predictedZ.toFixed(3)}
-                                    </span>
-                                </div>
-                            ))}
+                            {allKeypoints.map((kp) => {
+                                const isSquat = SQUAT_INDICES.has(kp.index);
+                                return (
+                                    <div
+                                        key={kp.index}
+                                        className={`flex items-baseline gap-1.5 py-0.5 ${
+                                            isSquat
+                                                ? "text-sky-600 font-bold"
+                                                : "text-slate-400"
+                                        }`}
+                                    >
+                                        <span className="w-5 text-right text-slate-300">
+                                            {kp.index}
+                                        </span>
+                                        <span className="w-28 truncate">
+                                            {kp.name}
+                                        </span>
+                                        <span className="tabular-nums">
+                                            {kp.x.toFixed(3)}
+                                        </span>
+                                        <span className="tabular-nums">
+                                            {kp.y.toFixed(3)}
+                                        </span>
+                                        {isSquat && (
+                                            <span
+                                                className={`tabular-nums ${
+                                                    kp.predictedZ == null
+                                                        ? "text-slate-500 italic"
+                                                        : "text-emerald-500"
+                                                }`}
+                                            >
+                                                {kp.predictedZ == null
+                                                    ? "—"
+                                                    : kp.predictedZ.toFixed(3)}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
             )}
+
+            {/* 3-D interactive skeleton viewer */}
+            <Skeleton3DViewer
+                frames={viewerFrames}
+                liveFrame={status === "running" ? liveFrame3d : null}
+            />
         </div>
     );
 }
