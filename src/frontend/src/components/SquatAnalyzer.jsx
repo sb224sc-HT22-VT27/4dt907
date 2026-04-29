@@ -283,23 +283,22 @@ function Skeleton3DViewer({ frames }) {
     const [frameIdx, setFrameIdx] = useState(0);
     // true = always show the newest frame (live follow); false = user has control
     const [liveMode, setLiveMode] = useState(true);
+    const [prevFramesLength, setPrevFramesLength] = useState(frames.length);
     const rotation = useRef({ x: 15, y: 25 });
     const dragRef = useRef(null);
     const zoomRef = useRef(260);
     const playTimerRef = useRef(null);
     const frameIdxRef = useRef(0);
 
-    // While in live mode (not scrubbing / replaying), follow the latest frame.
-    useEffect(() => {
-        if (liveMode && !playing && frames.length > 0) {
+    // Derived state updates during render (avoids setState-in-effect lint error).
+    if (prevFramesLength !== frames.length) {
+        setPrevFramesLength(frames.length);
+        if (frames.length === 0) {
+            setLiveMode(true);
+        } else if (liveMode && !playing) {
             setFrameIdx(frames.length - 1);
         }
-    }, [frames.length, liveMode, playing]);
-
-    // Reset to live mode when frames are cleared (new session).
-    useEffect(() => {
-        if (frames.length === 0) setLiveMode(true);
-    }, [frames.length]);
+    }
 
     const displayedFrameIdx = useMemo(() => {
         if (frames.length === 0) return 0;
