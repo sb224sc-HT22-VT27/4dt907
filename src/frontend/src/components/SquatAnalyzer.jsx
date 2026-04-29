@@ -64,23 +64,43 @@ const ALL_LANDMARK_NAMES = [
     "right_foot_index", // 32
 ];
 
-// Canonical joint order used by the GRU z-predictor model (matches Kinect CSV
-// column order after normalisation). Each entry is { name, idx }.
+// Canonical joint order used by the GRU z-predictor model.
+// MUST match the alphabetically-sorted column order produced by the training
+// notebook: sorted([c for c in cols if c.endswith('_x') or c.endswith('_y')])
+// and sorted([c for c in cols if c.endswith('_z')]).
 // Features per frame: [j0_x, j0_y, j1_x, j1_y, … ] → 13 × 2 = 26 floats.
-const SQUAT_JOINT_ORDER = [
-    { name: "nose", idx: 0 },
-    { name: "left_shoulder", idx: 11 },
-    { name: "left_elbow", idx: 13 },
+// z output: [j0_z, j1_z, … ] → 13 floats (same alphabetical order).
+const MODEL_JOINT_ORDER = [
+    { name: "left_ankle",     idx: 27 },
+    { name: "left_elbow",     idx: 13 },
+    { name: "left_hip",       idx: 23 },
+    { name: "left_knee",      idx: 25 },
+    { name: "left_shoulder",  idx: 11 },
+    { name: "left_wrist",     idx: 15 },
+    { name: "nose",           idx: 0  },
+    { name: "right_ankle",    idx: 28 },
+    { name: "right_elbow",    idx: 14 },
+    { name: "right_hip",      idx: 24 },
+    { name: "right_knee",     idx: 26 },
     { name: "right_shoulder", idx: 12 },
-    { name: "right_elbow", idx: 14 },
-    { name: "left_wrist", idx: 15 },
-    { name: "right_wrist", idx: 16 },
-    { name: "left_hip", idx: 23 },
-    { name: "right_hip", idx: 24 },
-    { name: "left_knee", idx: 25 },
-    { name: "right_knee", idx: 26 },
-    { name: "left_ankle", idx: 27 },
-    { name: "right_ankle", idx: 28 },
+    { name: "right_wrist",    idx: 16 },
+];
+
+// Display/viewer joint order (used only for 3-D skeleton rendering).
+const SQUAT_JOINT_ORDER = [
+    { name: "nose",           idx: 0  },
+    { name: "left_shoulder",  idx: 11 },
+    { name: "left_elbow",     idx: 13 },
+    { name: "right_shoulder", idx: 12 },
+    { name: "right_elbow",    idx: 14 },
+    { name: "left_wrist",     idx: 15 },
+    { name: "right_wrist",    idx: 16 },
+    { name: "left_hip",       idx: 23 },
+    { name: "right_hip",      idx: 24 },
+    { name: "left_knee",      idx: 25 },
+    { name: "right_knee",     idx: 26 },
+    { name: "left_ankle",     idx: 27 },
+    { name: "right_ankle",    idx: 28 },
 ];
 const SQUAT_JOINT_NAMES_SET = new Set(SQUAT_JOINT_ORDER.map((j) => j.name));
 
@@ -157,10 +177,11 @@ const SEQ_LEN = 30;
 
 /**
  * Build a 26-float feature vector for one frame from MediaPipe world landmarks.
- * Columns: [j0_x, j0_y, j1_x, j1_y, …] in SQUAT_JOINT_ORDER.
+ * Columns: [j0_x, j0_y, j1_x, j1_y, …] in MODEL_JOINT_ORDER (alphabetical),
+ * matching the sorted() column order used during training.
  */
 function buildFrameFeatures(worldLandmarks) {
-    return SQUAT_JOINT_ORDER.flatMap(({ idx }) => {
+    return MODEL_JOINT_ORDER.flatMap(({ idx }) => {
         const lm = worldLandmarks?.[idx];
         return lm ? [lm.x, lm.y] : [0, 0];
     });
@@ -277,7 +298,7 @@ function project3D(x, y, z, rxDeg, ryDeg, scale, cx, cy) {
     return { px: cx + x2 * scale, py: cy + y2 * scale, depth: z2 };
 }
 
-function Skeleton3DViewer({ frames }) {
+function Skeleton3DViewer({ frames, liveFrame }) {
     const canvasRef = useRef(null);
     const [playing, setPlaying] = useState(false);
     const [frameIdx, setFrameIdx] = useState(0);
@@ -328,7 +349,7 @@ function Skeleton3DViewer({ frames }) {
         return () => clearInterval(playTimerRef.current);
     }, [playing, frames.length]);
 
-    function drawFrame(frameData) {
+    function drawFrame(frameData, isLive = false) {
         const canvas = canvasRef.current;
         if (!canvas || !frameData) return;
         const ctx = canvas.getContext("2d");
@@ -397,20 +418,20 @@ function Skeleton3DViewer({ frames }) {
             ctx.fillText(cls, cx, 18);
         }
 
-        // Frame counter
+        // Frame counter / live indicator
         ctx.font = "11px system-ui, sans-serif";
         ctx.fillStyle = "rgba(148,163,184,0.8)";
         ctx.textAlign = "right";
         ctx.fillText(
-            `${displayedFrameIdx + 1} / ${frames.length}`,
+            isLive ? "● LIVE" : `${displayedFrameIdx + 1} / ${frames.length}`,
             W - 6,
             H - 6,
         );
     }
 
-    // Draw whenever frameIdx, rotation or zoom changes
+    // Draw whenever frameIdx, rotation, zoom, or liveFrame changes
     useEffect(() => {
-        drawFrame(frames[displayedFrameIdx]);
+        drawFrame(liveFrame ?? frames[displayedFrameIdx], !!liveFrame);
     }); // run on every render — canvas state is imperative
 
     // ── Drag to rotate ───────────────────────────────────────────────────────
@@ -427,7 +448,7 @@ function Skeleton3DViewer({ frames }) {
         rotation.current.y += dx * 0.4;
         rotation.current.x += dy * 0.4;
         dragRef.current = { x: e.clientX, y: e.clientY };
-        drawFrame(frames[frameIdxRef.current]);
+        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
     }
 
     function onPointerUp() {
@@ -440,10 +461,10 @@ function Skeleton3DViewer({ frames }) {
             80,
             Math.min(600, zoomRef.current - e.deltaY * 0.3),
         );
-        drawFrame(frames[frameIdxRef.current]);
+        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
     }
 
-    if (frames.length === 0) return null;
+    if (frames.length === 0 && !liveFrame) return null;
 
     return (
         <div className="ios-card rounded-2xl p-4 w-full flex flex-col items-center gap-3">
@@ -537,6 +558,7 @@ export default function SquatAnalyzer() {
     const [sessionLog, setSessionLog] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [predictedZByName, setPredictedZByName] = useState({});
+    const [liveFrame3d, setLiveFrame3d] = useState(null);
 
     const sessionNameRef = useRef("");
     const predictedZByNameRef = useRef({});
@@ -598,6 +620,7 @@ export default function SquatAnalyzer() {
         setVideoPaused(false);
         setPredictedZByName({});
         predictedZByNameRef.current = {};
+        setLiveFrame3d(null);
         setStatus(nextStatus);
     }, []);
 
@@ -809,17 +832,26 @@ export default function SquatAnalyzer() {
 
     // ── Detection loop ───────────────────────────────────────────────────────
     //
-    // Detection: ~20 Hz (every 3 rAF frames).
-    // Ring buffer update: every detection frame (~20 Hz).
-    // Backend call + z-prediction: ~2 Hz (every 15 detection frames).
+    // Uploaded video: MediaPipe runs once per video frame (currentTime gating).
+    // Webcam: MediaPipe throttled to ~20 Hz (every 3 rAF frames).
+    // Backend + z-prediction: every 15 detections (~1–2 Hz).
+    // Overlay canvas: always redrawn at full rAF rate from latest detection.
 
     useEffect(() => {
         if (status !== "running") return;
 
+        // frameCounter: every rAF tick.
+        // detectionCounter: every time MediaPipe actually runs.
+        // lastDetectedVideoTime: used to gate detection to one-per-video-frame for uploads.
         let frameCounter = 0;
-        const DETECT_EVERY = 3; // ~20 Hz detection
-        const DEBUG_EVERY = 6; // ~10 Hz debug panel update
-        const BACKEND_EVERY = 15; // ~2 Hz backend + z-prediction
+        let detectionCounter = 0;
+        let lastDetectedVideoTime = -1;
+
+        // Webcam: throttle MediaPipe to ~20 Hz (rAF runs at ~60 Hz).
+        // Video upload: detect once per video frame via currentTime gating instead.
+        const DETECT_EVERY = 3;
+        // Backend + z-prediction: every 15 detections (~1–2 Hz depending on mode).
+        const BACKEND_EVERY = 15;
 
         function detect(timestamp) {
             const video = videoRef.current;
@@ -848,12 +880,24 @@ export default function SquatAnalyzer() {
             const vw = video.videoWidth;
             const vh = video.videoHeight;
 
-            // ── Run MediaPipe detection ──
-            // We draw the video into an intermediate canvas first so the browser
-            // applies the video's rotation metadata (portrait iPhones store frames
-            // as landscape). MediaPipe then receives correctly-oriented pixels and
-            // returns landmarks in display space — no manual rotation needed.
-            if (frameCounter % DETECT_EVERY === 0) {
+            // ── Gate detection ──
+            // Uploaded video: detect exactly once per video frame by watching
+            // currentTime. This keeps the overlay perfectly in sync without
+            // running MediaPipe on duplicate frames (which wastes CPU and causes
+            // playback stutters).
+            // Webcam: fall back to the rAF-based throttle.
+            const isVideoUpload = inputMode === "upload";
+            const videoTime = video.currentTime;
+            const shouldDetect = isVideoUpload
+                ? videoTime !== lastDetectedVideoTime
+                : frameCounter % DETECT_EVERY === 0;
+
+            if (shouldDetect) {
+                if (isVideoUpload) lastDetectedVideoTime = videoTime;
+                detectionCounter++;
+
+                // Draw the current frame into an intermediate canvas so the browser
+                // applies any rotation metadata before MediaPipe sees the pixels.
                 try {
                     const cap = captureCanvasRef.current;
                     if (cap && vw > 0 && vh > 0) {
@@ -867,20 +911,87 @@ export default function SquatAnalyzer() {
                         lastDetectionRef.current = landmarker.detectForVideo(video, timestamp);
                     }
                 } catch {
-                    // Transient error — skip detection, keep loop alive.
+                    // Transient error — skip this frame, keep loop alive.
                 }
 
-                // Update ring buffer from world landmarks at detection rate (~20 Hz)
+                // Update ring buffer and live 3-D skeleton on every detection
                 const det = lastDetectionRef.current;
                 if (det?.worldLandmarks?.length > 0) {
                     const frame = buildFrameFeatures(det.worldLandmarks[0]);
                     const buf = frameBufferRef.current;
                     buf.push(frame);
                     if (buf.length > SEQ_LEN) buf.shift();
+
+                    // Live 3-D frame: update on every detection tick
+                    const joints = {};
+                    for (const { name, idx } of SQUAT_JOINT_ORDER) {
+                        const lm = det.worldLandmarks[0][idx];
+                        if (!lm) continue;
+                        joints[name] = {
+                            x: lm.x,
+                            y: lm.y,
+                            z: predictedZByNameRef.current[name] ?? lm.z ?? 0,
+                        };
+                    }
+                    setLiveFrame3d({ classification: null, joints });
+                }
+
+                // ── Debug panel (every 3 detections ≈ 7–10 Hz) ──
+                if (detectionCounter % 3 === 0) {
+                    const det2 = lastDetectionRef.current;
+                    if (det2?.landmarks?.length > 0) {
+                        setAllKeypoints(mapAllKeypoints(det2.landmarks[0]));
+                    } else {
+                        setAllKeypoints([]);
+                    }
+                }
+
+                // ── Backend call + z-prediction (every BACKEND_EVERY detections) ──
+                if (detectionCounter % BACKEND_EVERY === 0) {
+                    const det2 = lastDetectionRef.current;
+                    if (det2?.landmarks?.length > 0) {
+                        const kp3d = filterSquatKeypoints3d(
+                            det2.worldLandmarks?.[0] ?? [],
+                        );
+                        sendFrame(kp3d);
+                        setAllKeypoints(mapAllKeypoints(det2.landmarks[0]));
+
+                        // Sequence-based z prediction
+                        const worldLms = det2.worldLandmarks?.[0];
+                        if (worldLms) {
+                            const buf = frameBufferRef.current;
+                            if (buf.length > 0) {
+                                const sequence = padOrSlice(buf, SEQ_LEN);
+                                fetch(apiUrl("/api/v1/z-predictor/predict-sequence"), {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ sequence }),
+                                })
+                                    .then((r) => (r.ok ? r.json() : null))
+                                    .then((data) => {
+                                        if (!data) return;
+                                        const preds = data?.predictions ?? [];
+                                        // Use MODEL_JOINT_ORDER (alphabetical) — matches
+                                        // the sorted() column order from training.
+                                        const map = Object.fromEntries(
+                                            MODEL_JOINT_ORDER.map(({ name }, i) => [
+                                                name,
+                                                Number(preds[i] ?? 0),
+                                            ]),
+                                        );
+                                        predictedZByNameRef.current = map;
+                                        setPredictedZByName(map);
+                                    })
+                                    .catch(() => {});
+                            }
+                        }
+                    }
                 }
             }
 
-            // ── Redraw canvas at full rAF rate ──
+            // ── Redraw skeleton overlay at full rAF rate ──
+            // Always uses the freshest detection result, so the overlay never
+            // drifts behind the video even if detection ran on a previous tick.
             const detection = lastDetectionRef.current;
             const DISPLAY_W = 640;
             const DISPLAY_H = 480;
@@ -888,8 +999,6 @@ export default function SquatAnalyzer() {
                 canvas.width = DISPLAY_W;
                 canvas.height = DISPLAY_H;
             }
-
-            // Scale skeleton overlay to match the video element's objectFit:contain layout
             const scale = vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
             const drawW = vw * scale;
             const drawH = vh * scale;
@@ -897,56 +1006,6 @@ export default function SquatAnalyzer() {
             const offsetY = (DISPLAY_H - drawH) / 2;
             canvas.getContext("2d").clearRect(0, 0, DISPLAY_W, DISPLAY_H);
             if (detection) drawSkeleton(canvas, drawW, drawH, detection, { x: offsetX, y: offsetY });
-
-            // ── Debug panel (~10 Hz) ──
-            if (frameCounter % DEBUG_EVERY === 0) {
-                if (detection?.landmarks?.length > 0) {
-                    setAllKeypoints(mapAllKeypoints(detection.landmarks[0]));
-                } else {
-                    setAllKeypoints([]);
-                }
-            }
-
-            // ── Backend call + z-prediction (~2 Hz) ──
-            if (
-                frameCounter % BACKEND_EVERY === 0 &&
-                detection?.landmarks?.length > 0
-            ) {
-                const kp3d = filterSquatKeypoints3d(
-                    detection.worldLandmarks?.[0] ?? [],
-                );
-                sendFrame(kp3d);
-
-                setAllKeypoints(mapAllKeypoints(detection.landmarks[0]));
-
-                // Sequence-based z prediction (does NOT call per-keypoint endpoint)
-                const worldLms = detection.worldLandmarks?.[0];
-                if (worldLms) {
-                    const buf = frameBufferRef.current;
-                    if (buf.length > 0) {
-                        const sequence = padOrSlice(buf, SEQ_LEN);
-                        fetch(apiUrl("/api/v1/z-predictor/predict-sequence"), {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ sequence }),
-                        })
-                            .then((r) => (r.ok ? r.json() : null))
-                            .then((data) => {
-                                if (!data) return;
-                                const preds = data?.predictions ?? [];
-                                const map = Object.fromEntries(
-                                    SQUAT_JOINT_ORDER.map(({ name }, i) => [
-                                        name,
-                                        Number(preds[i] ?? 0),
-                                    ]),
-                                );
-                                predictedZByNameRef.current = map;
-                                setPredictedZByName(map);
-                            })
-                            .catch(() => {});
-                    }
-                }
-            }
 
             rafRef.current = requestAnimationFrame(detect);
         }
@@ -1425,7 +1484,10 @@ export default function SquatAnalyzer() {
             )}
 
             {/* 3-D interactive skeleton viewer */}
-            <Skeleton3DViewer frames={viewerFrames} />
+            <Skeleton3DViewer
+                frames={viewerFrames}
+                liveFrame={status === "running" ? liveFrame3d : null}
+            />
         </div>
     );
 }
