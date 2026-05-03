@@ -361,14 +361,54 @@ function Skeleton3DViewer({ frames, liveFrame }) {
         const ry = rotation.current.y;
         const scale = zoomRef.current;
         const cx = W / 2;
-        const cy = H / 2 + 20;
+        const cy = H * 0.82;
+
+        // Lock rotation pivot at ankle midpoint so the model spins around the feet
+        const la = frameData.joints?.["left_ankle"];
+        const ra = frameData.joints?.["right_ankle"];
+        const anchor = la && ra
+            ? { x: (la.x + ra.x) / 2, y: (la.y + ra.y) / 2, z: (la.z + ra.z) / 2 }
+            : la ?? ra ?? { x: 0, y: 0, z: 0 };
 
         // Project all joints
         const pos = {};
         for (const { name } of SQUAT_JOINT_ORDER) {
             const j = frameData.joints?.[name];
             if (!j) continue;
-            pos[name] = project3D(j.x, j.y, j.z, rx, ry, scale, cx, cy);
+            pos[name] = project3D(j.x - anchor.x, j.y - anchor.y, j.z - anchor.z, rx, ry, scale, cx, cy);
+        }
+
+        // ── Ground plane (projected circle at y=0 in foot-anchored space) ────
+        const GR = 0.5; // radius in world units
+        const SEGS = 72;
+        const rim = [];
+        for (let i = 0; i <= SEGS; i++) {
+            const t = (i / SEGS) * Math.PI * 2;
+            rim.push(project3D(GR * Math.cos(t), 0, GR * Math.sin(t), rx, ry, scale, cx, cy));
+        }
+        // Filled disc
+        ctx.beginPath();
+        ctx.moveTo(rim[0].px, rim[0].py);
+        for (let i = 1; i <= SEGS; i++) ctx.lineTo(rim[i].px, rim[i].py);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(30,41,59,0.55)";
+        ctx.fill();
+        // Outer ring
+        ctx.strokeStyle = "rgba(148,163,184,0.3)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // Grid lines (4 across each axis)
+        ctx.lineWidth = 0.5;
+        ctx.strokeStyle = "rgba(148,163,184,0.12)";
+        for (let i = -3; i <= 3; i++) {
+            const s = (i / 3) * GR;
+            const clamp = Math.sqrt(Math.max(0, GR * GR - s * s));
+            const xa = project3D(-clamp, 0, s, rx, ry, scale, cx, cy);
+            const xb = project3D( clamp, 0, s, rx, ry, scale, cx, cy);
+            ctx.beginPath(); ctx.moveTo(xa.px, xa.py); ctx.lineTo(xb.px, xb.py); ctx.stroke();
+            const za = project3D(s, 0, -clamp, rx, ry, scale, cx, cy);
+            const zb = project3D(s, 0,  clamp, rx, ry, scale, cx, cy);
+            ctx.beginPath(); ctx.moveTo(za.px, za.py); ctx.lineTo(zb.px, zb.py); ctx.stroke();
         }
 
         // Draw bones
@@ -471,7 +511,7 @@ function Skeleton3DViewer({ frames, liveFrame }) {
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider self-start">
                 3-D Skeleton Replay
                 <span className="ml-2 normal-case font-normal text-slate-300">
-                    — drag to rotate · scroll to zoom
+                    — drag to rotate · scroll or ±  to zoom
                 </span>
             </p>
 
@@ -520,6 +560,27 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                     }}
                     className="flex-1 accent-sky-400"
                 />
+                {/* Zoom buttons */}
+                <button
+                    onClick={() => {
+                        zoomRef.current = Math.min(600, zoomRef.current + 30);
+                        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+                    }}
+                    className="ios-btn w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-slate-600"
+                    title="Zoom in"
+                >
+                    +
+                </button>
+                <button
+                    onClick={() => {
+                        zoomRef.current = Math.max(80, zoomRef.current - 30);
+                        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+                    }}
+                    className="ios-btn w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-slate-600"
+                    title="Zoom out"
+                >
+                    −
+                </button>
             </div>
 
             <p className="text-xs text-slate-400 self-start">
@@ -544,6 +605,8 @@ export default function SquatAnalyzer() {
     const sessionLogRef = useRef([]);
     // Ring buffer: array of 26-float feature vectors, oldest → newest
     const frameBufferRef = useRef([]);
+    // All kp3d frames collected during a webcam recording session
+    const recordedKpFramesRef = useRef([]);
     // Offscreen canvas used to feed orientation-corrected frames to MediaPipe
     const captureCanvasRef = useRef(null);
 
@@ -559,9 +622,18 @@ export default function SquatAnalyzer() {
     const [isSaving, setIsSaving] = useState(false);
     const [predictedZByName, setPredictedZByName] = useState({});
     const [liveFrame3d, setLiveFrame3d] = useState(null);
+    const [modelMetrics, setModelMetrics] = useState(null);
 
     const sessionNameRef = useRef("");
     const predictedZByNameRef = useRef({});
+
+    // ── Fetch z-predictor model metrics from DagsHub on mount ───────────────
+    useEffect(() => {
+        fetch(apiUrl("/api/v1/model-info/z-metrics"))
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => d && setModelMetrics(d))
+            .catch(() => {});
+    }, []);
 
     // ── Preload VIDEO landmarker on mount ────────────────────────────────────
     useEffect(() => {
@@ -635,6 +707,7 @@ export default function SquatAnalyzer() {
     // Full reset: stop capture + discard data (used when switching modes).
     const stopAll = useCallback(() => {
         stopCapture("idle");
+        recordedKpFramesRef.current = [];
         sessionLogRef.current = [];
         setSessionLog([]);
         setUploadedFileName("");
@@ -671,20 +744,67 @@ export default function SquatAnalyzer() {
         [stopAll],
     );
 
+    // ── Batch analyze (webcam stop or video end) ─────────────────────────────
+
+    const stopAndAnalyze = useCallback(async () => {
+        const frames = recordedKpFramesRef.current;
+        stopCapture("analyzing");
+        if (frames.length === 0) {
+            setStatus("idle");
+            return;
+        }
+        try {
+            const res = await fetch(apiUrl("/api/v1/squat/classify-batch"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ frames }),
+            });
+            if (!res.ok) throw new Error("Batch classify failed");
+            const data = await res.json();
+            const entries = frames.map((kp3d, i) => ({
+                timestamp: Date.now() + i,
+                keypoints3d: kp3d,
+                predictedZ: {},
+                classification: data.results[i]?.classification ?? null,
+                confidence: data.results[i]?.confidence ?? null,
+            }));
+            sessionLogRef.current = entries;
+            setSessionLog(entries);
+            const valid = data.results.filter((r) => r.classification !== "Invalid");
+            if (valid.length > 0) {
+                const last = valid[valid.length - 1];
+                setResult({
+                    classification: last.classification,
+                    left_knee_angle: last.left_knee_angle,
+                    right_knee_angle: last.right_knee_angle,
+                    confidence: last.confidence,
+                });
+            }
+            setStatus("finished");
+        } catch {
+            setErrorMsg("Failed to analyze recording. Try again.");
+            setStatus("error");
+        }
+    }, [stopCapture]);
+
     // ── Video-ended auto-finish ──────────────────────────────────────────────
 
     useEffect(() => {
         if (status !== "running" || inputMode !== "upload") return;
         const video = videoRef.current;
         if (!video) return;
-        const handleEnded = () => stopCapture("finished");
+        const handleEnded = () => stopAndAnalyze();
         video.addEventListener("ended", handleEnded);
         return () => video.removeEventListener("ended", handleEnded);
-    }, [status, inputMode, stopCapture]);
+    }, [status, inputMode, stopAndAnalyze]);
 
     // ── Webcam ───────────────────────────────────────────────────────────────
 
     const startCamera = useCallback(async () => {
+        recordedKpFramesRef.current = [];
+        sessionLogRef.current = [];
+        setSessionLog([]);
+        setResult(null);
         setStatus("loading");
         setErrorMsg("");
         try {
@@ -934,58 +1054,11 @@ export default function SquatAnalyzer() {
                         };
                     }
                     setLiveFrame3d({ classification: null, joints });
-                }
 
-                // ── Debug panel (every 3 detections ≈ 7–10 Hz) ──
-                if (detectionCounter % 3 === 0) {
-                    const det2 = lastDetectionRef.current;
-                    if (det2?.landmarks?.length > 0) {
-                        setAllKeypoints(mapAllKeypoints(det2.landmarks[0]));
-                    } else {
-                        setAllKeypoints([]);
-                    }
-                }
-
-                // ── Backend call + z-prediction (every BACKEND_EVERY detections) ──
-                if (detectionCounter % BACKEND_EVERY === 0) {
-                    const det2 = lastDetectionRef.current;
-                    if (det2?.landmarks?.length > 0) {
-                        const kp3d = filterSquatKeypoints3d(
-                            det2.worldLandmarks?.[0] ?? [],
-                        );
-                        sendFrame(kp3d);
-                        setAllKeypoints(mapAllKeypoints(det2.landmarks[0]));
-
-                        // Sequence-based z prediction
-                        const worldLms = det2.worldLandmarks?.[0];
-                        if (worldLms) {
-                            const buf = frameBufferRef.current;
-                            if (buf.length > 0) {
-                                const sequence = padOrSlice(buf, SEQ_LEN);
-                                fetch(apiUrl("/api/v1/z-predictor/predict-sequence"), {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ sequence }),
-                                })
-                                    .then((r) => (r.ok ? r.json() : null))
-                                    .then((data) => {
-                                        if (!data) return;
-                                        const preds = data?.predictions ?? [];
-                                        // Use MODEL_JOINT_ORDER (alphabetical) — matches
-                                        // the sorted() column order from training.
-                                        const map = Object.fromEntries(
-                                            MODEL_JOINT_ORDER.map(({ name }, i) => [
-                                                name,
-                                                Number(preds[i] ?? 0),
-                                            ]),
-                                        );
-                                        predictedZByNameRef.current = map;
-                                        setPredictedZByName(map);
-                                    })
-                                    .catch(() => {});
-                            }
-                        }
-                    }
+                    // Collect every detected frame for batch send on stop/end
+                    recordedKpFramesRef.current.push(
+                        filterSquatKeypoints3d(det.worldLandmarks[0]),
+                    );
                 }
             }
 
@@ -1182,7 +1255,7 @@ export default function SquatAnalyzer() {
             {/* Mode toggle */}
             <div className="ios-pill flex rounded-full p-0.5 gap-px">
                 {[
-                    { id: "webcam", label: "Live Camera" },
+                    { id: "webcam", label: "Record Webcam" },
                     { id: "upload", label: "Upload Video" },
                     { id: "image", label: "Upload Image" },
                 ].map(({ id, label }) => (
@@ -1227,10 +1300,12 @@ export default function SquatAnalyzer() {
                     className="absolute inset-0 pointer-events-none"
                     style={{ width: 640, height: 480 }}
                 />
-                {status === "loading" && (
+                {(status === "loading" || status === "analyzing") && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                         <p className="text-white text-sm font-semibold animate-pulse">
-                            Loading MediaPipe model…
+                            {status === "analyzing"
+                                ? `Analyzing ${recordedKpFramesRef.current.length} frames…`
+                                : "Loading MediaPipe model…"}
                         </p>
                     </div>
                 )}
@@ -1238,23 +1313,29 @@ export default function SquatAnalyzer() {
 
             {/* Controls — webcam */}
             {inputMode === "webcam" && (
-                <div className="flex gap-3">
-                    {status !== "running" ? (
-                        <button
-                            onClick={startCamera}
-                            disabled={status === "loading"}
-                            className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
-                        >
-                            {status === "loading" ? "Loading…" : "Start Camera"}
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => stopCapture("idle")}
-                            className="ios-btn px-6 py-2 rounded-full text-sm font-semibold text-red-600"
-                        >
-                            Stop
-                        </button>
-                    )}
+                <div className="flex flex-col items-center gap-2">
+                    <div className="flex gap-3">
+                        {status !== "running" ? (
+                            <button
+                                onClick={startCamera}
+                                disabled={status === "loading" || status === "analyzing"}
+                                className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
+                            >
+                                {status === "loading"
+                                    ? "Loading…"
+                                    : status === "analyzing"
+                                      ? "Analyzing…"
+                                      : "Start Recording"}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={stopAndAnalyze}
+                                className="ios-btn px-6 py-2 rounded-full text-sm font-semibold text-red-600"
+                            >
+                                Stop & Analyze
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -1278,19 +1359,19 @@ export default function SquatAnalyzer() {
                                     {videoPaused ? "▶ Play" : "⏸ Pause"}
                                 </button>
                                 <button
-                                    onClick={() => stopCapture("idle")}
+                                    onClick={stopAndAnalyze}
                                     className="ios-btn px-5 py-2 rounded-full text-sm font-semibold text-red-600"
                                 >
-                                    ✕ Stop
+                                    ✕ Stop & Analyze
                                 </button>
                             </>
                         ) : (
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                disabled={status === "loading"}
+                                disabled={status === "loading" || status === "analyzing"}
                                 className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
                             >
-                                {status === "loading"
+                                {status === "loading" || status === "analyzing"
                                     ? "Loading…"
                                     : "Choose Video…"}
                             </button>
@@ -1299,11 +1380,6 @@ export default function SquatAnalyzer() {
                     {status === "finished" && (
                         <p className="text-green-600 text-sm font-semibold">
                             ✓ Analysis complete — review results below
-                        </p>
-                    )}
-                    {uploadedFileName && (
-                        <p className="text-slate-400 text-xs">
-                            {uploadedFileName}
                         </p>
                     )}
                     {uploadedFileName && (
@@ -1343,6 +1419,24 @@ export default function SquatAnalyzer() {
             {status === "error" && (
                 <p className="text-red-500 text-sm">
                     {errorMsg || "An error occurred."}
+                </p>
+            )}
+
+            {/* Model quality indicator — shown for all modes */}
+            {modelMetrics?.mean_f1 != null && (
+                <p className="text-xs text-slate-400">
+                    Model F1:{" "}
+                    <span className="font-semibold text-slate-600">
+                        {modelMetrics.mean_f1.toFixed(3)}
+                    </span>
+                    {modelMetrics.mae != null && (
+                        <>
+                            {" · "}MAE:{" "}
+                            <span className="font-semibold text-slate-600">
+                                {modelMetrics.mae.toFixed(4)}
+                            </span>
+                        </>
+                    )}
                 </p>
             )}
 

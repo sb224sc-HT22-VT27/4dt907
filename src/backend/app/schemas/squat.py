@@ -39,3 +39,11 @@ class SquatResponse(BaseModel):
     left_knee_angle: float
     right_knee_angle: float
     confidence: Optional[float] = None
+
+
+class SquatBatchRequest(BaseModel):
+    frames: List[List[Keypoint3D]]
+
+
+class SquatBatchResponse(BaseModel):
+    results: List[SquatResponse]

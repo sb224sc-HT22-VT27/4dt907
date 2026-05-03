@@ -11,7 +11,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from app.schemas.squat import SquatRequest, SquatResponse
+from app.schemas.squat import SquatBatchRequest, SquatBatchResponse, SquatRequest, SquatResponse
 from app.services.squat_service import classify_squat
 
 logger = logging.getLogger(__name__)
@@ -45,3 +45,31 @@ def squat_classify(req: SquatRequest):
     except Exception:
         logger.exception("Squat classification failed")
         raise HTTPException(status_code=503, detail="Service unavailable")
+
+
+@router.post("/squat/classify-batch", response_model=SquatBatchResponse)
+def squat_classify_batch(req: SquatBatchRequest):
+    """Classify squat depth for every frame in a recorded batch."""
+    results = []
+    for frame_kps in req.frames:
+        try:
+            kp_3d = [kp.model_dump() for kp in frame_kps]
+            classification, left_angle, right_angle, confidence = classify_squat(kp_3d)
+            results.append(
+                SquatResponse(
+                    classification=classification,
+                    left_knee_angle=left_angle,
+                    right_knee_angle=right_angle,
+                    confidence=confidence,
+                )
+            )
+        except Exception:
+            results.append(
+                SquatResponse(
+                    classification="Invalid",
+                    left_knee_angle=0.0,
+                    right_knee_angle=0.0,
+                    confidence=None,
+                )
+            )
+    return SquatBatchResponse(results=results)
