@@ -187,15 +187,6 @@ function buildFrameFeatures(worldLandmarks) {
     });
 }
 
-/**
- * Pad a frame buffer to exactly targetLen by repeating the first frame,
- * or slice the last targetLen frames if the buffer is too long.
- */
-function padOrSlice(buffer, targetLen) {
-    if (buffer.length >= targetLen) return buffer.slice(-targetLen);
-    const pad = buffer[0] ?? Array(SQUAT_JOINT_ORDER.length * 2).fill(0);
-    return [...Array(targetLen - buffer.length).fill(pad), ...buffer];
-}
 
 /**
  * Create a new PoseLandmarker for continuous video/webcam detection.
@@ -961,17 +952,13 @@ export default function SquatAnalyzer() {
         if (status !== "running") return;
 
         // frameCounter: every rAF tick.
-        // detectionCounter: every time MediaPipe actually runs.
         // lastDetectedVideoTime: used to gate detection to one-per-video-frame for uploads.
         let frameCounter = 0;
-        let detectionCounter = 0;
         let lastDetectedVideoTime = -1;
 
         // Webcam: throttle MediaPipe to ~20 Hz (rAF runs at ~60 Hz).
         // Video upload: detect once per video frame via currentTime gating instead.
         const DETECT_EVERY = 3;
-        // Backend + z-prediction: every 15 detections (~1–2 Hz depending on mode).
-        const BACKEND_EVERY = 15;
 
         function detect(timestamp) {
             const video = videoRef.current;
@@ -1014,7 +1001,6 @@ export default function SquatAnalyzer() {
 
             if (shouldDetect) {
                 if (isVideoUpload) lastDetectedVideoTime = videoTime;
-                detectionCounter++;
 
                 // Draw the current frame into an intermediate canvas so the browser
                 // applies any rotation metadata before MediaPipe sees the pixels.
@@ -1085,7 +1071,7 @@ export default function SquatAnalyzer() {
 
         rafRef.current = requestAnimationFrame(detect);
         return () => cancelAnimationFrame(rafRef.current);
-    }, [status]);
+    }, [status, inputMode]);
 
     useEffect(() => {
         predictedZByNameRef.current = predictedZByName;
