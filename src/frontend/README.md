@@ -29,6 +29,21 @@ npm run preview # Preview production build
 npm run lint    # Run linting
 ```
 
+### Testing
+
+Use the correct package.json
+
+```bash
+mv package.json package-dev.json
+mv package-test.json package.json
+
+npm install
+npm run test    # Run tests
+
+mv package.json package-test.json
+mv package-dev.json package.json
+```
+
 ## Configuration
 
 The Vite dev server proxies `/api/*` requests to the backend (default `http://localhost:8080`).
