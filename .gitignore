@@ -8,6 +8,7 @@ outputs/
 *.pt
 *.pth
 datafiles/
+*_mirrored.csv
 
 # Node.js
 node_modules/
