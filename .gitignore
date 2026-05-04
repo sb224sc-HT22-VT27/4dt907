@@ -1,10 +1,14 @@
 # Other
+.claude/
 .vscode/
 .DS_Store
 **/cache/
 *.pdf
 outputs/
 *.pt
+*.pth
+datafiles/
+*_mirrored.csv
 
 # Node.js
 node_modules/
