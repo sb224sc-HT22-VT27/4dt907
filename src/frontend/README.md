@@ -27,21 +27,7 @@ The application will be available at <http://localhost:3030>
 npm run build   # Build for production
 npm run preview # Preview production build
 npm run lint    # Run linting
-```
-
-### Testing
-
-Use the correct package.json
-
-```bash
-mv package.json package-dev.json
-mv package-test.json package.json
-
-npm install
 npm run test    # Run tests
-
-mv package.json package-test.json
-mv package-dev.json package.json
 ```
 
 ## Configuration
