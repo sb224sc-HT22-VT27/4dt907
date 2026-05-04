@@ -194,7 +194,7 @@ class mlutils:
                 prod_scores = results["Prod"]
                 new_scores = results["Challenger"]
                 k = len(new_scores)
-                n_test, n_train = 0.2, 0.8  #
+                n_test, n_train = 0.2, 0.8 
 
                 diffs = new_scores - prod_scores
                 d_bar = np.mean(diffs)
