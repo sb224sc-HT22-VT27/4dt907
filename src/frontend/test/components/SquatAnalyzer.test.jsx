@@ -99,16 +99,16 @@ describe("SquatAnalyzer - rendering", () => {
         ).toBeInTheDocument();
     });
 
-    it("renders four mode buttons", () => {
+    it("renders two mode buttons", () => {
         render(<SquatAnalyzer />);
         const buttons = screen.getAllByRole("button", { name: /camera|upload|snapshot/i });
-        expect(buttons).toHaveLength(4);
+        expect(buttons).toHaveLength(2);
     });
 
-    it("Defaults to 'Live camera' mode and shows 'Start camera' button", () => {
+    it("Defaults to 'Live camera' mode and shows 'Record Webcam' button", () => {
         render(<SquatAnalyzer />);
         expect(
-            screen.getByRole("button", { name: /start camera/i })
+            screen.getByRole("button", { name: /Record Webcam/i })
         ).toBeInTheDocument();
     });
 });
@@ -150,7 +150,7 @@ describe("SquatAnalyzer - error display", () => {
         });
 
         render(<SquatAnalyzer />);
-        await userEvent.click(screen.getByRole("button", { name: /start camera/i }));
+        await userEvent.click(screen.getByRole("button", { name: /start recording/i }));
 
         await waitFor(() => {
             expect(
