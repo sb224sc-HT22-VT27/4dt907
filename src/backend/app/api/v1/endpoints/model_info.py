@@ -9,12 +9,34 @@ They are intentionally read-only and should avoid heavy model calls where possib
 
 import logging
 from fastapi import APIRouter, HTTPException
+from mlflow.tracking import MlflowClient
 from app.services.model_service import get_model, expected_feature_count
 from app.services import weaklink_model_service
+from app.services import z_model_service
 
 logger = logging.getLogger(__name__)
 # Router for model provenance/metadata endpoints (used by UI and debugging tools).
 router = APIRouter()
+
+
+@router.get("/model-info/z-metrics")
+def model_info_z_metrics():
+    """Return Mean_F1 (and MAE if present) for the champion z-predictor from DagsHub/MLflow."""
+    try:
+        _, _, run_id = z_model_service.get_model("champion")
+        if not run_id:
+            return {"run_id": None, "mean_f1": None, "mae": None}
+        client = MlflowClient()
+        run = client.get_run(run_id)
+        m = run.data.metrics
+        return {
+            "run_id": run_id,
+            "mean_f1": m.get("Mean_F1"),
+            "mae": m.get("MAE"),
+        }
+    except Exception as e:
+        logger.exception("Failed to fetch z-predictor metrics")
+        raise HTTPException(status_code=503, detail=f"{type(e).__name__}: {e}")
 
 
 @router.get("/model-info/latest")
