@@ -41,10 +41,16 @@ A full-stack ML application with a FastAPI backend and React frontend, deployed 
 │   ├── frontend/          # React frontend (Vite + Tailwind)
 │   ├── ml-research/       # Jupyter notebooks for ML experiments
 │   └── docker-compose.yml
+├── .github/               # CI/CD workflows, issue templates, PR template
 ├── api/                   # Vercel serverless entry point
 ├── .env.example           # Environment variable template
+├── CHANGELOG.md           # Version history
+├── CONTRIBUTING.md        # Contribution guidelines
+├── DEPLOYMENT.md          # Deployment strategies (Vercel + Render, Docker)
 ├── README.md
-└── vercel.json            # Vercel configuration
+├── render.yaml            # Render infrastructure-as-code (backend)
+├── SECURITY.md            # Security policy
+└── vercel.json            # Vercel configuration (frontend)
 ```
 
 ## Branching Strategy

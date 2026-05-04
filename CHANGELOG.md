@@ -9,6 +9,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.11.0] – 2026-05-04
+
+Assignment 11 – LSTM-based squat activity segmentation with hyperparameter search.
+
+### Added
+
+- **A11 LSTM classification notebooks** (`src/ml-research/a11/`) — training, MLflow tracking,
+  and hand-in notebooks for a sequence-to-label squat activity classifier (cut vs. uncut).
+- **Bidirectional LSTM** support added to the classification model (`bidirectional` config flag).
+- **Optimizer and initializer search** — 25 experiments on DagsHub covering Adam vs. SGD,
+  Xavier/Kaiming/default weight initialization, learning rates, hidden sizes (64/128/256),
+  layer counts (1–4), sequence lengths (5 vs. 30 frames), dropout rates (0.2–0.5), and
+  MinMax vs. raw-coordinate feature scaling.
+- **10-fold cross-validation** used across all experiments for robust metric reporting
+  (mean precision, recall, F1).
+- Placeholder notebooks for assignments A12–A16 (`src/ml-research/a12/` – `a16/`).
+
+### Changed
+
+- Data augmentation extended to classification: y-axis mirroring doubles the labelled
+  squat dataset before training/validation splits are created.
+
+---
+
+## [0.10.0] – 2026-04-22
+
+Assignment 10 – Z-predictor model improvements: data pipeline fix, augmentation, and accuracy gains.
+
+### Added
+
+- **A10 research notebooks** (`src/ml-research/a10/`) — training, validation, and hand-in
+  notebooks for the improved z-axis predictor.
+- **`src/scripts/mediapipe_accuracy.py`** — standalone script that evaluates MediaPipe
+  landmark accuracy against Kinect ground-truth data; used as an offline validation tool.
+- **GitHub repository templates** — `CODEOWNERS`, issue templates (bug report, feature request,
+  user story) and pull-request template added under `.github/`.
+
+### Changed
+
+- **Sequence splitting fixed** — training/validation/test sets are now split at the *file*
+  level (80 / 10 / 10) instead of overlapping sliding windows, eliminating data leakage
+  between splits.
+- **Y-axis mirroring augmentation** applied to the z-predictor training set, doubling the
+  number of training files.
+- **Hidden size increased to 256** for the z-predictor GRU/LSTM, improving capacity.
+
+### Fixed
+
+- Z-predictor average joint prediction error reduced from ~3.24 cm to ~2.64 cm (std 1.80 cm)
+  following the data-pipeline fix and augmentation.
+
+---
+
 ## [0.9.0] – 2026-04-15
 
 Assignment 9 – Deep learning z-predictor, MLflow integration, and squat classification improvements.
