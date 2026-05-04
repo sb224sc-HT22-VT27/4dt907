@@ -7,8 +7,13 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from app.schemas.prediction import PredictRequest, PredictResponse
-from app.services.z_model_service import predict_one
+from app.schemas.prediction import (
+    PredictRequest,
+    PredictResponse,
+    ZSequencePredictResponse,
+    ZSequenceRequest,
+)
+from app.services.z_model_service import predict_one, predict_sequence
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -23,6 +28,19 @@ def z_predictor_champion(req: PredictRequest):
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.exception("Z-predictor champion prediction failed")
+        raise HTTPException(status_code=503, detail=f"{type(e).__name__}: {e}")
+
+
+@router.post("/z-predictor/predict-sequence", response_model=ZSequencePredictResponse)
+def z_predictor_predict_sequence(req: ZSequenceRequest):
+    """Predict z for all squat joints from a 30-frame (x, y) sequence."""
+    try:
+        preds, uri, run_id = predict_sequence(req.sequence, "champion")
+        return ZSequencePredictResponse(predictions=preds, model_uri=uri, run_id=run_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.exception("Z-predictor sequence prediction failed")
         raise HTTPException(status_code=503, detail=f"{type(e).__name__}: {e}")
 
 

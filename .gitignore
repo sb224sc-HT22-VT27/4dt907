@@ -1,4 +1,5 @@
 # Other
+.claude/
 .vscode/
 .DS_Store
 **/cache/
