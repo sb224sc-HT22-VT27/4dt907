@@ -47,3 +47,26 @@ class SquatBatchRequest(BaseModel):
 
 class SquatBatchResponse(BaseModel):
     results: List[SquatResponse]
+
+
+class SessionAnalysisRequest(BaseModel):
+    """All frames from a recorded session sent at once for the full pipeline."""
+
+    frames: List[List[Keypoint3D]]
+
+
+class FrameAnalysisResult(BaseModel):
+    """Per-frame result from the session analysis pipeline."""
+
+    start_stop: int  # 0 = not exercise, 1 = in exercise (after smoothing)
+    classification: str  # "Deep", "Shallow", "Invalid", or "NotExercise"
+    left_knee_angle: float
+    right_knee_angle: float
+    confidence: Optional[float] = None
+    predicted_z: dict  # {joint_name: z_value} for all 13 joints
+
+
+class SessionAnalysisResponse(BaseModel):
+    """Response from the session analysis pipeline."""
+
+    results: List[FrameAnalysisResult]

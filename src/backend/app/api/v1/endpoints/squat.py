@@ -11,8 +11,17 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from app.schemas.squat import SquatBatchRequest, SquatBatchResponse, SquatRequest, SquatResponse
+from app.schemas.squat import (
+    FrameAnalysisResult,
+    SessionAnalysisRequest,
+    SessionAnalysisResponse,
+    SquatBatchRequest,
+    SquatBatchResponse,
+    SquatRequest,
+    SquatResponse,
+)
 from app.services.squat_service import classify_squat
+from app.services import session_analysis_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -73,3 +82,35 @@ def squat_classify_batch(req: SquatBatchRequest):
                 )
             )
     return SquatBatchResponse(results=results)
+
+
+@router.post("/squat/analyze-session", response_model=SessionAnalysisResponse)
+def squat_analyze_session(req: SessionAnalysisRequest):
+    """Full pipeline: Cut (start/stop) → Z-pred → Classify → 3-D results.
+
+    All frames from a recording are sent at once.  The backend runs the
+    Start_Stop_Predictor_ModelV2 to cut the recording, smooths short gaps
+    (< 10 frames), predicts z for every joint in every frame, and classifies
+    squat depth for exercise frames.
+
+    Non-exercise frames are returned with ``start_stop=0`` and
+    ``classification="NotExercise"``.
+    """
+    try:
+        frames = [[kp.model_dump() for kp in frame] for frame in req.frames]
+        frame_results = session_analysis_service.analyze_session(frames)
+        results = [
+            FrameAnalysisResult(
+                start_stop=fr.start_stop,
+                classification=fr.classification,
+                left_knee_angle=fr.left_knee_angle,
+                right_knee_angle=fr.right_knee_angle,
+                confidence=fr.confidence,
+                predicted_z=fr.predicted_z,
+            )
+            for fr in frame_results
+        ]
+        return SessionAnalysisResponse(results=results)
+    except Exception:
+        logger.exception("Session analysis failed")
+        raise HTTPException(status_code=503, detail="Service unavailable")
