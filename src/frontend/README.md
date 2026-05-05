@@ -51,7 +51,7 @@ simply hidden. See `.env.example` for the required SQL to create the `squat_keyp
 
 Use the docker compose file to build entire project which uses the local Dockerfile for the frontend.
 
-## Project Structure (Update as needed)
+## Project Structure
 
 ```text
 frontend/

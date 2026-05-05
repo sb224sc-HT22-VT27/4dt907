@@ -27,19 +27,14 @@ Jupyter notebooks for ML experiments and assignment reporting. Each assignment h
 Models are tracked in MLflow on DagsHub using a utils file, ml_utils.py.
 
 ### Models
+
 A2 (Regression Model) - Regression model to predict aimoscore
 A3 (Weaklink Model) - Model that predicts th weakest link
-A9 (z Prediction Model) - Model that predicts z from x,y
+A9 (Z Prediction Model) - Model that predicts z from x,y
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.12.10
+- Python 3.9.12
 - Jupyter Notebook or JupyterLab
-
-```bash
-cd src/ml-research/<current-assignment>
-pip install -r requirements.txt
-jupyter lab
-```
