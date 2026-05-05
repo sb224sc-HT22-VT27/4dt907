@@ -25,7 +25,6 @@ def predict_champion(req: PredictRequest):
     try:
         if (result := predict_one(req.features, "champion")) is not None:
             pred, uri, run_id = result
-            # pred, uri, run_id = predict_one(req.features, "champion")
             return PredictResponse(prediction=pred, model_uri=uri, run_id=run_id)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -40,7 +39,6 @@ def predict_latest(req: PredictRequest):
     try:
         if (result := predict_one(req.features, "latest")) is not None:
             pred, uri, run_id = result
-            # pred, uri, run_id = predict_one(req.features, "latest")
             return PredictResponse(prediction=pred, model_uri=uri, run_id=run_id)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))

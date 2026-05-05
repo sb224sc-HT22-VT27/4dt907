@@ -123,38 +123,6 @@ def _init_mlflow() -> str:
     return uri
 
 
-# TODO: Unused???
-def _model_name_for_variant(variant: str) -> str:
-    v = (variant or "").lower().strip()
-    if v in {"champion", "best"}:
-        name = os.getenv("MLFLOW_BEST_MODEL_NAME")
-        if not name:
-            raise RuntimeError("MLFLOW_BEST_MODEL_NAME is not set")
-        return name
-
-    if v in {"latest"}:
-        name = os.getenv("MLFLOW_LATEST_MODEL_NAME")
-        if not name:
-            raise RuntimeError("MLFLOW_LATEST_MODEL_NAME is not set")
-        return name
-
-    raise RuntimeError("variant must be 'champion' or 'latest'")
-
-
-def _latest_source_uri(model_name: str) -> str:
-    client = MlflowClient()
-    versions = client.search_model_versions(f"name='{model_name}'")
-    if not versions:
-        raise RuntimeError(f"No versions found for model '{model_name}'")
-
-    latest_mv = max(versions, key=lambda mv: int(mv.version))
-
-    if not getattr(latest_mv, "source", None):
-        raise RuntimeError(f"Model version {latest_mv.version} has no source URI")
-
-    return latest_mv.source
-
-
 def _is_models_alias_uri(uri: str) -> bool:
     """Return True if URI looks like `models:/Name@alias` (alias form)."""
     # True for: models:/Name@alias
