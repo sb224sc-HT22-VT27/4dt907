@@ -102,8 +102,6 @@ const SQUAT_JOINT_ORDER = [
     { name: "left_ankle",     idx: 27 },
     { name: "right_ankle",    idx: 28 },
 ];
-const SQUAT_JOINT_NAMES_SET = new Set(SQUAT_JOINT_ORDER.map((j) => j.name));
-
 // Full body skeleton connections (MediaPipe BlazePose topology).
 const POSE_CONNECTIONS = [
     [0, 1],
