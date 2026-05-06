@@ -1,52 +1,121 @@
 # Deployment
 
-This document describes the deployment strategies for 4dt907.
+This document describes how to run 4dt907 locally and how to deploy it to production.
 
 ## Overview
 
-| Strategy | Frontend | Backend | When to use |
-| -------- | -------- | ------- | ----------- |
-| **Primary** | Vercel (static) | Render (web service) | Normal production |
-| **Fallback** | Vercel (static) | Vercel (serverless) | If Render is unavailable |
+| Component | Service | Purpose |
+| --------- | ------- | ------- |
+| Frontend | Vercel | Static site hosting |
+| Backend | Render | FastAPI web service |
+| Database | Supabase | Squat keypoint storage |
+| Model Registry | DagsHub | MLflow tracking & model registry |
 
 ---
 
-## Primary Strategy: Vercel (frontend) + Render (backend)
+## Local Development (Docker)
 
-The frontend is deployed as a static site on Vercel and the backend runs as a
-long-lived web service on [Render](https://render.com).
-This avoids serverless cold starts, execution time limits, and memory constraints
-that can affect ML model serving.
+For local full-stack development both services run via Docker Compose.
 
-### How it works
+### Prerequisites
 
-- The **frontend** is built from `src/frontend/` as a static site (`@vercel/static-build`).
-- The **backend** runs the FastAPI app directly on Render via `uvicorn`.
-- The frontend is built with `VITE_BACKEND_URL` pointing to the Render service so all
-  `/api/*` calls go directly to Render (no server-side proxy needed on Vercel).
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed.
+
+### Setup
+
+1. Copy the environment file and fill in the values:
+
+   ```bash
+   cp .env.example src/.env
+   ```
+
+2. Edit `src/.env` and set at minimum `MLFLOW_TRACKING_URI` and the `MODEL_URI_*`
+   variables (see `.env.example` for descriptions of every variable).
+
+3. Start all services:
+
+   ```bash
+   cd src
+   docker compose up -d
+   ```
+
+| Service | URL |
+| ------- | --- |
+| Frontend | <http://localhost:3030> |
+| Backend API | <http://localhost:8080> |
+| API docs (Swagger) | <http://localhost:8080/docs> |
+
+Hot-reload is enabled for both the backend (uvicorn `--reload`) and the frontend
+(Vite dev server) when using `docker compose up` locally.
+
+See [src/backend/README.md](src/backend/README.md) and
+[src/frontend/README.md](src/frontend/README.md) for standalone (non-Docker)
+development instructions.
+
+---
+
+## Split Hosting: Vercel + Render + Supabase + DagsHub
+
+In production each concern is handled by a dedicated platform:
+
+- **Vercel** hosts the static frontend.
+- **Render** runs the FastAPI backend as a long-lived web service, avoiding serverless
+  cold-start delays and memory constraints that affect ML model serving.
+- **Supabase** stores squat keypoints submitted by users.
+- **DagsHub** hosts the MLflow tracking server and model registry.
 
 ```Text
-┌─────────────────────┐   VITE_BACKEND_URL   ┌─────────────────────┐
-│       Vercel        │ ──────────────────►  │       Render        │
-│  Frontend (static)  │                      │   Backend (FastAPI) │
-└─────────────────────┘                      └─────────────────────┘
+Browser
+  │
+  ├──► Vercel (static frontend)
+  │         │  VITE_BACKEND_URL
+  │         ▼
+  │    Render (FastAPI backend)
+  │         │  MLFLOW_TRACKING_URI
+  │         ▼
+  │    DagsHub (MLflow / model registry)
+  │
+  └──► Supabase (keypoint storage)
+       VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
 ```
 
-### Configuration
+### Step 1 – DagsHub (MLflow model registry)
 
-`vercel.json` at the repository root controls the Vercel build (frontend only):
+DagsHub provides a hosted MLflow tracking server at no cost for public projects.
 
-```json
-{
-  "builds": [
-    { "src": "src/frontend/package.json", "use": "@vercel/static-build",
-      "config": { "distDir": "dist" } }
-  ],
-  "rewrites": [
-    { "source": "/(.*)", "destination": "src/frontend/$1" }
-  ]
-}
-```
+1. Create or log in to your [DagsHub](https://dagshub.com) account.
+2. Create a repository connected to (or mirroring) this GitHub repo.
+3. Navigate to **Settings → Integrations → MLflow** and copy the tracking URI:
+
+   ```
+   https://dagshub.com/<username>/<repo>.mlflow
+   ```
+
+4. Train your models and log them to the registry. Note the `runs:/<run-id>/model`
+   or `models:/<name>@<alias>` URIs for each model variant you want to serve.
+
+### Step 2 – Supabase (keypoint storage)
+
+1. Create a free project on [supabase.com](https://supabase.com).
+2. In the Supabase SQL editor, create the keypoints table and enable Row Level
+   Security (RLS):
+
+   ```sql
+   CREATE TABLE squat_keypoints (
+       id             SERIAL PRIMARY KEY,
+       id_name        VARCHAR,
+       raw_keypoints  JSONB NOT NULL,
+       score          FLOAT8,
+       classification VARCHAR,
+       created_at     TIMESTAMPTZ DEFAULT now()
+   );
+   ```
+
+3. Go to **Settings → API** and note:
+   - **Project URL** → used as `VITE_SUPABASE_URL` in Vercel
+   - **Anon (public) key** → used as `VITE_SUPABASE_ANON_KEY` in Vercel
+
+### Step 3 – Deploy the backend on Render
 
 `render.yaml` at the repository root is picked up by Render automatically when you
 connect the repository:
@@ -61,8 +130,6 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
 ```
-
-### Step 1 – Deploy the backend on Render
 
 1. Create a new **Web Service** on [render.com](https://render.com) and connect the
    repository. Render will detect `render.yaml` and pre-fill most settings.
@@ -80,7 +147,7 @@ services:
 
    | Variable | Description |
    | -------- | ----------- |
-   | `MLFLOW_TRACKING_URI` | MLflow / DagsHub tracking server URI |
+   | `MLFLOW_TRACKING_URI` | DagsHub MLflow tracking URI (from Step 1) |
    | `MODEL_URI_PROD` | Production model URI |
    | `MODEL_URI_DEV` | Development model URI |
    | `MODEL_URI_BACKUP` | Backup model URI |
@@ -94,119 +161,31 @@ services:
 
 4. Deploy the service and note the external URL (e.g. `https://4dt907-backend.onrender.com`).
 
-### Step 2 – Deploy the frontend on Vercel
+### Step 4 – Deploy the frontend on Vercel
+
+`vercel.json` at the repository root controls the Vercel build (frontend only):
+
+```json
+{
+  "builds": [
+    { "src": "src/frontend/package.json", "use": "@vercel/static-build",
+      "config": { "distDir": "dist" } }
+  ],
+  "rewrites": [
+    { "source": "/(.*)", "destination": "src/frontend/$1" }
+  ]
+}
+```
 
 1. Create (or update) a Vercel project connected to this repository.
 2. In the Vercel project settings → **Environment Variables**, add:
 
    | Variable | Value |
    | -------- | ----- |
-   | `VITE_BACKEND_URL` | `https://<your-service>.onrender.com` |
-   | `VITE_SUPABASE_URL` | Your Supabase project URL (optional — enables keypoint storage) |
-   | `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key (optional — required when `VITE_SUPABASE_URL` is set) |
+   | `VITE_BACKEND_URL` | Render service URL from Step 3 (e.g. `https://4dt907-backend.onrender.com`) |
+   | `VITE_SUPABASE_URL` | Supabase project URL from Step 2 |
+   | `VITE_SUPABASE_ANON_KEY` | Supabase anon key from Step 2 |
 
 3. Trigger a new deployment (or let Vercel deploy automatically on push).
    The static build will bake `VITE_BACKEND_URL` into the bundle so every API call
    goes directly to Render.
-
----
-
-## Fallback Strategy: Full Vercel Deployment
-
-Use this strategy if Render is unavailable.
-Both the frontend and a Python serverless function are deployed on Vercel.
-
-> The serverless function may hit cold-start delays, execution time limits or
-> memory constraints when loading large ML models.
-
-### How it works
-
-- The **frontend** is built as a static site.
-- The **backend** is served as a serverless function via `api/index.py` (`@vercel/python`).
-- Requests to `/api/*` are rewritten to the serverless function.
-
-```Text
-┌──────────────────────────────────────┐
-│              Vercel                  │
-│                                      │
-│  ┌────────────┐   /api/*             │
-│  │  Frontend  │ ──────────────────►  │
-│  │  (static)  │          ┌────────┐  │
-│  └────────────┘          │Backend │  │
-│                          │(lambda)│  │
-│         /*               └────────┘  │
-│  ◄──────────────────────────────     │
-└──────────────────────────────────────┘
-```
-
-### Restoring the full-Vercel `vercel.json`
-
-Replace the contents of `vercel.json` with:
-
-```json
-{
-  "version": 2,
-  "builds": [
-    { "src": "api/index.py", "use": "@vercel/python" },
-    { "src": "src/frontend/package.json", "use": "@vercel/static-build",
-      "config": { "distDir": "dist" } }
-  ],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "api/index.py" },
-    { "source": "/(.*)",     "destination": "src/frontend/$1" }
-  ]
-}
-```
-
-### Environment variables (Vercel dashboard)
-
-Set the following in the Vercel project settings under **Environment Variables**:
-
-| Variable | Description |
-| -------- | ----------- |
-| `MLFLOW_TRACKING_URI` | MLflow / DagsHub tracking server URI |
-| `MODEL_URI_PROD` | Production model URI |
-| `MODEL_URI_DEV` | Development model URI |
-| `MODEL_URI_BACKUP` | Backup model URI |
-| `WEAKLINK_MODEL_URI_PROD` | Weakest-Link production model URI |
-| `WEAKLINK_MODEL_URI_DEV` | Weakest-Link development model URI |
-| `WEAKLINK_MODEL_URI_BACKUP` | Weakest-Link backup model URI |
-| `Z_MODEL_URI_PROD` | Z-predictor production model URI |
-| `Z_MODEL_URI_DEV` | Z-predictor development model URI |
-| `Z_MODEL_URI_BACKUP` | Z-predictor backup model URI |
-| `VITE_SUPABASE_URL` | Supabase project URL (optional — enables keypoint storage) |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key (optional — required when URL is set) |
-
-Leave `VITE_BACKEND_URL` empty – the frontend will use relative `/api/*` paths which
-Vercel rewrites to the serverless function.
-
-### Local preview (full-Vercel)
-
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# From repository root
-vercel dev
-```
-
----
-
-## Local Development (Docker)
-
-For local full-stack development both services run via Docker Compose:
-
-```bash
-# From repository root – copy and fill in env vars first
-cp .env.example src/.env
-
-cd src
-docker compose build
-docker compose up -d
-```
-
-- Frontend: <http://localhost:3030>
-- Backend API: <http://localhost:8080>
-- API docs: <http://localhost:8080/docs>
-
-See [src/backend/README.md](src/backend/README.md) and [src/frontend/README.md](src/frontend/README.md) for standalone development instructions.
