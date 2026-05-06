@@ -1233,12 +1233,22 @@ export default function SquatAnalyzer() {
             }
             return { classification: entry.classification, joints };
         };
-        const exerciseFrames = sessionLog
-            .filter((entry) => (entry.startStop ?? 1) === 1)
-            .map(toViewerFrame);
-        // Fall back to all frames if the model detected no exercise segment,
-        // so the viewer is never blank after a completed analysis.
-        return exerciseFrames.length > 0 ? exerciseFrames : sessionLog.map(toViewerFrame);
+
+        // Find the contiguous exercise clip: from the first startStop=1 frame
+        // to the last startStop=1 frame (inclusive). This gives a clean slice
+        // even if a few frames inside the segment are 0 (already smoothed by backend).
+        // If start or stop is missing, fall back to the full video boundaries.
+        let startIdx = -1;
+        let stopIdx = -1;
+        for (let i = 0; i < sessionLog.length; i++) {
+            if ((sessionLog[i].startStop ?? 1) === 1) {
+                if (startIdx === -1) startIdx = i;
+                stopIdx = i;
+            }
+        }
+        const from = startIdx !== -1 ? startIdx : 0;
+        const to = stopIdx !== -1 ? stopIdx + 1 : sessionLog.length;
+        return sessionLog.slice(from, to).map(toViewerFrame);
     }, [sessionLog]);
 
     // ── Render ────────────────────────────────────────────────────────────────
