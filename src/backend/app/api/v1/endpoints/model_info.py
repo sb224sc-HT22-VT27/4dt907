@@ -13,10 +13,23 @@ from mlflow.tracking import MlflowClient
 from app.services.model_service import get_model, expected_feature_count
 from app.services import weaklink_model_service
 from app.services import z_model_service
+from app.services import start_stop_model_service
 
 logger = logging.getLogger(__name__)
 # Router for model provenance/metadata endpoints (used by UI and debugging tools).
 router = APIRouter()
+
+
+@router.get("/model-info/start-stop")
+def model_info_start_stop():
+    """Return MAE_Total_Average for the champion Start_Stop_Predictor_ModelV2."""
+    try:
+        _, _, run_id, _, _ = start_stop_model_service.get_model("champion")
+        mae = start_stop_model_service.get_mae_total_average("champion")
+        return {"run_id": run_id, "mae_total_average": mae}
+    except Exception as e:
+        logger.exception("Failed to fetch start/stop model metrics")
+        raise HTTPException(status_code=503, detail=f"{type(e).__name__}: {e}")
 
 
 @router.get("/model-info/z-metrics")

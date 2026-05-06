@@ -444,9 +444,15 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                     ? "#16a34a"
                     : cls === "Shallow"
                       ? "#d97706"
-                      : "#dc2626";
+                      : cls === "NotExercise"
+                        ? "#64748b"
+                        : "#dc2626";
             ctx.textAlign = "center";
-            ctx.fillText(cls, cx, 18);
+            ctx.fillText(
+                cls === "NotExercise" ? "— not exercise —" : cls,
+                cx,
+                18,
+            );
         }
 
         // Frame counter / live indicator
@@ -520,7 +526,7 @@ function Skeleton3DViewer({ frames, liveFrame }) {
             />
 
             {/* Controls */}
-            <div className="flex items-center gap-3 w-full">
+            <div className="flex items-center gap-2 w-full flex-wrap">
                 <button
                     onClick={() => {
                         setLiveMode(false);
@@ -539,6 +545,29 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                         ⏸ Pause
                     </button>
                 )}
+                {/* Step prev/next */}
+                <button
+                    onClick={() => {
+                        setPlaying(false);
+                        setLiveMode(false);
+                        setFrameIdx((i) => Math.max(0, i - 1));
+                    }}
+                    className="ios-btn w-8 h-7 flex items-center justify-center rounded-full text-sm font-bold text-slate-600"
+                    title="Previous frame"
+                >
+                    ‹‹
+                </button>
+                <button
+                    onClick={() => {
+                        setPlaying(false);
+                        setLiveMode(false);
+                        setFrameIdx((i) => Math.min(frames.length - 1, i + 1));
+                    }}
+                    className="ios-btn w-8 h-7 flex items-center justify-center rounded-full text-sm font-bold text-slate-600"
+                    title="Next frame"
+                >
+                    ››
+                </button>
                 <input
                     type="range"
                     min={0}
@@ -549,7 +578,7 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                         setLiveMode(false);
                         setFrameIdx(Number(e.target.value));
                     }}
-                    className="flex-1 accent-sky-400"
+                    className="flex-1 accent-sky-400 min-w-0"
                 />
                 {/* Zoom buttons */}
                 <button
@@ -575,7 +604,8 @@ function Skeleton3DViewer({ frames, liveFrame }) {
             </div>
 
             <p className="text-xs text-slate-400 self-start">
-                Frame {displayedFrameIdx + 1} of {frames.length} · z from DL model
+                Frame {displayedFrameIdx + 1} of {frames.length}
+                {" · exercise frames only · z from DL model"}
             </p>
         </div>
     );
@@ -613,16 +643,16 @@ export default function SquatAnalyzer() {
     const [isSaving, setIsSaving] = useState(false);
     const [predictedZByName, setPredictedZByName] = useState({});
     const [liveFrame3d, setLiveFrame3d] = useState(null);
-    const [modelMetrics, setModelMetrics] = useState(null);
+    const [startStopMetrics, setStartStopMetrics] = useState(null);
 
     const sessionNameRef = useRef("");
     const predictedZByNameRef = useRef({});
 
-    // ── Fetch z-predictor model metrics from DagsHub on mount ───────────────
+    // ── Fetch model metrics on mount ─────────────────────────────────────────
     useEffect(() => {
-        fetch(apiUrl("/api/v1/model-info/z-metrics"))
+        fetch(apiUrl("/api/v1/model-info/start-stop"))
             .then((r) => (r.ok ? r.json() : null))
-            .then((d) => d && setModelMetrics(d))
+            .then((d) => d && setStartStopMetrics(d))
             .catch(() => {});
     }, []);
 
@@ -736,6 +766,7 @@ export default function SquatAnalyzer() {
     );
 
     // ── Batch analyze (webcam stop or video end) ─────────────────────────────
+    // Sends all frames at once to the full pipeline: Cut → Z-pred → Classify.
 
     const stopAndAnalyze = useCallback(async () => {
         const frames = recordedKpFramesRef.current;
@@ -745,23 +776,26 @@ export default function SquatAnalyzer() {
             return;
         }
         try {
-            const res = await fetch(apiUrl("/api/v1/squat/classify-batch"), {
+            const res = await fetch(apiUrl("/api/v1/squat/analyze-session"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ frames }),
             });
-            if (!res.ok) throw new Error("Batch classify failed");
+            if (!res.ok) throw new Error("Session analysis failed");
             const data = await res.json();
             const entries = frames.map((kp3d, i) => ({
                 timestamp: Date.now() + i,
                 keypoints3d: kp3d,
-                predictedZ: {},
+                predictedZ: data.results[i]?.predicted_z ?? {},
                 classification: data.results[i]?.classification ?? null,
                 confidence: data.results[i]?.confidence ?? null,
+                startStop: data.results[i]?.start_stop ?? 1,
             }));
             sessionLogRef.current = entries;
             setSessionLog(entries);
-            const valid = data.results.filter((r) => r.classification !== "Invalid");
+            const valid = data.results.filter(
+                (r) => r.start_stop === 1 && r.classification !== "Invalid" && r.classification !== "NotExercise"
+            );
             if (valid.length > 0) {
                 const last = valid[valid.length - 1];
                 setResult({
@@ -1046,6 +1080,11 @@ export default function SquatAnalyzer() {
                         filterSquatKeypoints3d(det.worldLandmarks[0]),
                     );
                 }
+
+                // Update 2-D keypoints panel (uses normalized landmarks, not world coords)
+                if (det?.landmarks?.length > 0) {
+                    setAllKeypoints(mapAllKeypoints(det.landmarks[0]));
+                }
             }
 
             // ── Redraw skeleton overlay at full rAF rate ──
@@ -1176,27 +1215,41 @@ export default function SquatAnalyzer() {
     // Builds the 3-D viewer data from session log: x/y from MediaPipe world coords,
     // z from DL model prediction (falls back to MediaPipe world z if unavailable).
 
-    const viewerFrames = useMemo(
-        () =>
-            sessionLog.map((entry) => {
-                const kpMap = {};
-                entry.keypoints3d.forEach((kp) => {
-                    kpMap[kp.name] = kp;
-                });
-                const joints = {};
-                for (const { name } of SQUAT_JOINT_ORDER) {
-                    const kp = kpMap[name];
-                    if (!kp) continue;
-                    joints[name] = {
-                        x: kp.x,
-                        y: kp.y,
-                        z: entry.predictedZ?.[name] ?? kp.z ?? 0,
-                    };
-                }
-                return { classification: entry.classification, joints };
-            }),
-        [sessionLog],
-    );
+    const viewerFrames = useMemo(() => {
+        const toViewerFrame = (entry) => {
+            const kpMap = {};
+            entry.keypoints3d.forEach((kp) => {
+                kpMap[kp.name] = kp;
+            });
+            const joints = {};
+            for (const { name } of SQUAT_JOINT_ORDER) {
+                const kp = kpMap[name];
+                if (!kp) continue;
+                joints[name] = {
+                    x: kp.x,
+                    y: kp.y,
+                    z: entry.predictedZ?.[name] ?? kp.z ?? 0,
+                };
+            }
+            return { classification: entry.classification, joints };
+        };
+
+        // Find the contiguous exercise clip: from the first startStop=1 frame
+        // to the last startStop=1 frame (inclusive). This gives a clean slice
+        // even if a few frames inside the segment are 0 (already smoothed by backend).
+        // If start or stop is missing, fall back to the full video boundaries.
+        let startIdx = -1;
+        let stopIdx = -1;
+        for (let i = 0; i < sessionLog.length; i++) {
+            if ((sessionLog[i].startStop ?? 1) === 1) {
+                if (startIdx === -1) startIdx = i;
+                stopIdx = i;
+            }
+        }
+        const from = startIdx !== -1 ? startIdx : 0;
+        const to = stopIdx !== -1 ? stopIdx + 1 : sessionLog.length;
+        return sessionLog.slice(from, to).map(toViewerFrame);
+    }, [sessionLog]);
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1241,7 +1294,7 @@ export default function SquatAnalyzer() {
             {/* Mode toggle */}
             <div className="ios-pill flex rounded-full p-0.5 gap-px">
                 {[
-                    { id: "webcam", label: "Record Webcam" },
+                    { id: "webcam", label: "Webcam (Record)" },
                     { id: "upload", label: "Upload Video" },
                     { id: "image", label: "Upload Image" },
                 ].map(({ id, label }) => (
@@ -1408,21 +1461,13 @@ export default function SquatAnalyzer() {
                 </p>
             )}
 
-            {/* Model quality indicator — shown for all modes */}
-            {modelMetrics?.mean_f1 != null && (
+            {/* Model quality indicator — Start/Stop MAE from DagsHub */}
+            {startStopMetrics?.mae_total_average != null && (
                 <p className="text-xs text-slate-400">
-                    Model F1:{" "}
+                    Start/Stop MAE:{" "}
                     <span className="font-semibold text-slate-600">
-                        {modelMetrics.mean_f1.toFixed(3)}
+                        {startStopMetrics.mae_total_average.toFixed(4)}
                     </span>
-                    {modelMetrics.mae != null && (
-                        <>
-                            {" · "}MAE:{" "}
-                            <span className="font-semibold text-slate-600">
-                                {modelMetrics.mae.toFixed(4)}
-                            </span>
-                        </>
-                    )}
                 </p>
             )}
 
