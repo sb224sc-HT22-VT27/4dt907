@@ -31,13 +31,13 @@ class mlutils:
             )
         except Exception:
             # If no dev exists
-            if metric_name=="Grand_Avg_Test_MAE_cm":
+            if metric_name=="Grand_Avg_Test_MAE_cm" or metric_name=="MAE_Total_Average":
                 dev_score = 20
             else:
                 dev_score = -1
 
 
-        if metric_name=="Grand_Avg_Test_MAE_cm":
+        if metric_name=="Grand_Avg_Test_MAE_cm" or metric_name=="MAE_Total_Average":
             res = new_score < dev_score
             print(f"Comparing {new_score} < {dev_score}")
         else:
