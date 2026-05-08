@@ -17,14 +17,13 @@ from app.services import start_stop_model_service
 from app.services.squat_service import calculate_knee_angle, _rule_based
 from app.services.z_model_service import predict_one as predict_z
 
-# Joint names in Kinect SDK column order — must match training-time column order
-# (sample.csv: nose, left_shoulder, right_shoulder, left_elbow, ...).
-# The training notebook selects feat_cols WITHOUT sorting, so CSV order is preserved.
+# Joint names in training column order — must match the feat_cols order from the
+# training notebook exactly (nose, left_shoulder, left_elbow, right_shoulder, ...).
 _MODEL_JOINT_NAMES: List[str] = [
     "nose",
     "left_shoulder",
-    "right_shoulder",
     "left_elbow",
+    "right_shoulder",
     "right_elbow",
     "left_wrist",
     "right_wrist",
@@ -144,14 +143,25 @@ class FrameResult:
         self.predicted_z = predicted_z
 
 
-def analyze_session(frames: List[List[Dict]]) -> List[FrameResult]:
+import logging as _logging
+_log = _logging.getLogger(__name__)
+
+
+def analyze_session(
+    frames: List[List[Dict]],
+    norm_frames: Optional[List[List[Dict]]] = None,
+) -> List[FrameResult]:
     """Run the full pipeline on all frames.
 
     Parameters
     ----------
     frames:
-        List of N frames; each frame is a list of kp3d dicts
-        ``{"name": str, "x": float, "y": float, "z": float}``.
+        World-space keypoints (hip-centred, metres) used for z-prediction
+        and squat classification.
+    norm_frames:
+        Image-normalised keypoints (x, y ∈ [0,1]) used as input to the
+        start-stop model which was trained on this coordinate system.
+        Falls back to ``frames`` when not provided.
 
     Returns
     -------
@@ -160,13 +170,23 @@ def analyze_session(frames: List[List[Dict]]) -> List[FrameResult]:
     if not frames:
         return []
 
-    # 1. Build feature vectors for start/stop model
-    features_batch = [_build_features(f) for f in frames]
+    # 1. Build feature vectors for start/stop model.
+    #    Use norm_frames when available — the model was trained on [0,1] normalised
+    #    image coordinates, not world coordinates.
+    feature_source = norm_frames if (norm_frames and len(norm_frames) == len(frames)) else frames
+    features_batch = [_build_features(f) for f in feature_source]
 
-    # 2. Predict start/stop (fallback: all exercise)
+    # 2. Predict start/stop
     try:
         raw_start_stop = start_stop_model_service.predict_batch(features_batch, "champion")
-    except Exception:
+        _log.info("start_stop: %d frames → %d exercise, %d non-exercise",
+                  len(raw_start_stop), sum(raw_start_stop), raw_start_stop.count(0))
+        # If the model labels nothing as exercise, fall back to full-video exercise.
+        if sum(raw_start_stop) == 0:
+            _log.warning("start_stop returned all-0 — falling back to all-exercise")
+            raw_start_stop = [1] * len(frames)
+    except Exception as exc:
+        _log.error("start_stop model failed (%s), falling back to all-exercise", exc)
         raw_start_stop = [1] * len(frames)
 
     # 3. Smooth gaps

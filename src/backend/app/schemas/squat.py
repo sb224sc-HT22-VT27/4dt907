@@ -53,6 +53,7 @@ class SessionAnalysisRequest(BaseModel):
     """All frames from a recorded session sent at once for the full pipeline."""
 
     frames: List[List[Keypoint3D]]
+    norm_frames: Optional[List[List[Keypoint3D]]] = None
 
 
 class FrameAnalysisResult(BaseModel):

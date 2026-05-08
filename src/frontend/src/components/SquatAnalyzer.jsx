@@ -626,8 +626,10 @@ export default function SquatAnalyzer() {
     const sessionLogRef = useRef([]);
     // Ring buffer: array of 26-float feature vectors, oldest → newest
     const frameBufferRef = useRef([]);
-    // All kp3d frames collected during a webcam recording session
+    // All kp3d frames collected during a webcam recording session (world coords for z-pred/classify)
     const recordedKpFramesRef = useRef([]);
+    // Normalized image-space landmarks [0,1] collected in parallel — fed to start-stop model
+    const recordedNormFramesRef = useRef([]);
     // Offscreen canvas used to feed orientation-corrected frames to MediaPipe
     const captureCanvasRef = useRef(null);
 
@@ -729,6 +731,7 @@ export default function SquatAnalyzer() {
     const stopAll = useCallback(() => {
         stopCapture("idle");
         recordedKpFramesRef.current = [];
+        recordedNormFramesRef.current = [];
         sessionLogRef.current = [];
         setSessionLog([]);
         setUploadedFileName("");
@@ -770,19 +773,25 @@ export default function SquatAnalyzer() {
 
     const stopAndAnalyze = useCallback(async () => {
         const frames = recordedKpFramesRef.current;
+        const normFrames = recordedNormFramesRef.current;
         stopCapture("analyzing");
         if (frames.length === 0) {
             setStatus("idle");
             return;
         }
         try {
+            const body = { frames };
+            if (normFrames.length === frames.length) body.norm_frames = normFrames;
             const res = await fetch(apiUrl("/api/v1/squat/analyze-session"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ frames }),
+                body: JSON.stringify(body),
             });
             if (!res.ok) throw new Error("Session analysis failed");
             const data = await res.json();
+            const ones = data.results.filter(r => r.start_stop === 1).length;
+            const zeros = data.results.filter(r => r.start_stop === 0).length;
+            console.log(`[analyze-session] ${data.results.length} frames → ${ones} exercise (1), ${zeros} non-exercise (0)`);
             const entries = frames.map((kp3d, i) => ({
                 timestamp: Date.now() + i,
                 keypoints3d: kp3d,
@@ -827,6 +836,7 @@ export default function SquatAnalyzer() {
 
     const startCamera = useCallback(async () => {
         recordedKpFramesRef.current = [];
+        recordedNormFramesRef.current = [];
         sessionLogRef.current = [];
         setSessionLog([]);
         setResult(null);
@@ -1075,10 +1085,17 @@ export default function SquatAnalyzer() {
                     }
                     setLiveFrame3d({ classification: null, joints });
 
-                    // Collect every detected frame for batch send on stop/end
+                    // Collect every detected frame for batch send on stop/end.
+                    // World coords → z-prediction + classification.
+                    // Normalized image coords [0,1] → start-stop model (trained on these).
                     recordedKpFramesRef.current.push(
                         filterSquatKeypoints3d(det.worldLandmarks[0]),
                     );
+                    if (det.landmarks?.[0]) {
+                        recordedNormFramesRef.current.push(
+                            filterSquatKeypoints3d(det.landmarks[0]),
+                        );
+                    }
                 }
 
                 // Update 2-D keypoints panel (uses normalized landmarks, not world coords)
@@ -1234,21 +1251,10 @@ export default function SquatAnalyzer() {
             return { classification: entry.classification, joints };
         };
 
-        // Find the contiguous exercise clip: from the first startStop=1 frame
-        // to the last startStop=1 frame (inclusive). This gives a clean slice
-        // even if a few frames inside the segment are 0 (already smoothed by backend).
-        // If start or stop is missing, fall back to the full video boundaries.
-        let startIdx = -1;
-        let stopIdx = -1;
-        for (let i = 0; i < sessionLog.length; i++) {
-            if ((sessionLog[i].startStop ?? 1) === 1) {
-                if (startIdx === -1) startIdx = i;
-                stopIdx = i;
-            }
-        }
-        const from = startIdx !== -1 ? startIdx : 0;
-        const to = stopIdx !== -1 ? stopIdx + 1 : sessionLog.length;
-        return sessionLog.slice(from, to).map(toViewerFrame);
+        // Strict filter: only replay frames the model labelled as exercise.
+        // No fallback slice — if the model returns no 1s the viewer is empty,
+        // which makes a broken model visible rather than hiding it.
+        return sessionLog.filter(e => e.startStop === 1).map(toViewerFrame);
     }, [sessionLog]);
 
     // ── Render ────────────────────────────────────────────────────────────────

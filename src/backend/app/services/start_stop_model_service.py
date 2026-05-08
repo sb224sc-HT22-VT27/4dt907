@@ -3,8 +3,8 @@
 Model loading + prediction utilities for Start_Stop_Predictor_ModelV2.
 
 Predicts per-frame whether a pose frame belongs to an exercise (1) or not (0).
-Input features: 39 floats = 13 joints × [x, y, z] in Kinect SDK column order
-(nose, left_shoulder, right_shoulder, left_elbow, right_elbow, left_wrist,
+Input features: 39 floats = 13 joints × [x, y, z] in training column order
+(nose, left_shoulder, left_elbow, right_shoulder, right_elbow, left_wrist,
 right_wrist, left_hip, right_hip, left_knee, right_knee, left_ankle, right_ankle).
 
 The RNN model requires sliding windows of seq_length consecutive frames.
@@ -193,8 +193,8 @@ def predict_batch(
     ----------
     features_list:
         List of N feature vectors, each 39 floats
-        [nose_x, nose_y, nose_z, left_shoulder_x, …] in Kinect SDK column order
-        (13 joints × 3 = 39), matching the training column layout exactly.
+        [nose_x, nose_y, nose_z, left_shoulder_x, …] in training column order
+        (nose, left_shoulder, left_elbow, right_shoulder, …; 13 joints × 3 = 39).
     variant:
         Model variant (``"champion"`` or ``"latest"``).
 
@@ -219,7 +219,15 @@ def predict_batch(
 
     # model.predict returns raw logits (BCEWithLogitsLoss, no sigmoid in forward).
     # logit > 0  ↔  sigmoid(logit) > 0.5
-    logits = np.asarray(model.predict(windows), dtype=np.float32).flatten()
+    raw = model.predict(windows)
+    logits = np.asarray(raw, dtype=np.float32).flatten()
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    _log.info(
+        "start_stop logits: shape=%s min=%.4f max=%.4f mean=%.4f ones=%d zeros=%d",
+        logits.shape, logits.min(), logits.max(), logits.mean(),
+        int((logits > 0.0).sum()), int((logits <= 0.0).sum()),
+    )
     return [int(l > 0.0) for l in logits]
 
 
