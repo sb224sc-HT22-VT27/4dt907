@@ -16,9 +16,9 @@ Jupyter notebooks for ML experiments and assignment reporting. Each assignment h
 | $A7$ | PCA and Clustering | Did PCA and clustering on weak link data |
 | $A8$ | Preparation for DL | Prepared for DL by reading docs and tutorials |
 | $A9$ | DeepLearning model to predict z | Using kinectdata transformed to mediapipe to train a model to predict z form x,y |
-| $A10$ | - | - |
-| $A11$ | - | - |
-| $A12$ | - | - |
+| $A10$ | Z-predictor model improvements | Fixed data leakage (file-level train/val/test splits), applied y-axis mirroring augmentation, increased hidden size to 256; avg joint error improved from ~3.24 cm to ~2.64 cm |
+| $A11$ | LSTM squat activity classification | Trained bidirectional LSTM to classify squat segments (cut vs. uncut); 25 experiments on DagsHub covering optimizers, layer counts, sequence lengths, dropout, and feature scaling; 10-fold CV |
+| $A12$ | Session analysis pipeline | Integrated Start_Stop_Predictor_ModelV2 for per-frame exercise detection; end-to-end analyze-session endpoint; frontend switched from real-time streaming to record-and-send |
 | $A13$ | - | - |
 | $A14$ | - | - |
 | $A15$ | - | - |
