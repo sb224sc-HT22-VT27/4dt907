@@ -81,7 +81,11 @@ def _resolve_alias_to_version_uri(model_name: str, alias: str) -> str:
     second_latest = versions[-2] if len(versions) >= 2 else latest
     a = alias.lower().strip()
     if a in {"prod", "production"}:
-        prod = [mv for mv in versions if (getattr(mv, "current_stage", "") or "").lower() == "production"]
+        prod = [
+            mv
+            for mv in versions
+            if (getattr(mv, "current_stage", "") or "").lower() == "production"
+        ]
         chosen = prod[-1] if prod else latest
     elif a in {"backup"}:
         chosen = second_latest
@@ -105,7 +109,7 @@ def _fetch_run_id(uri: str) -> Optional[str]:
     if not uri:
         return None
     if uri.startswith("runs:/"):
-        tail = uri[len("runs:/"):]
+        tail = uri[len("runs:/") :]
         return tail.split("/", 1)[0] if tail else None
     client = MlflowClient()
     if _is_models_alias_uri(uri):
@@ -117,7 +121,7 @@ def _fetch_run_id(uri: str) -> Optional[str]:
             resolved = _resolve_alias_to_version_uri(name, alias)
             return _fetch_run_id(resolved)
     if uri.startswith("models:/"):
-        tail = uri[len("models:/"):]
+        tail = uri[len("models:/") :]
         parts = tail.split("/", 2)
         if len(parts) < 2:
             return None
@@ -153,15 +157,21 @@ def _fetch_scaler(run_id: Optional[str]) -> Optional[object]:
         return None
     try:
         import joblib
+
         client = MlflowClient()
-        tmp = tempfile.mkdtemp()
-        path = client.download_artifacts(run_id, "scaler_best.joblib", tmp)
-        return joblib.load(path)
+        # tmp = tempfile.mkdtemp()
+        # path = client.download_artifacts(run_id, "scaler_best.joblib", tmp)
+        # return joblib.load(path)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = client.download_artifacts(run_id, "scaler_best.joblib", tmp)
+            return joblib.load(path)
     except Exception:
         return None
 
 
-def get_model(variant: str = "champion") -> Tuple[object, str, Optional[str], int, Optional[object]]:
+def get_model(
+    variant: str = "champion",
+) -> Tuple[object, str, Optional[str], int, Optional[object]]:
     """Return (model, uri_used, run_id, seq_len, scaler_or_None)."""
     _init_mlflow()
     direct_uri = _direct_uri_for_variant(variant)
@@ -222,11 +232,16 @@ def predict_batch(
     raw = model.predict(windows)
     logits = np.asarray(raw, dtype=np.float32).flatten()
     import logging as _logging
+
     _log = _logging.getLogger(__name__)
     _log.info(
         "start_stop logits: shape=%s min=%.4f max=%.4f mean=%.4f ones=%d zeros=%d",
-        logits.shape, logits.min(), logits.max(), logits.mean(),
-        int((logits > 0.0).sum()), int((logits <= 0.0).sum()),
+        logits.shape,
+        logits.min(),
+        logits.max(),
+        logits.mean(),
+        int((logits > 0.0).sum()),
+        int((logits <= 0.0).sum()),
     )
     return [int(l > 0.0) for l in logits]
 
