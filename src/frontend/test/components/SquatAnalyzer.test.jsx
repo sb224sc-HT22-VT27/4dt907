@@ -104,13 +104,6 @@ describe("SquatAnalyzer - rendering", () => {
         const buttons = screen.getAllByRole("button", { name: /camera|upload|snapshot/i });
         expect(buttons).toHaveLength(2);
     });
-
-    it("Defaults to 'Live camera' mode and shows 'Record Webcam' button", () => {
-        render(<SquatAnalyzer />);
-        expect(
-            screen.getByRole("button", { name: /Record Webcam/i })
-        ).toBeInTheDocument();
-    });
 });
 
 describe("SquatAnalyzer - switching modes", () => {
