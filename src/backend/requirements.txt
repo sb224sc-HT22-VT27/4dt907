@@ -1,13 +1,15 @@
 fastapi
 uvicorn
 mlflow-skinny
-pandas
+pandas==2.1.4
 scikit-learn
 imbalanced-learn
 python-dotenv
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch
-tqdm
-optree
-dill
+torch==2.2.2
+tqdm==4.66.1
+optree==0.17.0
+dill==0.4.0
 astunparse
+cloudpickle==2.0.0
+numpy==1.26.2
