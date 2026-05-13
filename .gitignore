@@ -9,6 +9,7 @@ outputs/
 *.pth
 datafiles/
 *_mirrored.csv
+*.zip
 
 # Node.js
 node_modules/
