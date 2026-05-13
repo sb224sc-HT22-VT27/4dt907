@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.13.0] – 2026-05-13
+
+Assignment 13 – Good vs Bad Exercise Classifier.
+
+### Added
+
+- **A13 Good vs Bad classifier notebooks** (`src/ml-research/a13/`) — training, MLflow tracking,
+  and hand-in notebooks for a binary exercise quality classifier (`GoodBad_ClassifierV2`).
+- **Start/Stop-gated pipeline** — uses the A12 `Start_Stop_Predictor_ModelV2` (`@prod`) to
+  cut raw pose sequences to the active exercise window before training.
+- **Data augmentation** — each original sequence is expanded with: x-axis mirror (left/right
+  joint swap), y-axis rotations (−10°, −5°, +5°, +10°), xyz scaling (6 scale variants),
+  mirror+rotate combinations, mirror+scale combinations, and Gaussian noise (σ = 0.01).
+- **Feature engineering** — 16 normalised inter-joint distances (bone/limb pairs) and 6 joint
+  bend angles (cosine at elbow, knee, shoulder) added per frame, enriching base 3-D coordinates.
+- **Fixed-length resampling** — each cut sequence resampled to 10 equidistant frames (first and
+  last preserved) for uniform model input.
+- MLflow experiment tracking under `GoodBad_ClassifierV2` project on DagsHub.
+
+---
+
 ## [0.12.0] – 2026-05-12
 
 Assignment 12 – Session analysis pipeline, start/stop model integration, and frontend test suite.

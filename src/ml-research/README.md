@@ -19,7 +19,7 @@ Jupyter notebooks for ML experiments and assignment reporting. Each assignment h
 | $A10$ | Z-predictor model improvements | Fixed data leakage (file-level train/val/test splits), applied y-axis mirroring augmentation, increased hidden size to 256; avg joint error improved from ~3.24 cm to ~2.64 cm |
 | $A11$ | LSTM squat activity classification | Trained bidirectional LSTM to classify squat segments (cut vs. uncut); 25 experiments on DagsHub covering optimizers, layer counts, sequence lengths, dropout, and feature scaling; 10-fold CV |
 | $A12$ | Session analysis pipeline | Integrated Start_Stop_Predictor_ModelV2 for per-frame exercise detection; end-to-end analyze-session endpoint; frontend switched from real-time streaming to record-and-send |
-| $A13$ | - | - |
+| $A13$ | Good vs Bad Exercise Classifier | Trained `GoodBad_ClassifierV2` using the A12 Start/Stop model to segment sequences; augmentation (mirror, rotate, scale, noise); feature engineering with 16 inter-joint distances + 6 joint angles; fixed-length resampling to 10 frames |
 | $A14$ | - | - |
 | $A15$ | - | - |
 | $A16$ | - | - |
