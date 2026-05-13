@@ -15,8 +15,7 @@ FastAPI backend service for 4dt907 ML data-intensive system.
 
 ### Prerequisites
 
-- [Python 3.12.10](https://www.python.org/downloads/release/python-31210/)
-- For vercel local testing use [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- [Python 3.9.12](https://www.python.org/downloads/release/python-3912/)
 - For docker local testing use pip
 
 ### Installation
@@ -28,9 +27,6 @@ source .venv/bin/activate # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-# For vercel local testing
-uv sync
 ```
 
 ### Environment variables (.env)
@@ -38,7 +34,7 @@ uv sync
 Create `.env` files using `.env.example` as a template:
 
 `src/.env` (For docker)
-`.env` (in root for `vercel dev`)
+`.env`
 
 ### Running the Application
 
@@ -83,6 +79,7 @@ black .
 - `POST /api/v1/squat/classify` — classify squat depth from MediaPipe 3-D keypoints
 
   **Request** (`application/json`):
+
   ```json
   {
     "keypoints_3d": [
@@ -92,10 +89,12 @@ black .
     ]
   }
   ```
+
   At minimum `left_hip`, `left_knee`, `left_ankle`, `right_hip`, `right_knee`, `right_ankle`
   must be present.
 
   **Response**:
+
   ```json
   {
     "classification": "Deep",
@@ -121,6 +120,7 @@ regression model. The squat classifier calls this internally to improve depth es
   **Request** — same schema as `/api/v1/predict/*` (a flat feature vector).
 
   **Response**:
+
   ```json
   { "prediction": 0.042, "model_uri": "models:/…", "run_id": "abc123" }
   ```
@@ -134,10 +134,10 @@ Use the docker compose file to build entire project which uses the local Dockerf
 ## MLflow Integration
 
 The `/api/v1/predict/*` and `/api/v1/weakest-link/*` endpoints load models from MLflow
-(DagsHub) at startup. Set `MLFLOW_TRACKING_URI` and the appropriate `MODEL_URI_*` / 
+(DagsHub) at startup. Set `MLFLOW_TRACKING_URI` and the appropriate `MODEL_URI_*` /
 `WEAKLINK_MODEL_URI_*` / `Z_MODEL_URI_*` environment variables (see `.env.example`).
 
-## Project Structure (Update as needed)
+## Project Structure
 
 ```text
 backend/
