@@ -3,7 +3,7 @@
 Full session analysis pipeline: Cut → Z-pred → Classify → Results.
 
 Pipeline per session (all frames at once):
-1. Build per-frame feature vectors (39 floats: 13 joints × [x, y, z]).
+1. Build per-frame feature vectors (26 floats: 13 joints × [x, y]).
 2. Run Start_Stop_Predictor_ModelV2 on all frames → [0/1, ...].
 3. Apply gap-fill smoothing: 0-runs < 10 frames between two 1-regions → 1.
 4. For every frame: predict z for all 13 joints.
@@ -39,10 +39,10 @@ _MODEL_JOINT_NAMES: List[str] = [
 
 
 def _build_features(kp3d: List[Dict]) -> List[float]:
-    """39-float feature vector [j0_x, j0_y, j0_z, j1_x, j1_y, j1_z, …] from kp3d list.
+    """26-float feature vector [j0_x, j0_y, j1_x, j1_y, …] from kp3d list.
 
-    Order matches the alphabetically-sorted _3d_x / _3d_y / _3d_z columns
-    used during training (13 joints × 3 = 39).
+    Start/stop was trained on image-normalized x/y coordinates only
+    (13 joints × 2 = 26), so z is intentionally excluded.
     """
     kp_map = {kp["name"]: kp for kp in kp3d}
     feats: List[float] = []
@@ -50,7 +50,6 @@ def _build_features(kp3d: List[Dict]) -> List[float]:
         kp = kp_map.get(name)
         feats.append(float(kp["x"]) if kp else 0.0)
         feats.append(float(kp["y"]) if kp else 0.0)
-        feats.append(float(kp["z"]) if kp else 0.0)
     return feats
 
 
