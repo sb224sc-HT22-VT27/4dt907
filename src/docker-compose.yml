@@ -17,6 +17,10 @@ services:
                 - Z_MODEL_URI_PROD=${Z_MODEL_URI_PROD}
                 - Z_MODEL_URI_DEV=${Z_MODEL_URI_DEV}
                 - Z_MODEL_URI_BACKUP=${Z_MODEL_URI_BACKUP}
+
+                - START_STOP_MODEL_URI_PROD=${START_STOP_MODEL_URI_PROD}
+                - START_STOP_MODEL_URI_DEV=${START_STOP_MODEL_URI_DEV}
+                - START_STOP_MODEL_URI_BACKUP=${START_STOP_MODEL_URI_BACKUP}
         container_name: 4dt907-backend
         environment:
             - BACKEND_PORT=${BACKEND_PORT:-8080}
@@ -33,6 +37,10 @@ services:
             - Z_MODEL_URI_PROD=${Z_MODEL_URI_PROD}
             - Z_MODEL_URI_DEV=${Z_MODEL_URI_DEV}
             - Z_MODEL_URI_BACKUP=${Z_MODEL_URI_BACKUP}
+
+            - START_STOP_MODEL_URI_PROD=${START_STOP_MODEL_URI_PROD}
+            - START_STOP_MODEL_URI_DEV=${START_STOP_MODEL_URI_DEV}
+            - START_STOP_MODEL_URI_BACKUP=${START_STOP_MODEL_URI_BACKUP}
         ports:
             - "${BACKEND_PORT:-8080}:${BACKEND_PORT:-8080}"
         volumes:
@@ -54,6 +62,7 @@ services:
             timeout: 10s
             retries: 3
             start_period: 40s
+        mem_limit: 2g
         deploy:
             resources:
                 limits:

@@ -86,61 +86,6 @@ def test_init_mlflow_sets_uri(monkeypatch):
     assert uri == "http://mlflow:5050"
 
 
-"""_model_name_for_variant tests."""
-
-
-def test_model_name_for_variant_champion(monkeypatch):
-    monkeypatch.setenv("MLFLOW_BEST_MODEL_NAME", "best_model")
-    assert model_service._model_name_for_variant("champion") == "best_model"
-
-
-def test_model_name_for_variant_best(monkeypatch):
-    monkeypatch.setenv("MLFLOW_BEST_MODEL_NAME", "best_model")
-    assert model_service._model_name_for_variant("best") == "best_model"
-
-
-def test_model_name_for_variant_latest(monkeypatch):
-    monkeypatch.setenv("MLFLOW_LATEST_MODEL_NAME", "latest_model")
-    assert model_service._model_name_for_variant("latest") == "latest_model"
-
-
-def test_model_name_for_variant_missing_env_best(monkeypatch):
-    monkeypatch.delenv("MLFLOW_BEST_MODEL_NAME", raising=False)
-    with pytest.raises(RuntimeError):
-        model_service._model_name_for_variant("champion")
-
-
-def test_model_name_for_variant_missing_env_latest(monkeypatch):
-    monkeypatch.delenv("MLFLOW_LATEST_MODEL_NAME", raising=False)
-    with pytest.raises(RuntimeError):
-        model_service._model_name_for_variant("latest")
-
-
-def test_model_name_for_variant_invalid():
-    with pytest.raises(RuntimeError):
-        model_service._model_name_for_variant("unknown")
-
-
-"""_latest_source_uri tests."""
-
-
-def test_latest_source_uri(monkeypatch):
-    fake_version = MagicMock()
-    fake_version.version = "3"
-    fake_version.source = "models:/MyModel/3"
-
-    fake_client = MagicMock()
-    fake_client.search_model_versions.return_value = [fake_version]
-
-    monkeypatch.setattr(
-        model_service,
-        "MlflowClient",
-        lambda: fake_client,
-    )
-
-    uri = model_service._latest_source_uri("MyModel")
-    assert uri == "models:/MyModel/3"
-
 
 """_is_models_alias_uri tests"""
 

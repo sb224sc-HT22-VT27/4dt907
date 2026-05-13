@@ -33,6 +33,11 @@ export default defineConfig(({ mode }) => {
           secure: false
         }
       }
-    }
+    },
+    test: {
+      globals: true,           // lets you use describe/it/expect without imports
+      environment: "jsdom",    // simulates the browser DOM
+      setupFiles: path.resolve(import.meta.dirname, "test/setup.js"),
+    },
   };
 });

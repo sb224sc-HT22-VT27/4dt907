@@ -1,0 +1,22 @@
+{
+  "note": "ACNN_v1_baseline",
+  "model_type": "cnn",
+  "config": {
+    "note": "ACNN_v1_baseline",
+    "model_type": "cnn",
+    "n_filters": 8,
+    "kernel_size": 3,
+    "pool_size": 2,
+    "fc_h": 16,
+    "dropout": 0.3,
+    "lr": 0.001,
+    "batch_size": 64,
+    "epochs": 80,
+    "patience": 10,
+    "use_scaling": true
+  },
+  "mean_acc": 1.0,
+  "mean_auc": 1.0,
+  "ckpt_path": "saved_models/goodbad_best_ACNN_v1_baseline.pth",
+  "scaler_path": "saved_models/scaler_goodbad_ACNN_v1_baseline.joblib"
+}

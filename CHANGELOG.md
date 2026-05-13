@@ -9,7 +9,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.11.0] – 2026-05-04
+## [0.13.0] – 2026-05-13
+
+Assignment 13 – Good vs Bad Exercise Classifier.
+
+### Added
+
+- **A13 Good vs Bad classifier notebooks** (`src/ml-research/a13/`) — training, MLflow tracking,
+  and hand-in notebooks for a binary exercise quality classifier (`GoodBad_ClassifierV2`).
+- **Start/Stop-gated pipeline** — uses the A12 `Start_Stop_Predictor_ModelV2` (`@prod`) to
+  cut raw pose sequences to the active exercise window before training.
+- **Data augmentation** — each original sequence is expanded with: x-axis mirror (left/right
+  joint swap), y-axis rotations (−10°, −5°, +5°, +10°), xyz scaling (6 scale variants),
+  mirror+rotate combinations, mirror+scale combinations, and Gaussian noise (σ = 0.01).
+- **Feature engineering** — 16 normalised inter-joint distances (bone/limb pairs) and 6 joint
+  bend angles (cosine at elbow, knee, shoulder) added per frame, enriching base 3-D coordinates.
+- **Fixed-length resampling** — each cut sequence resampled to 10 equidistant frames (first and
+  last preserved) for uniform model input.
+- MLflow experiment tracking under `GoodBad_ClassifierV2` project on DagsHub.
+
+---
+
+## [0.12.0] – 2026-05-06
+
+Assignment 12 – Session analysis pipeline, start/stop model integration, and frontend test suite.
+
+### Added
+
+- **A12 session analysis pipeline** (`src/backend/app/services/session_analysis_service.py`,
+  `start_stop_model_service.py`) — `POST /api/v1/squat/analyze-session` endpoint receives all
+  recorded frames at once, detects exercise segments using a per-frame RNN start/stop model
+  (`Start_Stop_Predictor_ModelV2`), then runs z-prediction and squat classification on each
+  frame; returns per-frame `FrameAnalysisResult` with `start_stop`, `classification`,
+  knee angles, confidence, and predicted z values.
+- **`SessionAnalysisRequest` / `SessionAnalysisResponse` schemas** — accepts
+  `frames: List[List[Keypoint3D]]`; wraps a list of `FrameAnalysisResult` objects.
+- **Frontend test suite** (`src/frontend/test/`) — Vitest + jsdom tests for `App.jsx`,
+  `Predict.jsx`, `FeatureBuilder.jsx`, and `SquatAnalyzer.jsx`; integrated into CI via
+  `npm run test:run`.
+- `START_STOP_MODEL_URI_PROD` / `START_STOP_MODEL_URI_DEV` environment variables for the
+  start/stop model loader.
+
+### Changed
+
+- **Frontend webcam mode** — switched from real-time frame streaming to record-and-send:
+  frames accumulate in a ref cache during recording and are sent to the backend simultaneously
+  on stop; 3-D skeleton viewer falls back to showing all frames when no exercise segment is
+  detected.
+- **`model_info` endpoint** — fixed tuple unpack from 3-values to 5-values to match the
+  updated service signature.
+- **Docker Compose** (`src/docker-compose.yml`) — updated service configuration and
+  dependencies to support the session analysis pipeline.
+- **`DEPLOYMENT.md`** — updated to cover local Docker dev and split hosting (Vercel, Render,
+  Supabase, DagsHub); removed single-host Vercel deployment instructions.
+
+### Removed
+
+- **`api/` directory** — Vercel serverless entry-point (`api/index.py`) removed; single-host
+  deployment via Vercel is no longer supported.
+- **Dead code** — removed unused `hello_world.py`, `hello.py` schema, `test_hello.py`,
+  `test_deps.py`, `test_model_service.py`, `App.css`, and `SQUAT_JOINT_NAMES_SET` frontend
+  constant.
+- **Unused env vars** — `MLFLOW_BEST_MODEL_NAME` and `MLFLOW_LATEST_MODEL_NAME` removed from
+  `.env.example`.
+
+---
+
+## [0.11.0] – 2026-04-29
 
 Assignment 11 – LSTM-based squat activity segmentation with hyperparameter search.
 

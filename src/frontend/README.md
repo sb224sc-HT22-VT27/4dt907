@@ -27,6 +27,7 @@ The application will be available at <http://localhost:3030>
 npm run build   # Build for production
 npm run preview # Preview production build
 npm run lint    # Run linting
+npm run test    # Run tests
 ```
 
 ## Configuration
@@ -51,7 +52,7 @@ simply hidden. See `.env.example` for the required SQL to create the `squat_keyp
 
 Use the docker compose file to build entire project which uses the local Dockerfile for the frontend.
 
-## Project Structure (Update as needed)
+## Project Structure
 
 ```text
 frontend/
