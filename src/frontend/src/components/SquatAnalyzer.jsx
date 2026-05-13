@@ -797,6 +797,7 @@ export default function SquatAnalyzer() {
                 classification: data.results[i]?.classification ?? null,
                 confidence: data.results[i]?.confidence ?? null,
                 startStop: data.results[i]?.start_stop ?? 1,
+                goodBadScore: data.results[i]?.good_bad_score ?? null,
             }));
             sessionLogRef.current = entries;
             setSessionLog(entries);
@@ -805,11 +806,15 @@ export default function SquatAnalyzer() {
             );
             if (valid.length > 0) {
                 const last = valid[valid.length - 1];
+                // good_bad_score: use the first exercise frame's score (all frames in
+                // the same segment share the same score from the classifier).
+                const firstWithScore = valid.find(r => r.good_bad_score != null);
                 setResult({
                     classification: last.classification,
                     left_knee_angle: last.left_knee_angle,
                     right_knee_angle: last.right_knee_angle,
                     confidence: last.confidence,
+                    goodBadScore: firstWithScore?.good_bad_score ?? null,
                 });
             }
             setStatus("finished");
@@ -1477,14 +1482,14 @@ export default function SquatAnalyzer() {
 
             {/* Classification result */}
             {result && (
-                <div className="ios-card rounded-2xl p-5 text-center w-72">
+                <div className="ios-card rounded-2xl p-5 text-center w-80">
                     <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">
                         Classification
                     </p>
                     <p className={`text-4xl font-bold mb-4 ${colorClass}`}>
                         {result.classification}
                     </p>
-                    <div className="flex justify-around text-sm">
+                    <div className="flex justify-around text-sm mb-4">
                         <div>
                             <p className="text-slate-400 text-xs">Left knee</p>
                             <p className="font-mono text-slate-700 font-semibold">
@@ -1508,6 +1513,34 @@ export default function SquatAnalyzer() {
                             </div>
                         )}
                     </div>
+
+                    {/* Good / Bad form score */}
+                    {result.goodBadScore != null && (() => {
+                        const s = result.goodBadScore;
+                        const label = s >= 0.65 ? "Good form" : s <= 0.35 ? "Bad form" : "Uncertain";
+                        const pct = Math.round(s * 100);
+                        const barColor = s >= 0.65 ? "bg-green-500" : s <= 0.35 ? "bg-red-500" : "bg-amber-400";
+                        const textColor = s >= 0.65 ? "text-green-600" : s <= 0.35 ? "text-red-600" : "text-amber-600";
+                        return (
+                            <div className="border-t border-slate-100 pt-3">
+                                <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">
+                                    Form quality
+                                </p>
+                                <p className={`text-xl font-bold mb-2 ${textColor}`}>
+                                    {label}
+                                </p>
+                                <div className="w-full bg-slate-100 rounded-full h-2 mb-1">
+                                    <div
+                                        className={`h-2 rounded-full transition-all ${barColor}`}
+                                        style={{ width: `${pct}%` }}
+                                    />
+                                </div>
+                                <p className="text-xs text-slate-400 tabular-nums">
+                                    {pct}% good
+                                </p>
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
 

@@ -111,6 +111,7 @@ def squat_analyze_session(req: SessionAnalysisRequest):
                 right_knee_angle=fr.right_knee_angle,
                 confidence=fr.confidence,
                 predicted_z=fr.predicted_z,
+                good_bad_score=fr.good_bad_score,
             )
             for fr in frame_results
         ]

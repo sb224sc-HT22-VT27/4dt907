@@ -65,6 +65,7 @@ class FrameAnalysisResult(BaseModel):
     right_knee_angle: float
     confidence: Optional[float] = None
     predicted_z: dict  # {joint_name: z_value} for all 13 joints
+    good_bad_score: Optional[float] = None  # [0,1] ~1.0=Good ~0.0=Bad ~0.5=uncertain
 
 
 class SessionAnalysisResponse(BaseModel):
