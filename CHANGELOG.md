@@ -30,7 +30,7 @@ Assignment 13 – Good vs Bad Exercise Classifier.
 
 ---
 
-## [0.12.0] – 2026-05-12
+## [0.12.0] – 2026-05-06
 
 Assignment 12 – Session analysis pipeline, start/stop model integration, and frontend test suite.
 
@@ -75,7 +75,7 @@ Assignment 12 – Session analysis pipeline, start/stop model integration, and f
 
 ---
 
-## [0.11.0] – 2026-05-04
+## [0.11.0] – 2026-04-29
 
 Assignment 11 – LSTM-based squat activity segmentation with hyperparameter search.
 
