@@ -1,0 +1,3 @@
+note,model_type,n_params,AUC,accuracy,precision,recall
+ADense_v1_baseline,dense,8695,1.0,0.9818181818181818,0.975,1.0
+ACNN_v1_baseline,cnn,2145,1.0,1.0,1.0,1.0
