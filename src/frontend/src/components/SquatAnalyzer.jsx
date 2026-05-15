@@ -609,6 +609,81 @@ function Skeleton3DViewer({ frames, liveFrame }) {
     );
 }
 
+/**
+ * Assess per-frame video quality for squat analysis.
+ * Returns { blocking, warnings } where:
+ *   blocking — issues that prevent reliable analysis (pipeline should be gated)
+ *   warnings — advisory hints shown live but never block the pipeline
+ */
+function assessVideoQuality(detection, captureCanvas) {
+    if (!detection?.landmarks?.length) {
+        return { blocking: ["No person detected in frame"], warnings: [] };
+    }
+
+    const lms = detection.landmarks[0];
+    const blocking = [];
+    const warnings = [];
+    const CORE = [11, 12, 23, 24, 25, 26, 27, 28];
+    const vis = (i) => lms[i]?.visibility ?? 0;
+
+    // ── BLOCKING: frame brightness ────────────────────────────────────────────
+    if (captureCanvas?.width > 0 && captureCanvas?.height > 0) {
+        try {
+            const ctx = captureCanvas.getContext("2d");
+            const { width: w, height: h } = captureCanvas;
+            const { data } = ctx.getImageData(
+                Math.floor(w * 0.25), Math.floor(h * 0.15),
+                Math.floor(w * 0.5),  Math.floor(h * 0.7),
+            );
+            let lum = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                lum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            }
+            const avg = lum / (data.length / 4);
+            if (avg < 28)  blocking.push("Frame too dark: improve room lighting");
+            else if (avg > 238) blocking.push("Frame overexposed: reduce direct lighting behind the subject");
+        } catch { /* cross-origin / security errors ignored */ }
+    }
+
+    // ── WARNINGS: advisory hints — never stop the pipeline ───────────────────
+
+    // Upside down
+    const nose = lms[0], la = lms[27], ra = lms[28];
+    if (nose && la && ra && nose.y > (la.y + ra.y) / 2 + 0.1) {
+        warnings.push("Video appears upside down: rotate the camera 180°");
+    }
+
+    // Hands below hips
+    const lw = lms[15], rw = lms[16], lh = lms[23], rh = lms[24];
+    if (lw && rw && lh && rh && vis(15) > 0.5 && vis(16) > 0.5) {
+        if ((lw.y + rw.y) / 2 > (lh.y + rh.y) / 2 + 0.12) {
+            warnings.push("Hands are below the hips: unusual posture for squat analysis");
+        }
+    }
+
+    // Key joints clipped at frame edges
+    const coreLms = CORE.map((i) => lms[i]).filter(Boolean);
+    if (coreLms.filter((lm) => lm.x < 0.04 || lm.x > 0.96 || lm.y < 0.04 || lm.y > 0.96).length >= 2) {
+        warnings.push("Person is partially out of frame: move camera back or reposition");
+    }
+
+    // Person too small / too far
+    const ys = coreLms.map((lm) => lm.y);
+    const xs = coreLms.map((lm) => lm.x);
+    if (ys.length >= 4 && Math.max(...ys) - Math.min(...ys) < 0.3 && Math.max(...xs) - Math.min(...xs) < 0.2) {
+        warnings.push("Person is too far from the camera: move closer");
+    }
+
+    // Knees hidden while shoulders clearly visible (facing camera head-on)
+    if (vis(25) < 0.35 && vis(26) < 0.35 && vis(11) > 0.6 && vis(12) > 0.6) {
+        if (Math.abs((lms[12]?.x ?? 0) - (lms[11]?.x ?? 0)) > 0.15) {
+            warnings.push("Knees not visible: try a side-on camera angle for better depth measurement");
+        }
+    }
+
+    return { blocking, warnings };
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SquatAnalyzer() {
@@ -645,9 +720,13 @@ export default function SquatAnalyzer() {
     const [predictedZByName, setPredictedZByName] = useState({});
     const [liveFrame3d, setLiveFrame3d] = useState(null);
     const [startStopMetrics, setStartStopMetrics] = useState(null);
+    const [qualityIssues, setQualityIssues] = useState([]);
+    const [qualityError, setQualityError] = useState(null);
 
     const sessionNameRef = useRef("");
     const predictedZByNameRef = useRef({});
+    const qualityIssueCountsRef = useRef({});
+    const qualityFrameCountRef = useRef(0);
 
     // ── Fetch model metrics on mount ─────────────────────────────────────────
     useEffect(() => {
@@ -715,6 +794,9 @@ export default function SquatAnalyzer() {
         setPredictedZByName({});
         predictedZByNameRef.current = {};
         setLiveFrame3d(null);
+        qualityIssueCountsRef.current = {};
+        qualityFrameCountRef.current = 0;
+        setQualityIssues([]);
         setStatus(nextStatus);
     }, []);
 
@@ -724,6 +806,8 @@ export default function SquatAnalyzer() {
         setSessionLog([]);
         setUploadedFileName("");
         setErrorMsg("");
+        setQualityError(null);
+        setQualityIssues([]);
     }, []);
 
     // Full reset: stop capture + discard data (used when switching modes).
@@ -735,6 +819,7 @@ export default function SquatAnalyzer() {
         setSessionLog([]);
         setUploadedFileName("");
         setErrorMsg("");
+        setQualityError(null);
     }, [stopCapture]);
 
     function mapAllKeypoints(landmarks) {
@@ -773,10 +858,25 @@ export default function SquatAnalyzer() {
     const stopAndAnalyze = useCallback(async () => {
         const frames = recordedKpFramesRef.current;
         const normFrames = recordedNormFramesRef.current;
+        // Snapshot quality data before stopCapture resets it
+        const totalQFrames = qualityFrameCountRef.current;
+        const issueCounts = { ...qualityIssueCountsRef.current };
         stopCapture("analyzing");
         if (frames.length === 0) {
             setStatus("idle");
             return;
+        }
+        // Quality gate: abort if any issue persisted in more than 50% of frames
+        if (totalQFrames > 10) {
+            const persistentIssues = Object.entries(issueCounts)
+                .filter(([, n]) => n / totalQFrames > 0.65)
+                .sort(([, a], [, b]) => b - a)
+                .map(([issue]) => issue);
+            if (persistentIssues.length > 0) {
+                setQualityError({ issues: persistentIssues });
+                setStatus("idle");
+                return;
+            }
         }
         try {
             const body = { frames };
@@ -846,6 +946,7 @@ export default function SquatAnalyzer() {
         setResult(null);
         setStatus("loading");
         setErrorMsg("");
+        setQualityError(null);
         try {
             if (!landmarkerRef.current) {
                 landmarkerRef.current = await createVideoLandmarker();
@@ -954,15 +1055,22 @@ export default function SquatAnalyzer() {
                 const detection = imageLandmarker.detect(img);
 
                 if (detection.landmarks?.length > 0) {
+                    // Quality check — canvas has raw image pixels before skeleton draw
+                    const { blocking, warnings } = assessVideoQuality(detection, canvas);
                     drawSkeleton(canvas, drawW, drawH, detection, {
                         x: offsetX,
                         y: offsetY,
                     });
                     setAllKeypoints(mapAllKeypoints(detection.landmarks[0]));
-                    const kp3d = filterSquatKeypoints3d(
-                        detection.worldLandmarks?.[0] ?? [],
-                    );
-                    sendFrame(kp3d);
+                    if (warnings.length > 0) setQualityIssues(warnings);
+                    if (blocking.length > 0) {
+                        setQualityError({ issues: blocking });
+                    } else {
+                        const kp3d = filterSquatKeypoints3d(
+                            detection.worldLandmarks?.[0] ?? [],
+                        );
+                        sendFrame(kp3d);
+                    }
                 }
                 setStatus("idle");
             } catch (err) {
@@ -1105,6 +1213,23 @@ export default function SquatAnalyzer() {
                 // Update 2-D keypoints panel (uses normalized landmarks, not world coords)
                 if (det?.landmarks?.length > 0) {
                     setAllKeypoints(mapAllKeypoints(det.landmarks[0]));
+                }
+
+                // Quality assessment — skip 15-frame grace period
+                if (det?.landmarks?.length > 0) {
+                    qualityFrameCountRef.current++;
+                    if (qualityFrameCountRef.current > 15) {
+                        const { blocking, warnings } = assessVideoQuality(det, captureCanvasRef.current);
+                        // Only blocking issues count toward the gate
+                        blocking.forEach((issue) => {
+                            qualityIssueCountsRef.current[issue] =
+                                (qualityIssueCountsRef.current[issue] || 0) + 1;
+                        });
+                        // Show all issues (blocking + advisory) in the live overlay
+                        if (qualityFrameCountRef.current % 8 === 0) {
+                            setQualityIssues([...blocking, ...warnings]);
+                        }
+                    }
                 }
             }
 
@@ -1348,6 +1473,30 @@ export default function SquatAnalyzer() {
                     height={480}
                     className="absolute inset-0 pointer-events-none w-full h-full"
                 />
+                {/* Live quality warning overlay */}
+                {qualityIssues.length > 0 && status === "running" && (
+                    <div className="absolute top-2 inset-x-2">
+                        <div
+                            className="rounded-xl px-3 py-2.5"
+                            style={{
+                                background: "rgba(245,158,11,0.88)",
+                                backdropFilter: "blur(14px)",
+                                border: "1px solid rgba(251,191,36,0.35)",
+                                boxShadow: "0 4px 20px rgba(245,158,11,0.28)",
+                            }}
+                        >
+                            <p className="text-white text-xs font-bold uppercase tracking-wide mb-1">
+                                Video quality
+                            </p>
+                            {qualityIssues.map((issue, i) => (
+                                <p key={i} className="text-white/95 text-xs leading-snug">
+                                    {issue}
+                                </p>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {(status === "loading" || status === "analyzing") && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                         <p className="text-white text-sm font-semibold animate-pulse">
@@ -1468,6 +1617,48 @@ export default function SquatAnalyzer() {
                 <p className="text-red-500 text-sm">
                     {errorMsg || "An error occurred."}
                 </p>
+            )}
+
+            {/* Quality error card */}
+            {qualityError && (
+                <div
+                    className="ios-card rounded-2xl p-5 w-full"
+                    style={{
+                        border: "1px solid rgba(251,191,36,0.4)",
+                        boxShadow: "0 8px 32px rgba(245,158,11,0.12)",
+                    }}
+                >
+                    <div className="flex items-start gap-3 mb-3">
+                        <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shrink-0"
+                            style={{
+                                background: "radial-gradient(circle at 35% 30%, rgba(254,243,199,0.95), rgba(253,230,138,0.85))",
+                                border: "1px solid rgba(251,191,36,0.4)",
+                                color: "#92400e",
+                            }}
+                        >
+                            !
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-amber-700">
+                                Video quality too poor to analyze
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                Fix the issues below and record again
+                            </p>
+                        </div>
+                    </div>
+                    <ul className="space-y-2 pl-1">
+                        {qualityError.issues.map((issue, i) => (
+                            <li key={i} className="flex items-start gap-2">
+                                <span className="text-amber-400 font-bold shrink-0 mt-0.5">
+                                    ·
+                                </span>
+                                <span className="text-sm text-slate-600">{issue}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             )}
 
             {/* Model quality indicator — Start/Stop MAE from DagsHub */}
