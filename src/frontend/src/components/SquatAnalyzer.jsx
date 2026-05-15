@@ -447,7 +447,7 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                         : "#dc2626";
             ctx.textAlign = "center";
             ctx.fillText(
-                cls === "NotExercise" ? "— not exercise —" : cls,
+                cls === "NotExercise" ? "not exercise" : cls,
                 cx,
                 18,
             );
@@ -506,7 +506,7 @@ function Skeleton3DViewer({ frames, liveFrame }) {
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider self-start">
                 3-D Skeleton Replay
                 <span className="ml-2 normal-case font-normal text-slate-300">
-                    — drag to rotate · scroll or ±  to zoom
+                    drag to rotate · scroll or ± to zoom
                 </span>
             </p>
 
@@ -635,6 +635,7 @@ export default function SquatAnalyzer() {
     const [sessionName, setSessionName] = useState("");
     const [status, setStatus] = useState("idle");
     const [result, setResult] = useState(null);
+    const [goodBadThreshold, setGoodBadThreshold] = useState(0.5);
     const [errorMsg, setErrorMsg] = useState("");
     const [uploadedFileName, setUploadedFileName] = useState("");
     const [videoPaused, setVideoPaused] = useState(false);
@@ -805,11 +806,16 @@ export default function SquatAnalyzer() {
             );
             if (valid.length > 0) {
                 const last = valid[valid.length - 1];
+                // Use the good_bad_score from the first exercise frame that has one.
+                const firstWithScore = data.results.find(
+                    r => r.start_stop === 1 && r.good_bad_score != null
+                );
                 setResult({
                     classification: last.classification,
                     left_knee_angle: last.left_knee_angle,
                     right_knee_angle: last.right_knee_angle,
                     confidence: last.confidence,
+                    goodBadScore: firstWithScore?.good_bad_score ?? null,
                 });
             }
             setStatus("finished");
@@ -1322,15 +1328,13 @@ export default function SquatAnalyzer() {
 
             {/* Video + canvas overlay */}
             <div
-                className="ios-card relative rounded-2xl overflow-hidden bg-black"
-                style={{ width: 640, height: 480 }}
+                className="ios-card relative rounded-2xl overflow-hidden bg-black w-full"
+                style={{ maxWidth: 640, aspectRatio: "4/3" }}
             >
                 <video
                     ref={videoRef}
-                    className="block bg-black"
+                    className="absolute inset-0 bg-black w-full h-full"
                     style={{
-                        width: 640,
-                        height: 480,
                         objectFit: "contain",
                         visibility:
                             inputMode === "image" ? "hidden" : "visible",
@@ -1340,8 +1344,9 @@ export default function SquatAnalyzer() {
                 />
                 <canvas
                     ref={canvasRef}
-                    className="absolute inset-0 pointer-events-none"
-                    style={{ width: 640, height: 480 }}
+                    width={640}
+                    height={480}
+                    className="absolute inset-0 pointer-events-none w-full h-full"
                 />
                 {(status === "loading" || status === "analyzing") && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60">
@@ -1422,7 +1427,7 @@ export default function SquatAnalyzer() {
                     </div>
                     {status === "finished" && (
                         <p className="text-green-600 text-sm font-semibold">
-                            ✓ Analysis complete — review results below
+                            ✓ Analysis complete · review results below
                         </p>
                     )}
                     {uploadedFileName && (
@@ -1477,7 +1482,7 @@ export default function SquatAnalyzer() {
 
             {/* Classification result */}
             {result && (
-                <div className="ios-card rounded-2xl p-5 text-center w-72">
+                <div className="ios-card rounded-2xl p-5 text-center w-full">
                     <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">
                         Classification
                     </p>
@@ -1510,6 +1515,107 @@ export default function SquatAnalyzer() {
                     </div>
                 </div>
             )}
+
+            {/* Form quality + threshold */}
+            {result?.goodBadScore != null && (() => {
+                const s = result.goodBadScore;
+                const isGood = s >= goodBadThreshold;
+                const pct = Math.round(s * 100);
+                const threshPct = Math.round(goodBadThreshold * 100);
+                const textColor = isGood ? "text-green-500" : "text-red-500";
+                return (
+                    <div className="ios-card rounded-2xl p-5 w-full">
+                        {/* Header row */}
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
+                                    Form Quality
+                                </p>
+                                <p className={`text-2xl font-bold ${textColor}`}>
+                                    {isGood ? "Good form" : "Bad form"}
+                                </p>
+                            </div>
+                            <div
+                                className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold ios-card ${
+                                    isGood
+                                        ? "text-green-500"
+                                        : "text-red-500"
+                                }`}
+                                style={{
+                                    background: isGood
+                                        ? "radial-gradient(circle at 35% 30%, rgba(220,252,231,0.95), rgba(187,247,208,0.85))"
+                                        : "radial-gradient(circle at 35% 30%, rgba(254,226,226,0.95), rgba(252,165,165,0.70))",
+                                    border: isGood
+                                        ? "1px solid rgba(74,222,128,0.35)"
+                                        : "1px solid rgba(248,113,113,0.35)",
+                                }}
+                            >
+                                {isGood ? "✓" : "✗"}
+                            </div>
+                        </div>
+
+                        {/* Score bar with threshold marker */}
+                        <div className="mb-5">
+                            <div className="flex justify-between text-xs mb-2">
+                                <span className="text-slate-400">Score</span>
+                                <span className="font-bold text-slate-600 tabular-nums">
+                                    {pct}%
+                                </span>
+                            </div>
+                            <div className="relative h-3 rounded-full bg-slate-100 overflow-visible">
+                                <div
+                                    className="h-full rounded-full transition-all duration-700 ease-out"
+                                    style={{
+                                        width: `${pct}%`,
+                                        background: isGood
+                                            ? "linear-gradient(to right, #fbbf24, #4ade80)"
+                                            : "linear-gradient(to right, #f87171, #fbbf24)",
+                                        boxShadow: isGood
+                                            ? "0 0 12px rgba(74,222,128,0.4)"
+                                            : "0 0 12px rgba(248,113,113,0.35)",
+                                    }}
+                                />
+                                {/* Threshold marker line */}
+                                <div
+                                    className="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-slate-500 opacity-60"
+                                    style={{ left: `calc(${threshPct}% - 1px)` }}
+                                />
+                            </div>
+                            <p className="text-xs text-slate-300 text-right mt-1 tabular-nums">
+                                threshold at {threshPct}%
+                            </p>
+                        </div>
+
+                        {/* Threshold slider */}
+                        <div>
+                            <div className="flex justify-between text-xs mb-2">
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                    Threshold
+                                </span>
+                                <span className="font-bold text-slate-600 tabular-nums">
+                                    {threshPct}%
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={threshPct}
+                                onChange={(e) =>
+                                    setGoodBadThreshold(
+                                        Number(e.target.value) / 100,
+                                    )
+                                }
+                                className="ios-slider"
+                            />
+                            <div className="flex justify-between text-xs text-slate-300 mt-2">
+                                <span>Bad</span>
+                                <span>Good</span>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Session actions */}
             {sessionLog.length > 0 && (
@@ -1552,7 +1658,7 @@ export default function SquatAnalyzer() {
                         Keypoints
                         {status === "running" && (
                             <span className="ml-2 normal-case font-normal text-slate-300">
-                                — live
+                                live
                             </span>
                         )}
                     </p>
@@ -1600,7 +1706,7 @@ export default function SquatAnalyzer() {
                                                 }`}
                                             >
                                                 {kp.predictedZ == null
-                                                    ? "—"
+                                                    ? "n/a"
                                                     : kp.predictedZ.toFixed(3)}
                                             </span>
                                         )}
