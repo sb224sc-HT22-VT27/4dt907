@@ -1,6 +1,6 @@
 """app.services.session_analysis_service
 
-Full session analysis pipeline: Cut → Z-pred → Classify → Results.
+Full session analysis pipeline: Cut → Z-pred → Classify → GoodBad → Results.
 
 Pipeline per session (all frames at once):
 1. Build per-frame feature vectors (39 floats: 13 joints × [x, y, z]).
@@ -8,12 +8,14 @@ Pipeline per session (all frames at once):
 3. Apply gap-fill smoothing: 0-runs < 10 frames between two 1-regions → 1.
 4. For every frame: predict z for all 13 joints.
 5. For exercise frames (start_stop=1): classify squat depth using predicted z.
-6. Return per-frame results.
+6. Run GoodBad_ClassifierV2 on each continuous exercise segment → quality score [0,1].
+7. Return per-frame results.
 """
 
 from typing import Dict, List, Optional, Tuple
 
 from app.services import start_stop_model_service
+from app.services import goodbad_model_service
 from app.services.squat_service import calculate_knee_angle, _rule_based
 from app.services.z_model_service import predict_one as predict_z
 
@@ -124,7 +126,7 @@ def _classify_with_z(
 
 class FrameResult:
     __slots__ = ("start_stop", "classification", "left_knee_angle",
-                 "right_knee_angle", "confidence", "predicted_z")
+                 "right_knee_angle", "confidence", "predicted_z", "good_bad_score")
 
     def __init__(
         self,
@@ -134,6 +136,7 @@ class FrameResult:
         right_knee_angle: float,
         confidence: Optional[float],
         predicted_z: Dict[str, float],
+        good_bad_score: Optional[float] = None,
     ):
         self.start_stop = start_stop
         self.classification = classification
@@ -141,6 +144,7 @@ class FrameResult:
         self.right_knee_angle = right_knee_angle
         self.confidence = confidence
         self.predicted_z = predicted_z
+        self.good_bad_score = good_bad_score
 
 
 import logging as _logging
@@ -209,6 +213,52 @@ def analyze_session(
             right_knee_angle=ra,
             confidence=conf,
             predicted_z=predicted_z,
+            good_bad_score=None,
         ))
 
+    # 6. GoodBad quality scoring — one score per continuous exercise segment.
+    #    Pass norm_frames so the model receives the normalised [0,1] coords it
+    #    was trained on (world coords cause all-bad predictions).
+    _score_exercise_segments(norm_frames or frames, smoothed, results)
+
     return results
+
+
+def _score_exercise_segments(
+    source_frames: List[List[Dict]],
+    smoothed: List[int],
+    results: List[FrameResult],
+) -> None:
+    """Run GoodBad_ClassifierV2 on each continuous exercise segment in-place.
+
+    source_frames must be image-normalised keypoints (x, y ∈ [0,1]) — the
+    coordinate system the model was trained on.  Passing world-space coords
+    will cause all segments to be classified as Bad.
+    """
+    n = len(smoothed)
+    i = 0
+    while i < n:
+        if smoothed[i] == 1:
+            seg_start = i
+            while i < n and smoothed[i] == 1:
+                i += 1
+            seg_end = i  # exclusive
+
+            seg_frames = source_frames[seg_start:seg_end]
+            try:
+                score = goodbad_model_service.predict_session(seg_frames, "champion")
+            except Exception as exc:
+                _log.error(
+                    "GoodBad scoring failed for segment [%d:%d]: %s",
+                    seg_start, seg_end, exc,
+                )
+                score = None
+
+            _log.info(
+                "GoodBad segment [%d:%d] (%d frames): score=%.4f",
+                seg_start, seg_end, seg_end - seg_start, score,
+            )
+            for j in range(seg_start, seg_end):
+                results[j].good_bad_score = score
+        else:
+            i += 1
