@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM python:3.9.12-slim
+FROM python:3.14.5-slim
 
 ARG BACKEND_PORT
 ARG MLFLOW_TRACKING_URI
