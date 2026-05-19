@@ -17,7 +17,7 @@ from typing import Dict, List, Optional, Tuple
 from app.services import start_stop_model_service
 from app.services import goodbad_model_service
 from app.services.squat_service import calculate_knee_angle, _rule_based
-from app.services.z_model_service import predict_one as predict_z
+from app.services.z_model_service import predict_batch as predict_z_batch
 
 # Joint names in training column order — must match the feat_cols order from the
 # training notebook exactly (nose, left_shoulder, left_elbow, right_shoulder, ...).
@@ -54,21 +54,33 @@ def _build_features(kp3d: List[Dict]) -> List[float]:
     return feats
 
 
-def _predict_z_all_joints(kp3d: List[Dict]) -> Dict[str, float]:
-    """Predict z for all 13 joints in one frame via the z-predictor."""
-    kp_map = {kp["name"]: kp for kp in kp3d}
-    result: Dict[str, float] = {}
-    for name in _MODEL_JOINT_NAMES:
-        kp = kp_map.get(name)
-        if kp:
-            try:
-                z, _, _ = predict_z([float(kp["x"]), float(kp["y"])], "champion")
-                result[name] = float(z)
-            except Exception:
-                result[name] = float(kp.get("z", 0.0))
-        else:
-            result[name] = 0.0
-    return result
+def _predict_z_all_frames(frames: List[List[Dict]]) -> List[Dict[str, float]]:
+    """Predict z for all joints across all frames in a single batch model call."""
+    entries = []
+    for i, kp3d in enumerate(frames):
+        kp_map = {kp["name"]: kp for kp in kp3d}
+        for name in _MODEL_JOINT_NAMES:
+            kp = kp_map.get(name)
+            if kp:
+                entries.append((i, name, [float(kp["x"]), float(kp["y"])]))
+
+    results: List[Dict[str, float]] = [{} for _ in frames]
+    if entries:
+        try:
+            z_values = predict_z_batch([e[2] for e in entries], "champion")
+            for (i, name, _), z in zip(entries, z_values):
+                results[i][name] = z
+        except Exception as exc:
+            _log.error("z-batch prediction failed: %s", exc)
+
+    for i, kp3d in enumerate(frames):
+        kp_map = {kp["name"]: kp for kp in kp3d}
+        for name in _MODEL_JOINT_NAMES:
+            if name not in results[i]:
+                kp = kp_map.get(name)
+                results[i][name] = float(kp.get("z", 0.0)) if kp else 0.0
+
+    return results
 
 
 def _smooth_start_stop(predictions: List[int], gap_threshold: int = 10) -> List[int]:
@@ -196,11 +208,10 @@ def analyze_session(
     # 3. Smooth gaps
     smoothed = _smooth_start_stop(raw_start_stop)
 
-    # 4 & 5. Z-pred + classify per frame
+    # 4 & 5. Z-pred + classify per frame (single batch call across all frames)
+    all_predicted_z = _predict_z_all_frames(frames)
     results: List[FrameResult] = []
-    for kp3d, ss in zip(frames, smoothed):
-        predicted_z = _predict_z_all_joints(kp3d)
-
+    for kp3d, ss, predicted_z in zip(frames, smoothed, all_predicted_z):
         if ss == 1:
             cls, la, ra, conf = _classify_with_z(kp3d, predicted_z)
         else:
