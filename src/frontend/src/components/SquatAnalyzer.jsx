@@ -71,36 +71,36 @@ const ALL_LANDMARK_NAMES = [
 // Features per frame: [j0_x, j0_y, j1_x, j1_y, … ] → 13 × 2 = 26 floats.
 // z output: [j0_z, j1_z, … ] → 13 floats (same alphabetical order).
 const MODEL_JOINT_ORDER = [
-    { name: "left_ankle",     idx: 27 },
-    { name: "left_elbow",     idx: 13 },
-    { name: "left_hip",       idx: 23 },
-    { name: "left_knee",      idx: 25 },
-    { name: "left_shoulder",  idx: 11 },
-    { name: "left_wrist",     idx: 15 },
-    { name: "nose",           idx: 0  },
-    { name: "right_ankle",    idx: 28 },
-    { name: "right_elbow",    idx: 14 },
-    { name: "right_hip",      idx: 24 },
-    { name: "right_knee",     idx: 26 },
+    { name: "left_ankle", idx: 27 },
+    { name: "left_elbow", idx: 13 },
+    { name: "left_hip", idx: 23 },
+    { name: "left_knee", idx: 25 },
+    { name: "left_shoulder", idx: 11 },
+    { name: "left_wrist", idx: 15 },
+    { name: "nose", idx: 0 },
+    { name: "right_ankle", idx: 28 },
+    { name: "right_elbow", idx: 14 },
+    { name: "right_hip", idx: 24 },
+    { name: "right_knee", idx: 26 },
     { name: "right_shoulder", idx: 12 },
-    { name: "right_wrist",    idx: 16 },
+    { name: "right_wrist", idx: 16 },
 ];
 
 // Display/viewer joint order (used only for 3-D skeleton rendering).
 const SQUAT_JOINT_ORDER = [
-    { name: "nose",           idx: 0  },
-    { name: "left_shoulder",  idx: 11 },
-    { name: "left_elbow",     idx: 13 },
+    { name: "nose", idx: 0 },
+    { name: "left_shoulder", idx: 11 },
+    { name: "left_elbow", idx: 13 },
     { name: "right_shoulder", idx: 12 },
-    { name: "right_elbow",    idx: 14 },
-    { name: "left_wrist",     idx: 15 },
-    { name: "right_wrist",    idx: 16 },
-    { name: "left_hip",       idx: 23 },
-    { name: "right_hip",      idx: 24 },
-    { name: "left_knee",      idx: 25 },
-    { name: "right_knee",     idx: 26 },
-    { name: "left_ankle",     idx: 27 },
-    { name: "right_ankle",    idx: 28 },
+    { name: "right_elbow", idx: 14 },
+    { name: "left_wrist", idx: 15 },
+    { name: "right_wrist", idx: 16 },
+    { name: "left_hip", idx: 23 },
+    { name: "right_hip", idx: 24 },
+    { name: "left_knee", idx: 25 },
+    { name: "right_knee", idx: 26 },
+    { name: "left_ankle", idx: 27 },
+    { name: "right_ankle", idx: 28 },
 ];
 // Full body skeleton connections (MediaPipe BlazePose topology).
 const POSE_CONNECTIONS = [
@@ -185,7 +185,6 @@ function buildFrameFeatures(worldLandmarks) {
     });
 }
 
-
 /**
  * Create a new PoseLandmarker for continuous video/webcam detection.
  */
@@ -266,7 +265,7 @@ function drawSkeleton(canvas, w, h, detection, off = { x: 0, y: 0 }) {
     }
 }
 
-// ── 3-D Skeleton Viewer ──────────────────────────────────────────────────────
+// 3-D Skeleton Viewer
 
 /**
  * Rotate a 3-D point by yaw (ry, around Y) then pitch (rx, around X).
@@ -355,25 +354,50 @@ function Skeleton3DViewer({ frames, liveFrame }) {
         // Lock rotation pivot at ankle midpoint so the model spins around the feet
         const la = frameData.joints?.["left_ankle"];
         const ra = frameData.joints?.["right_ankle"];
-        const anchor = la && ra
-            ? { x: (la.x + ra.x) / 2, y: (la.y + ra.y) / 2, z: (la.z + ra.z) / 2 }
-            : la ?? ra ?? { x: 0, y: 0, z: 0 };
+        const anchor =
+            la && ra
+                ? {
+                      x: (la.x + ra.x) / 2,
+                      y: (la.y + ra.y) / 2,
+                      z: (la.z + ra.z) / 2,
+                  }
+                : (la ?? ra ?? { x: 0, y: 0, z: 0 });
 
         // Project all joints
         const pos = {};
         for (const { name } of SQUAT_JOINT_ORDER) {
             const j = frameData.joints?.[name];
             if (!j) continue;
-            pos[name] = project3D(j.x - anchor.x, j.y - anchor.y, j.z - anchor.z, rx, ry, scale, cx, cy);
+            pos[name] = project3D(
+                j.x - anchor.x,
+                j.y - anchor.y,
+                j.z - anchor.z,
+                rx,
+                ry,
+                scale,
+                cx,
+                cy,
+            );
         }
 
-        // ── Ground plane (projected circle at y=0 in foot-anchored space) ────
+        // Ground plane (projected circle at y=0 in foot-anchored space)
         const GR = 0.5; // radius in world units
         const SEGS = 72;
         const rim = [];
         for (let i = 0; i <= SEGS; i++) {
             const t = (i / SEGS) * Math.PI * 2;
-            rim.push(project3D(GR * Math.cos(t), 0, GR * Math.sin(t), rx, ry, scale, cx, cy));
+            rim.push(
+                project3D(
+                    GR * Math.cos(t),
+                    0,
+                    GR * Math.sin(t),
+                    rx,
+                    ry,
+                    scale,
+                    cx,
+                    cy,
+                ),
+            );
         }
         // Filled disc
         ctx.beginPath();
@@ -393,11 +417,17 @@ function Skeleton3DViewer({ frames, liveFrame }) {
             const s = (i / 3) * GR;
             const clamp = Math.sqrt(Math.max(0, GR * GR - s * s));
             const xa = project3D(-clamp, 0, s, rx, ry, scale, cx, cy);
-            const xb = project3D( clamp, 0, s, rx, ry, scale, cx, cy);
-            ctx.beginPath(); ctx.moveTo(xa.px, xa.py); ctx.lineTo(xb.px, xb.py); ctx.stroke();
+            const xb = project3D(clamp, 0, s, rx, ry, scale, cx, cy);
+            ctx.beginPath();
+            ctx.moveTo(xa.px, xa.py);
+            ctx.lineTo(xb.px, xb.py);
+            ctx.stroke();
             const za = project3D(s, 0, -clamp, rx, ry, scale, cx, cy);
-            const zb = project3D(s, 0,  clamp, rx, ry, scale, cx, cy);
-            ctx.beginPath(); ctx.moveTo(za.px, za.py); ctx.lineTo(zb.px, zb.py); ctx.stroke();
+            const zb = project3D(s, 0, clamp, rx, ry, scale, cx, cy);
+            ctx.beginPath();
+            ctx.moveTo(za.px, za.py);
+            ctx.lineTo(zb.px, zb.py);
+            ctx.stroke();
         }
 
         // Draw bones
@@ -446,11 +476,7 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                         ? "#64748b"
                         : "#dc2626";
             ctx.textAlign = "center";
-            ctx.fillText(
-                cls === "NotExercise" ? "not exercise" : cls,
-                cx,
-                18,
-            );
+            ctx.fillText(cls === "NotExercise" ? "not exercise" : cls, cx, 18);
         }
 
         // Frame counter / live indicator
@@ -469,7 +495,7 @@ function Skeleton3DViewer({ frames, liveFrame }) {
         drawFrame(liveFrame ?? frames[displayedFrameIdx], !!liveFrame);
     }); // run on every render — canvas state is imperative
 
-    // ── Drag to rotate ───────────────────────────────────────────────────────
+    // Drag to rotate
 
     function onPointerDown(e) {
         dragRef.current = { x: e.clientX, y: e.clientY };
@@ -582,7 +608,10 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                 <button
                     onClick={() => {
                         zoomRef.current = Math.min(600, zoomRef.current + 30);
-                        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+                        drawFrame(
+                            liveFrame ?? frames[frameIdxRef.current],
+                            !!liveFrame,
+                        );
                     }}
                     className="ios-btn w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-slate-600"
                     title="Zoom in"
@@ -592,7 +621,10 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                 <button
                     onClick={() => {
                         zoomRef.current = Math.max(80, zoomRef.current - 30);
-                        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+                        drawFrame(
+                            liveFrame ?? frames[frameIdxRef.current],
+                            !!liveFrame,
+                        );
                     }}
                     className="ios-btn w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-slate-600"
                     title="Zoom out"
@@ -626,48 +658,71 @@ function assessVideoQuality(detection, captureCanvas) {
     const CORE = [11, 12, 23, 24, 25, 26, 27, 28];
     const vis = (i) => lms[i]?.visibility ?? 0;
 
-    // ── BLOCKING: frame brightness ────────────────────────────────────────────
+    // BLOCKING: frame brightness
     if (captureCanvas?.width > 0 && captureCanvas?.height > 0) {
         try {
             const ctx = captureCanvas.getContext("2d");
             const { width: w, height: h } = captureCanvas;
             const { data } = ctx.getImageData(
-                Math.floor(w * 0.25), Math.floor(h * 0.15),
-                Math.floor(w * 0.5),  Math.floor(h * 0.7),
+                Math.floor(w * 0.25),
+                Math.floor(h * 0.15),
+                Math.floor(w * 0.5),
+                Math.floor(h * 0.7),
             );
             let lum = 0;
             for (let i = 0; i < data.length; i += 4) {
-                lum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                lum +=
+                    0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
             }
             const avg = lum / (data.length / 4);
-            if (avg < 28)  blocking.push("Frame too dark: improve room lighting");
-            else if (avg > 238) blocking.push("Frame overexposed: reduce direct lighting behind the subject");
-        } catch { /* cross-origin / security errors ignored */ }
+            // TODO: Improve values for better preformance
+            if (avg < 28)
+                blocking.push("Frame too dark: improve room lighting");
+            else if (avg > 238)
+                blocking.push(
+                    "Frame overexposed: reduce direct lighting behind the subject",
+                );
+        } catch {
+            /* cross-origin / security errors ignored */
+        }
     }
 
-    // ── WARNINGS: advisory hints — never stop the pipeline ───────────────────
+    // WARNINGS: advisory hints — never stop the pipeline
 
     // Upside down
-    const nose = lms[0], la = lms[27], ra = lms[28];
+    const nose = lms[0],
+        la = lms[27],
+        ra = lms[28];
     if (nose && la && ra && nose.y > (la.y + ra.y) / 2 + 0.1) {
         warnings.push("Video appears upside down: rotate the camera 180°");
     }
 
     // Hands at or below hip level — warn when arms hang at sides instead of
     // being raised (normal squat starting position).
-    const lw = lms[15], rw = lms[16], lh = lms[23], rh = lms[24];
+    const lw = lms[15],
+        rw = lms[16],
+        lh = lms[23],
+        rh = lms[24];
     if (lw && rw && lh && rh) {
         const hipY = (lh.y + rh.y) / 2;
         const wristY = (lw.y + rw.y) / 2;
         if (wristY > hipY - 0.05) {
-            warnings.push("Hands are not raised: lift your arms into squat position");
+            warnings.push(
+                "Hands are not raised: lift your arms into squat position",
+            );
         }
     }
 
     // Key joints clipped at frame edges
     const coreLms = CORE.map((i) => lms[i]).filter(Boolean);
-    if (coreLms.filter((lm) => lm.x < 0.04 || lm.x > 0.96 || lm.y < 0.04 || lm.y > 0.96).length >= 2) {
-        warnings.push("Person is partially out of frame: move camera back or reposition");
+    if (
+        coreLms.filter(
+            (lm) => lm.x < 0.04 || lm.x > 0.96 || lm.y < 0.04 || lm.y > 0.96,
+        ).length >= 2
+    ) {
+        warnings.push(
+            "Person is partially out of frame: move camera back or reposition",
+        );
     }
 
     // "Too far" check removed — bounding box shrinks naturally during a squat,
@@ -676,14 +731,16 @@ function assessVideoQuality(detection, captureCanvas) {
     // Knees hidden while shoulders clearly visible (facing camera head-on)
     if (vis(25) < 0.35 && vis(26) < 0.35 && vis(11) > 0.6 && vis(12) > 0.6) {
         if (Math.abs((lms[12]?.x ?? 0) - (lms[11]?.x ?? 0)) > 0.15) {
-            warnings.push("Knees not visible: try a side-on camera angle for better depth measurement");
+            warnings.push(
+                "Knees not visible: try a side-on camera angle for better depth measurement",
+            );
         }
     }
 
     return { blocking, warnings };
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// Main component
 
 export default function SquatAnalyzer() {
     const videoRef = useRef(null);
@@ -727,7 +784,7 @@ export default function SquatAnalyzer() {
     const qualityIssueCountsRef = useRef({});
     const qualityFrameCountRef = useRef(0);
 
-    // ── Fetch model metrics on mount ─────────────────────────────────────────
+    // Fetch model metrics on mount
     useEffect(() => {
         fetch(apiUrl("/api/v1/model-info/start-stop"))
             .then((r) => (r.ok ? r.json() : null))
@@ -735,7 +792,7 @@ export default function SquatAnalyzer() {
             .catch(() => {});
     }, []);
 
-    // ── Preload VIDEO landmarker on mount ────────────────────────────────────
+    // Preload VIDEO landmarker on mount
     useEffect(() => {
         let cancelled = false;
         createVideoLandmarker()
@@ -755,8 +812,7 @@ export default function SquatAnalyzer() {
         };
     }, []);
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
+    // Helpers
     function revokeBlobUrl() {
         if (videoBlobUrlRef.current) {
             URL.revokeObjectURL(videoBlobUrlRef.current);
@@ -851,7 +907,7 @@ export default function SquatAnalyzer() {
         [stopAll],
     );
 
-    // ── Batch analyze (webcam stop or video end) ─────────────────────────────
+    // Batch analyze (webcam stop or video end)
     // Sends all frames at once to the full pipeline: Cut → Z-pred → Classify.
 
     const stopAndAnalyze = useCallback(async () => {
@@ -879,7 +935,8 @@ export default function SquatAnalyzer() {
         }
         try {
             const body = { frames };
-            if (normFrames.length === frames.length) body.norm_frames = normFrames;
+            if (normFrames.length === frames.length)
+                body.norm_frames = normFrames;
             const res = await fetch(apiUrl("/api/v1/squat/analyze-session"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -887,9 +944,11 @@ export default function SquatAnalyzer() {
             });
             if (!res.ok) throw new Error("Session analysis failed");
             const data = await res.json();
-            const ones = data.results.filter(r => r.start_stop === 1).length;
-            const zeros = data.results.filter(r => r.start_stop === 0).length;
-            console.log(`[analyze-session] ${data.results.length} frames → ${ones} exercise (1), ${zeros} non-exercise (0)`);
+            const ones = data.results.filter((r) => r.start_stop === 1).length;
+            const zeros = data.results.filter((r) => r.start_stop === 0).length;
+            console.log(
+                `[analyze-session] ${data.results.length} frames → ${ones} exercise (1), ${zeros} non-exercise (0)`,
+            );
             const entries = frames.map((kp3d, i) => ({
                 timestamp: Date.now() + i,
                 keypoints3d: kp3d,
@@ -901,12 +960,15 @@ export default function SquatAnalyzer() {
             sessionLogRef.current = entries;
             setSessionLog(entries);
             const valid = data.results.filter(
-                (r) => r.start_stop === 1 && r.classification !== "Invalid" && r.classification !== "NotExercise"
+                (r) =>
+                    r.start_stop === 1 &&
+                    r.classification !== "Invalid" &&
+                    r.classification !== "NotExercise",
             );
             if (valid.length > 0) {
                 const last = valid[valid.length - 1];
                 const firstWithScore = data.results.find(
-                    r => r.start_stop === 1 && r.good_bad_score != null
+                    (r) => r.start_stop === 1 && r.good_bad_score != null,
                 );
                 setResult({
                     classification: last.classification,
@@ -923,7 +985,7 @@ export default function SquatAnalyzer() {
         }
     }, [stopCapture]);
 
-    // ── Video-ended auto-finish ──────────────────────────────────────────────
+    // Video-ended auto-finish
 
     useEffect(() => {
         if (status !== "running" || inputMode !== "upload") return;
@@ -934,7 +996,7 @@ export default function SquatAnalyzer() {
         return () => video.removeEventListener("ended", handleEnded);
     }, [status, inputMode, stopAndAnalyze]);
 
-    // ── Webcam ───────────────────────────────────────────────────────────────
+    // Webcam
 
     const startCamera = useCallback(async () => {
         recordedKpFramesRef.current = [];
@@ -961,7 +1023,7 @@ export default function SquatAnalyzer() {
         }
     }, []);
 
-    // ── Video upload ─────────────────────────────────────────────────────────
+    // Video upload
 
     const handleVideoChange = useCallback(
         async (e) => {
@@ -1001,7 +1063,7 @@ export default function SquatAnalyzer() {
         [stopAll],
     );
 
-    // ── Image upload ─────────────────────────────────────────────────────────
+    // Image upload
 
     const handleImageChange = useCallback(
         async (e) => {
@@ -1054,7 +1116,10 @@ export default function SquatAnalyzer() {
 
                 if (detection.landmarks?.length > 0) {
                     // Quality check — canvas has raw image pixels before skeleton draw
-                    const { blocking, warnings } = assessVideoQuality(detection, canvas);
+                    const { blocking, warnings } = assessVideoQuality(
+                        detection,
+                        canvas,
+                    );
                     drawSkeleton(canvas, drawW, drawH, detection, {
                         x: offsetX,
                         y: offsetY,
@@ -1095,7 +1160,7 @@ export default function SquatAnalyzer() {
         }
     }, []);
 
-    // ── Detection loop ───────────────────────────────────────────────────────
+    // Detection loop
     //
     // Uploaded video: MediaPipe runs once per video frame (currentTime gating).
     // Webcam: MediaPipe throttled to ~20 Hz (every 3 rAF frames).
@@ -1141,7 +1206,7 @@ export default function SquatAnalyzer() {
             const vw = video.videoWidth;
             const vh = video.videoHeight;
 
-            // ── Gate detection ──
+            // Gate detection
             // Uploaded video: detect exactly once per video frame by watching
             // currentTime. This keeps the overlay perfectly in sync without
             // running MediaPipe on duplicate frames (which wastes CPU and causes
@@ -1166,9 +1231,15 @@ export default function SquatAnalyzer() {
                             cap.height = vh;
                         }
                         cap.getContext("2d").drawImage(video, 0, 0, vw, vh);
-                        lastDetectionRef.current = landmarker.detectForVideo(cap, timestamp);
+                        lastDetectionRef.current = landmarker.detectForVideo(
+                            cap,
+                            timestamp,
+                        );
                     } else {
-                        lastDetectionRef.current = landmarker.detectForVideo(video, timestamp);
+                        lastDetectionRef.current = landmarker.detectForVideo(
+                            video,
+                            timestamp,
+                        );
                     }
                 } catch {
                     // Transient error — skip this frame, keep loop alive.
@@ -1217,21 +1288,26 @@ export default function SquatAnalyzer() {
                 if (det?.landmarks?.length > 0) {
                     qualityFrameCountRef.current++;
                     if (qualityFrameCountRef.current > 15) {
-                        const { blocking, warnings } = assessVideoQuality(det, captureCanvasRef.current);
+                        const { blocking, warnings } = assessVideoQuality(
+                            det,
+                            captureCanvasRef.current,
+                        );
+                        const issues = [...blocking, ...warnings];
                         // Only blocking issues count toward the gate
                         blocking.forEach((issue) => {
                             qualityIssueCountsRef.current[issue] =
                                 (qualityIssueCountsRef.current[issue] || 0) + 1;
                         });
                         // Show all issues (blocking + advisory) in the live overlay
+                        // and explicitly clear stale warnings when none remain.
                         if (qualityFrameCountRef.current % 8 === 0) {
-                            setQualityIssues([...blocking, ...warnings]);
+                            setQualityIssues(issues);
                         }
                     }
                 }
             }
 
-            // ── Redraw skeleton overlay at full rAF rate ──
+            // Redraw skeleton overlay at full rAF rate
             // Always uses the freshest detection result, so the overlay never
             // drifts behind the video even if detection ran on a previous tick.
             const detection = lastDetectionRef.current;
@@ -1241,13 +1317,18 @@ export default function SquatAnalyzer() {
                 canvas.width = DISPLAY_W;
                 canvas.height = DISPLAY_H;
             }
-            const scale = vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
+            const scale =
+                vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
             const drawW = vw * scale;
             const drawH = vh * scale;
             const offsetX = (DISPLAY_W - drawW) / 2;
             const offsetY = (DISPLAY_H - drawH) / 2;
             canvas.getContext("2d").clearRect(0, 0, DISPLAY_W, DISPLAY_H);
-            if (detection) drawSkeleton(canvas, drawW, drawH, detection, { x: offsetX, y: offsetY });
+            if (detection)
+                drawSkeleton(canvas, drawW, drawH, detection, {
+                    x: offsetX,
+                    y: offsetY,
+                });
 
             rafRef.current = requestAnimationFrame(detect);
         }
@@ -1260,7 +1341,7 @@ export default function SquatAnalyzer() {
         predictedZByNameRef.current = predictedZByName;
     }, [predictedZByName]);
 
-    // ── Backend + session log ────────────────────────────────────────────────
+    // Backend + session log
 
     sessionNameRef.current = sessionName;
 
@@ -1290,7 +1371,7 @@ export default function SquatAnalyzer() {
         setSessionLog(sessionLogRef.current);
     }
 
-    // ── Manual save to Supabase ───────────────────────────────────────────────
+    // Manual save to Supabase
 
     async function handleSave() {
         if (!supabase || sessionLogRef.current.length === 0) return;
@@ -1309,7 +1390,7 @@ export default function SquatAnalyzer() {
         setIsSaving(false);
     }
 
-    // ── CSV export ────────────────────────────────────────────────────────────
+    // CSV export
 
     function downloadCSV() {
         const log = sessionLogRef.current;
@@ -1355,7 +1436,7 @@ export default function SquatAnalyzer() {
         URL.revokeObjectURL(url);
     }
 
-    // ── Viewer frames (memoised) ──────────────────────────────────────────────
+    // Viewer frames (memoised)
     // Builds the 3-D viewer data from session log: x/y from MediaPipe world coords,
     // z from DL model prediction (falls back to MediaPipe world z if unavailable).
 
@@ -1381,10 +1462,10 @@ export default function SquatAnalyzer() {
         // Strict filter: only replay frames the model labelled as exercise.
         // No fallback slice — if the model returns no 1s the viewer is empty,
         // which makes a broken model visible rather than hiding it.
-        return sessionLog.filter(e => e.startStop === 1).map(toViewerFrame);
+        return sessionLog.filter((e) => e.startStop === 1).map(toViewerFrame);
     }, [sessionLog]);
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    // Render
 
     const colorClass = result
         ? (CLASSIFICATION_COLORS[result.classification] ?? "text-slate-700")
@@ -1492,7 +1573,10 @@ export default function SquatAnalyzer() {
                                 Video quality
                             </p>
                             {qualityIssues.map((issue, i) => (
-                                <p key={i} className="text-white/95 text-xs leading-snug">
+                                <p
+                                    key={i}
+                                    className="text-white/95 text-xs leading-snug"
+                                >
                                     {issue}
                                 </p>
                             ))}
@@ -1518,7 +1602,10 @@ export default function SquatAnalyzer() {
                         {status !== "running" ? (
                             <button
                                 onClick={startCamera}
-                                disabled={status === "loading" || status === "analyzing"}
+                                disabled={
+                                    status === "loading" ||
+                                    status === "analyzing"
+                                }
                                 className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
                             >
                                 {status === "loading"
@@ -1568,7 +1655,10 @@ export default function SquatAnalyzer() {
                         ) : (
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                disabled={status === "loading" || status === "analyzing"}
+                                disabled={
+                                    status === "loading" ||
+                                    status === "analyzing"
+                                }
                                 className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
                             >
                                 {status === "loading" || status === "analyzing"
@@ -1635,7 +1725,8 @@ export default function SquatAnalyzer() {
                         <div
                             className="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shrink-0"
                             style={{
-                                background: "radial-gradient(circle at 35% 30%, rgba(254,243,199,0.95), rgba(253,230,138,0.85))",
+                                background:
+                                    "radial-gradient(circle at 35% 30%, rgba(254,243,199,0.95), rgba(253,230,138,0.85))",
                                 border: "1px solid rgba(251,191,36,0.4)",
                                 color: "#92400e",
                             }}
@@ -1657,7 +1748,9 @@ export default function SquatAnalyzer() {
                                 <span className="text-amber-400 font-bold shrink-0 mt-0.5">
                                     ·
                                 </span>
-                                <span className="text-sm text-slate-600">{issue}</span>
+                                <span className="text-sm text-slate-600">
+                                    {issue}
+                                </span>
                             </li>
                         ))}
                     </ul>
@@ -1673,7 +1766,6 @@ export default function SquatAnalyzer() {
                     </span>
                 </p>
             )}
-
 
             {/* Classification result */}
             {result && (
@@ -1720,7 +1812,9 @@ export default function SquatAnalyzer() {
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
                                 Form Quality
                             </p>
-                            <p className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}>
+                            <p
+                                className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}
+                            >
                                 {formIsGood ? "Good form" : "Bad form"}
                             </p>
                         </div>
@@ -1790,7 +1884,9 @@ export default function SquatAnalyzer() {
                             step="1"
                             value={threshPct}
                             onChange={(e) =>
-                                setGoodBadThreshold(Number(e.target.value) / 100)
+                                setGoodBadThreshold(
+                                    Number(e.target.value) / 100,
+                                )
                             }
                             className="ios-slider"
                             style={{ width: "100%", display: "block" }}
