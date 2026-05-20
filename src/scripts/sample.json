@@ -2,11 +2,61 @@
     {
         "kp1": "left_hip",
         "kp2": "left_knee",
-        "distance_cm": 42.0
+        "distance_cm": 44.0
     },
     {
         "kp1": "right_hip",
         "kp2": "right_knee",
-        "distance_cm": 42.0
+        "distance_cm": 45.0
+    },
+    {
+        "kp1": "left_knee",
+        "kp2": "left_ankle",
+        "distance_cm": 46.0
+    },
+    {
+        "kp1": "right_knee",
+        "kp2": "right_ankle",
+        "distance_cm": 45.0
+    },
+    {
+        "kp1": "left_shoulder",
+        "kp2": "left_hip",
+        "distance_cm": 52.0
+    },
+    {
+        "kp1": "right_shoulder",
+        "kp2": "right_hip",
+        "distance_cm": 51.0
+    },
+    {
+        "kp1": "left_shoulder",
+        "kp2": "left_elbow",
+        "distance_cm": 37.0
+    },
+    {
+        "kp1": "right_shoulder",
+        "kp2": "right_elbow",
+        "distance_cm": 38.0
+    },
+    {
+        "kp1": "left_elbow",
+        "kp2": "left_wrist",
+        "distance_cm": 28.5
+    },
+    {
+        "kp1": "right_elbow",
+        "kp2": "right_wrist",
+        "distance_cm": 29.0
+    },
+    {
+        "kp1": "left_shoulder",
+        "kp2": "nose",
+        "distance_cm": 23.0
+    },
+    {
+        "kp1": "right_shoulder",
+        "kp2": "nose",
+        "distance_cm": 22.0
     }
 ]
