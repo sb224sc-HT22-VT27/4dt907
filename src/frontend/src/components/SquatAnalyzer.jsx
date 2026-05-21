@@ -653,11 +653,14 @@ function assessVideoQuality(detection, captureCanvas) {
         warnings.push("Video appears upside down: rotate the camera 180°");
     }
 
-    // Hands below hips
+    // Hands at or below hip level — warn when arms hang at sides instead of
+    // being raised (normal squat starting position).
     const lw = lms[15], rw = lms[16], lh = lms[23], rh = lms[24];
-    if (lw && rw && lh && rh && vis(15) > 0.5 && vis(16) > 0.5) {
-        if ((lw.y + rw.y) / 2 > (lh.y + rh.y) / 2 + 0.12) {
-            warnings.push("Hands are below the hips: unusual posture for squat analysis");
+    if (lw && rw && lh && rh) {
+        const hipY = (lh.y + rh.y) / 2;
+        const wristY = (lw.y + rw.y) / 2;
+        if (wristY > hipY - 0.05) {
+            warnings.push("Hands are not raised: lift your arms into squat position");
         }
     }
 
@@ -667,12 +670,8 @@ function assessVideoQuality(detection, captureCanvas) {
         warnings.push("Person is partially out of frame: move camera back or reposition");
     }
 
-    // Person too small / too far
-    const ys = coreLms.map((lm) => lm.y);
-    const xs = coreLms.map((lm) => lm.x);
-    if (ys.length >= 4 && Math.max(...ys) - Math.min(...ys) < 0.3 && Math.max(...xs) - Math.min(...xs) < 0.2) {
-        warnings.push("Person is too far from the camera: move closer");
-    }
+    // "Too far" check removed — bounding box shrinks naturally during a squat,
+    // causing false positives. MediaPipe visibility already reflects true range.
 
     // Knees hidden while shoulders clearly visible (facing camera head-on)
     if (vis(25) < 0.35 && vis(26) < 0.35 && vis(11) > 0.6 && vis(12) > 0.6) {
@@ -906,7 +905,6 @@ export default function SquatAnalyzer() {
             );
             if (valid.length > 0) {
                 const last = valid[valid.length - 1];
-                // Use the good_bad_score from the first exercise frame that has one.
                 const firstWithScore = data.results.find(
                     r => r.start_stop === 1 && r.good_bad_score != null
                 );
@@ -1392,6 +1390,11 @@ export default function SquatAnalyzer() {
         ? (CLASSIFICATION_COLORS[result.classification] ?? "text-slate-700")
         : "";
 
+    const formScore = result?.goodBadScore ?? null;
+    const formIsGood = formScore != null && formScore >= goodBadThreshold;
+    const formPct = formScore != null ? Math.round(formScore * 100) : 0;
+    const threshPct = Math.round(goodBadThreshold * 100);
+
     return (
         <div className="flex flex-col items-center gap-5 px-6 py-8 max-w-3xl mx-auto">
             {/* Header */}
@@ -1671,6 +1674,7 @@ export default function SquatAnalyzer() {
                 </p>
             )}
 
+
             {/* Classification result */}
             {result && (
                 <div className="ios-card rounded-2xl p-5 text-center w-full">
@@ -1708,105 +1712,96 @@ export default function SquatAnalyzer() {
             )}
 
             {/* Form quality + threshold */}
-            {result?.goodBadScore != null && (() => {
-                const s = result.goodBadScore;
-                const isGood = s >= goodBadThreshold;
-                const pct = Math.round(s * 100);
-                const threshPct = Math.round(goodBadThreshold * 100);
-                const textColor = isGood ? "text-green-500" : "text-red-500";
-                return (
-                    <div className="ios-card rounded-2xl p-5 w-full">
-                        {/* Header row */}
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
-                                    Form Quality
-                                </p>
-                                <p className={`text-2xl font-bold ${textColor}`}>
-                                    {isGood ? "Good form" : "Bad form"}
-                                </p>
-                            </div>
-                            <div
-                                className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold ios-card ${
-                                    isGood
-                                        ? "text-green-500"
-                                        : "text-red-500"
-                                }`}
-                                style={{
-                                    background: isGood
-                                        ? "radial-gradient(circle at 35% 30%, rgba(220,252,231,0.95), rgba(187,247,208,0.85))"
-                                        : "radial-gradient(circle at 35% 30%, rgba(254,226,226,0.95), rgba(252,165,165,0.70))",
-                                    border: isGood
-                                        ? "1px solid rgba(74,222,128,0.35)"
-                                        : "1px solid rgba(248,113,113,0.35)",
-                                }}
-                            >
-                                {isGood ? "✓" : "✗"}
-                            </div>
-                        </div>
-
-                        {/* Score bar with threshold marker */}
-                        <div className="mb-5">
-                            <div className="flex justify-between text-xs mb-2">
-                                <span className="text-slate-400">Score</span>
-                                <span className="font-bold text-slate-600 tabular-nums">
-                                    {pct}%
-                                </span>
-                            </div>
-                            <div className="relative h-3 rounded-full bg-slate-100 overflow-visible">
-                                <div
-                                    className="h-full rounded-full transition-all duration-700 ease-out"
-                                    style={{
-                                        width: `${pct}%`,
-                                        background: isGood
-                                            ? "linear-gradient(to right, #fbbf24, #4ade80)"
-                                            : "linear-gradient(to right, #f87171, #fbbf24)",
-                                        boxShadow: isGood
-                                            ? "0 0 12px rgba(74,222,128,0.4)"
-                                            : "0 0 12px rgba(248,113,113,0.35)",
-                                    }}
-                                />
-                                {/* Threshold marker line */}
-                                <div
-                                    className="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-slate-500 opacity-60"
-                                    style={{ left: `calc(${threshPct}% - 1px)` }}
-                                />
-                            </div>
-                            <p className="text-xs text-slate-300 text-right mt-1 tabular-nums">
-                                threshold at {threshPct}%
+            {formScore != null && (
+                <div className="ios-card rounded-2xl p-5 w-full">
+                    {/* Header row */}
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
+                                Form Quality
+                            </p>
+                            <p className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}>
+                                {formIsGood ? "Good form" : "Bad form"}
                             </p>
                         </div>
-
-                        {/* Threshold slider */}
-                        <div>
-                            <div className="flex justify-between text-xs mb-2">
-                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                    Threshold
-                                </span>
-                                <span className="font-bold text-slate-600 tabular-nums">
-                                    {threshPct}%
-                                </span>
-                            </div>
-                            <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={threshPct}
-                                onChange={(e) =>
-                                    setGoodBadThreshold(
-                                        Number(e.target.value) / 100,
-                                    )
-                                }
-                                className="ios-slider"
-                            />
-                            <div className="flex justify-between text-xs text-slate-300 mt-2">
-                                <span>Bad</span>
-                                <span>Good</span>
-                            </div>
+                        <div
+                            className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold ios-card ${
+                                formIsGood ? "text-green-500" : "text-red-500"
+                            }`}
+                            style={{
+                                background: formIsGood
+                                    ? "radial-gradient(circle at 35% 30%, rgba(220,252,231,0.95), rgba(187,247,208,0.85))"
+                                    : "radial-gradient(circle at 35% 30%, rgba(254,226,226,0.95), rgba(252,165,165,0.70))",
+                                border: formIsGood
+                                    ? "1px solid rgba(74,222,128,0.35)"
+                                    : "1px solid rgba(248,113,113,0.35)",
+                            }}
+                        >
+                            {formIsGood ? "✓" : "✗"}
                         </div>
                     </div>
-                );
-            })()}
+
+                    {/* Score bar with threshold marker */}
+                    <div className="mb-5">
+                        <div className="flex justify-between text-xs mb-2">
+                            <span className="text-slate-400">Score</span>
+                            <span className="font-bold text-slate-600 tabular-nums">
+                                {formPct}%
+                            </span>
+                        </div>
+                        <div className="relative h-3 rounded-full bg-slate-100 overflow-visible">
+                            <div
+                                className="h-full rounded-full transition-all duration-700 ease-out"
+                                style={{
+                                    width: `${formPct}%`,
+                                    background: formIsGood
+                                        ? "linear-gradient(to right, #fbbf24, #4ade80)"
+                                        : "linear-gradient(to right, #f87171, #fbbf24)",
+                                    boxShadow: formIsGood
+                                        ? "0 0 12px rgba(74,222,128,0.4)"
+                                        : "0 0 12px rgba(248,113,113,0.35)",
+                                }}
+                            />
+                            {/* Threshold marker line */}
+                            <div
+                                className="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-slate-500 opacity-60"
+                                style={{ left: `calc(${threshPct}% - 1px)` }}
+                            />
+                        </div>
+                        <p className="text-xs text-slate-300 text-right mt-1 tabular-nums">
+                            threshold at {threshPct}%
+                        </p>
+                    </div>
+
+                    {/* Threshold slider */}
+                    <div>
+                        <div className="flex justify-between text-xs mb-2">
+                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                Threshold
+                            </span>
+                            <span className="font-bold text-slate-600 tabular-nums">
+                                {threshPct}%
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={threshPct}
+                            onChange={(e) =>
+                                setGoodBadThreshold(Number(e.target.value) / 100)
+                            }
+                            className="ios-slider"
+                            style={{ width: "100%", display: "block" }}
+                        />
+                        <div className="flex justify-between text-xs text-slate-300 mt-2">
+                            <span>Bad</span>
+                            <span>Good</span>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Session actions */}
             {sessionLog.length > 0 && (
