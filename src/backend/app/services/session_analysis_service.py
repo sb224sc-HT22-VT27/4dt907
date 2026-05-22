@@ -1,26 +1,26 @@
 """app.services.session_analysis_service
 
-Full session analysis pipeline: Cut → Z-pred → Classify → GoodBad → Results.
+Full session analysis pipeline: Cut → Z-pred → GoodBad → Results.
 
 Pipeline per session (all frames at once):
 1. Build per-frame feature vectors (39 floats: 13 joints × [x, y, z]).
 2. Run Start_Stop_Predictor_ModelV2 on all frames → [0/1, ...].
 3. Apply gap-fill smoothing: 0-runs < 10 frames between two 1-regions → 1.
 4. For every frame: predict z for all 13 joints.
-5. For exercise frames (start_stop=1): classify squat depth using predicted z.
-6. Run GoodBad_ClassifierV2 on each continuous exercise segment → quality score [0,1].
-7. Return per-frame results.
+5. Run GoodBad_ClassifierV2 on each continuous exercise segment → quality score [0,1].
+6. Return per-frame results.
 """
 
+import logging as _logging
+from time import perf_counter
 from typing import Dict, List, Optional, Tuple
 
 from app.services import start_stop_model_service
 from app.services import goodbad_model_service
-from app.services.squat_service import calculate_knee_angle, _rule_based
 from app.services.z_model_service import predict_batch as predict_z_batch
 
-# Joint names in training column order — must match the feat_cols order from the
-# training notebook exactly (nose, left_shoulder, left_elbow, right_shoulder, ...).
+_log = _logging.getLogger(__name__)
+
 _MODEL_JOINT_NAMES: List[str] = [
     "nose",
     "left_shoulder",
@@ -39,11 +39,7 @@ _MODEL_JOINT_NAMES: List[str] = [
 
 
 def _build_features(kp3d: List[Dict]) -> List[float]:
-    """39-float feature vector [j0_x, j0_y, j0_z, j1_x, j1_y, j1_z, …] from kp3d list.
-
-    Order matches the alphabetically-sorted _3d_x / _3d_y / _3d_z columns
-    used during training (13 joints × 3 = 39).
-    """
+    """39-float feature vector [j0_x, j0_y, j0_z, …] in _MODEL_JOINT_NAMES order."""
     kp_map = {kp["name"]: kp for kp in kp3d}
     feats: List[float] = []
     for name in _MODEL_JOINT_NAMES:
@@ -90,15 +86,12 @@ def _smooth_start_stop(predictions: List[int], gap_threshold: int = 10) -> List[
     i = 0
     while i < n:
         if result[i] == 1:
-            # Skip over consecutive 1s
             j = i + 1
             while j < n and result[j] == 1:
                 j += 1
-            # j is now the first 0 after a 1-run
             gap_start = j
             while j < n and result[j] == 0:
                 j += 1
-            # j is now the next 1 (or end of array)
             if j < n:
                 gap_len = j - gap_start
                 if gap_len < gap_threshold:
@@ -112,127 +105,75 @@ def _smooth_start_stop(predictions: List[int], gap_threshold: int = 10) -> List[
     return result
 
 
-def _classify_with_z(
-    kp3d: List[Dict], predicted_z: Dict[str, float]
-) -> Tuple[str, float, float, Optional[float]]:
-    """Classify squat depth using pre-computed z values."""
-    kp_map = {kp["name"]: kp for kp in kp3d}
-    required = ["left_hip", "left_knee", "left_ankle", "right_hip", "right_knee", "right_ankle"]
-    if not all(k in kp_map for k in required):
-        return "Invalid", 0.0, 0.0, None
-
-    def _with_z(name: str) -> Dict:
-        kp = kp_map[name]
-        z = predicted_z.get(name, kp.get("z", 0.0))
-        return {**kp, "z": float(z)}
-
-    left_angle = calculate_knee_angle(
-        _with_z("left_hip"), _with_z("left_knee"), _with_z("left_ankle")
-    )
-    right_angle = calculate_knee_angle(
-        _with_z("right_hip"), _with_z("right_knee"), _with_z("right_ankle")
-    )
-    classification, confidence = _rule_based(left_angle, right_angle)
-    return classification, left_angle, right_angle, confidence
-
-
 class FrameResult:
-    __slots__ = ("start_stop", "classification", "left_knee_angle",
-                 "right_knee_angle", "confidence", "predicted_z", "good_bad_score")
+    __slots__ = ("start_stop", "predicted_z", "good_bad_score")
 
     def __init__(
         self,
         start_stop: int,
-        classification: str,
-        left_knee_angle: float,
-        right_knee_angle: float,
-        confidence: Optional[float],
         predicted_z: Dict[str, float],
         good_bad_score: Optional[float] = None,
     ):
         self.start_stop = start_stop
-        self.classification = classification
-        self.left_knee_angle = left_knee_angle
-        self.right_knee_angle = right_knee_angle
-        self.confidence = confidence
         self.predicted_z = predicted_z
         self.good_bad_score = good_bad_score
-
-
-import logging as _logging
-_log = _logging.getLogger(__name__)
 
 
 def analyze_session(
     frames: List[List[Dict]],
     norm_frames: Optional[List[List[Dict]]] = None,
-) -> List[FrameResult]:
+) -> Tuple[List[FrameResult], Dict[str, float]]:
     """Run the full pipeline on all frames.
 
-    Parameters
-    ----------
-    frames:
-        World-space keypoints (hip-centred, metres) used for z-prediction
-        and squat classification.
-    norm_frames:
-        Image-normalised keypoints (x, y ∈ [0,1]) used as input to the
-        start-stop model which was trained on this coordinate system.
-        Falls back to ``frames`` when not provided.
-
-    Returns
-    -------
-    List of FrameResult, one per input frame.
+    Returns (results, timings) where timings maps step name → elapsed ms.
     """
     if not frames:
-        return []
+        return [], {}
 
-    # 1. Build feature vectors for start/stop model.
-    #    Use norm_frames when available — the model was trained on [0,1] normalised
-    #    image coordinates, not world coordinates.
+    timings: Dict[str, float] = {}
+    t_total = perf_counter()
+
     feature_source = norm_frames if (norm_frames and len(norm_frames) == len(frames)) else frames
-    features_batch = [_build_features(f) for f in feature_source]
 
-    # 2. Predict start/stop
+    t = perf_counter()
+    features_batch = [_build_features(f) for f in feature_source]
+    timings["feature_build_ms"] = round((perf_counter() - t) * 1000, 1)
+
+    t = perf_counter()
     try:
         raw_start_stop = start_stop_model_service.predict_batch(features_batch, "champion")
-        _log.info("start_stop: %d frames → %d exercise, %d non-exercise",
-                  len(raw_start_stop), sum(raw_start_stop), raw_start_stop.count(0))
-        # If the model labels nothing as exercise, fall back to full-video exercise.
+        _log.info(
+            "start_stop: %d frames → %d exercise, %d non-exercise",
+            len(raw_start_stop), sum(raw_start_stop), raw_start_stop.count(0),
+        )
         if sum(raw_start_stop) == 0:
             _log.warning("start_stop returned all-0 — falling back to all-exercise")
             raw_start_stop = [1] * len(frames)
     except Exception as exc:
         _log.error("start_stop model failed (%s), falling back to all-exercise", exc)
         raw_start_stop = [1] * len(frames)
+    timings["start_stop_ms"] = round((perf_counter() - t) * 1000, 1)
 
-    # 3. Smooth gaps
+    t = perf_counter()
     smoothed = _smooth_start_stop(raw_start_stop)
+    timings["smooth_ms"] = round((perf_counter() - t) * 1000, 1)
 
-    # 4 & 5. Z-pred + classify per frame (single batch call across all frames)
+    t = perf_counter()
     all_predicted_z = _predict_z_all_frames(frames)
-    results: List[FrameResult] = []
-    for kp3d, ss, predicted_z in zip(frames, smoothed, all_predicted_z):
-        if ss == 1:
-            cls, la, ra, conf = _classify_with_z(kp3d, predicted_z)
-        else:
-            cls, la, ra, conf = "NotExercise", 0.0, 0.0, None
+    timings["z_prediction_ms"] = round((perf_counter() - t) * 1000, 1)
 
-        results.append(FrameResult(
-            start_stop=ss,
-            classification=cls,
-            left_knee_angle=la,
-            right_knee_angle=ra,
-            confidence=conf,
-            predicted_z=predicted_z,
-            good_bad_score=None,
-        ))
+    results: List[FrameResult] = [
+        FrameResult(start_stop=ss, predicted_z=pz)
+        for ss, pz in zip(smoothed, all_predicted_z)
+    ]
 
-    # 6. GoodBad quality scoring — one score per continuous exercise segment.
-    #    Pass norm_frames so the model receives the normalised [0,1] coords it
-    #    was trained on (world coords cause all-bad predictions).
+    t = perf_counter()
     _score_exercise_segments(norm_frames or frames, smoothed, results)
+    timings["goodbad_ms"] = round((perf_counter() - t) * 1000, 1)
 
-    return results
+    timings["total_ms"] = round((perf_counter() - t_total) * 1000, 1)
+
+    return results, timings
 
 
 def _score_exercise_segments(
@@ -242,9 +183,7 @@ def _score_exercise_segments(
 ) -> None:
     """Run GoodBad_ClassifierV2 on each continuous exercise segment in-place.
 
-    source_frames must be image-normalised keypoints (x, y ∈ [0,1]) — the
-    coordinate system the model was trained on.  Passing world-space coords
-    will cause all segments to be classified as Bad.
+    source_frames must be image-normalised keypoints (x, y ∈ [0,1]).
     """
     n = len(smoothed)
     i = 0
@@ -253,7 +192,7 @@ def _score_exercise_segments(
             seg_start = i
             while i < n and smoothed[i] == 1:
                 i += 1
-            seg_end = i  # exclusive
+            seg_end = i
 
             seg_frames = source_frames[seg_start:seg_end]
             try:
