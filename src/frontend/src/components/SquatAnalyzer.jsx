@@ -1012,7 +1012,7 @@ export default function SquatAnalyzer() {
                 landmarkerRef.current = await createVideoLandmarker();
             }
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 640, height: 480 },
+                video: { width: 640, height: 480, frameRate: { ideal: 60 } },
             });
             videoRef.current.srcObject = stream;
             await videoRef.current.play();
