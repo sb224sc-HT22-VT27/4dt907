@@ -76,45 +76,44 @@ _JOINT_NAMES: List[str] = [
 
 # Canonical feature column names in training order (mirrors FEAT_COLS).
 _FEAT_COLS: List[str] = [
-    f"{joint}_3d_{axis}"
-    for joint in _JOINT_NAMES
-    for axis in ["x", "y", "z"]
+    f"{joint}_3d_{axis}" for joint in _JOINT_NAMES for axis in ["x", "y", "z"]
 ]
 
 # 16 joint-pair distances (normalised by shoulder width).
 _KEY_DIST_PAIRS: List[Tuple[str, str]] = [
-    ("left_shoulder",  "right_shoulder"),
-    ("left_elbow",     "right_elbow"),
-    ("left_wrist",     "right_wrist"),
-    ("left_hip",       "right_hip"),
-    ("left_knee",      "right_knee"),
-    ("left_ankle",     "right_ankle"),
-    ("left_shoulder",  "left_elbow"),
-    ("left_elbow",     "left_wrist"),
+    ("left_shoulder", "right_shoulder"),
+    ("left_elbow", "right_elbow"),
+    ("left_wrist", "right_wrist"),
+    ("left_hip", "right_hip"),
+    ("left_knee", "right_knee"),
+    ("left_ankle", "right_ankle"),
+    ("left_shoulder", "left_elbow"),
+    ("left_elbow", "left_wrist"),
     ("right_shoulder", "right_elbow"),
-    ("right_elbow",    "right_wrist"),
-    ("left_hip",       "left_knee"),
-    ("left_knee",      "left_ankle"),
-    ("right_hip",      "right_knee"),
-    ("right_knee",     "right_ankle"),
-    ("left_shoulder",  "left_hip"),
+    ("right_elbow", "right_wrist"),
+    ("left_hip", "left_knee"),
+    ("left_knee", "left_ankle"),
+    ("right_hip", "right_knee"),
+    ("right_knee", "right_ankle"),
+    ("left_shoulder", "left_hip"),
     ("right_shoulder", "right_hip"),
 ]
 
 # 6 joint-angle triples (a, vertex, b) — angle measured at vertex.
 _KEY_ANGLE_TRIPLES: List[Tuple[str, str, str]] = [
-    ("left_shoulder",  "left_elbow",   "left_wrist"),
-    ("right_shoulder", "right_elbow",  "right_wrist"),
-    ("left_hip",       "left_knee",    "left_ankle"),
-    ("right_hip",      "right_knee",   "right_ankle"),
-    ("left_elbow",     "left_shoulder",  "left_hip"),
-    ("right_elbow",    "right_shoulder", "right_hip"),
+    ("left_shoulder", "left_elbow", "left_wrist"),
+    ("right_shoulder", "right_elbow", "right_wrist"),
+    ("left_hip", "left_knee", "left_ankle"),
+    ("right_hip", "right_knee", "right_ankle"),
+    ("left_elbow", "left_shoulder", "left_hip"),
+    ("right_elbow", "right_shoulder", "right_hip"),
 ]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # MLflow helpers (mirrors start_stop_model_service pattern)
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _clean_uri(value: Optional[str]) -> Optional[str]:
     if not value:
@@ -164,7 +163,8 @@ def _resolve_alias_to_version_uri(model_name: str, alias: str) -> str:
     a = alias.lower().strip()
     if a in {"prod", "production"}:
         prod = [
-            mv for mv in versions
+            mv
+            for mv in versions
             if (getattr(mv, "current_stage", "") or "").lower() == "production"
         ]
         chosen = prod[-1] if prod else latest
@@ -191,7 +191,7 @@ def _fetch_run_id(uri: str) -> Optional[str]:
     if not uri:
         return None
     if uri.startswith("runs:/"):
-        tail = uri[len("runs:/"):]
+        tail = uri[len("runs:/") :]
         return tail.split("/", 1)[0] if tail else None
     client = MlflowClient()
     if _is_models_alias_uri(uri):
@@ -203,7 +203,7 @@ def _fetch_run_id(uri: str) -> Optional[str]:
             resolved = _resolve_alias_to_version_uri(name, alias)
             return _fetch_run_id(resolved)
     if uri.startswith("models:/"):
-        tail = uri[len("models:/"):]
+        tail = uri[len("models:/") :]
         parts = tail.split("/", 2)
         if len(parts) < 2:
             return None
@@ -238,6 +238,7 @@ def _fetch_scaler(run_id: Optional[str]):
         return None
     try:
         import joblib
+
         client = MlflowClient()
         artifacts = client.list_artifacts(run_id)
         scaler_path = next(
@@ -271,7 +272,10 @@ def get_model(variant: str = "champion"):
 
         _log.info(
             "GoodBad model loaded: uri=%s  c_frames=%d  n_features=%d  scaler=%s",
-            uri_used, c_frames, n_features, "yes" if scaler else "no",
+            uri_used,
+            c_frames,
+            n_features,
+            "yes" if scaler else "no",
         )
         _cache[direct_uri] = (model, uri_used, run_id, c_frames, n_features, scaler)
         return model, uri_used, run_id, c_frames, n_features, scaler
@@ -283,12 +287,10 @@ def get_model(variant: str = "champion"):
 # for the distance/angle extras.
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _pos(base_arr: np.ndarray, joint: str) -> np.ndarray:
     """Return (n_frames, 3) xyz slice for a joint, using _FEAT_COLS index lookup."""
-    idxs = [
-        _FEAT_COLS.index(f"{joint}_3d_{ax}")
-        for ax in ["x", "y", "z"]
-    ]
+    idxs = [_FEAT_COLS.index(f"{joint}_3d_{ax}") for ax in ["x", "y", "z"]]
     return base_arr[:, idxs]
 
 
@@ -333,9 +335,8 @@ def _add_dist_angle_features(base_arr: np.ndarray) -> np.ndarray:
         pb = _pos(base_arr, jb)
         va = pa - pv
         vb = pb - pv
-        cos_val = (
-            np.sum(va * vb, axis=1)
-            / (np.linalg.norm(va, axis=1) * np.linalg.norm(vb, axis=1) + 1e-8)
+        cos_val = np.sum(va * vb, axis=1) / (
+            np.linalg.norm(va, axis=1) * np.linalg.norm(vb, axis=1) + 1e-8
         )
         extras.append(cos_val.reshape(-1, 1))
 
@@ -358,6 +359,7 @@ def _resample_to_fixed(arr: np.ndarray, target: int) -> np.ndarray:
 # Public inference API
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def predict_session(
     exercise_frames: List[List[Dict]],
     variant: str = "champion",
@@ -370,7 +372,7 @@ def predict_session(
         All frames belonging to one continuous squat rep (start_stop == 1).
         Each element is a list of keypoint dicts with keys ``name``, ``x``,
         ``y``, ``z``.  Must be image-normalised coordinates (x, y ∈ [0, 1])
-        — the coordinate system used in training (kinect_good_vs_bad_not_preprocessed_A13_mediapipe).
+        the coordinate system used in training(kinect_good_vs_bad_not_preprocessed_A13_mediapipe).
         Passing world-space (hip-centred) coords will produce all-Bad predictions.
     variant:
         Model variant (``"champion"`` / ``"prod"`` or ``"dev"``).
@@ -400,8 +402,11 @@ def predict_session(
 
         _log.info(
             "GoodBad features: n_frames=%d shape=%s mean=%.4f min=%.4f max=%.4f",
-            len(exercise_frames), enriched.shape,
-            float(enriched.mean()), float(enriched.min()), float(enriched.max()),
+            len(exercise_frames),
+            enriched.shape,
+            float(enriched.mean()),
+            float(enriched.min()),
+            float(enriched.max()),
         )
 
         # 3. Resample to exactly c_frames equidistant frames → (c_frames, 61).
@@ -421,7 +426,10 @@ def predict_session(
 
         _log.info(
             "GoodBad logit=%.4f → score=%.4f (frames=%d → resampled to %d)",
-            logit, score, len(exercise_frames), c_frames,
+            logit,
+            score,
+            len(exercise_frames),
+            c_frames,
         )
         return score
 

@@ -36,9 +36,12 @@ def squat_analyze_session(req: SessionAnalysisRequest):
         frames = [[kp.model_dump() for kp in frame] for frame in req.frames]
         norm_frames = (
             [[kp.model_dump() for kp in frame] for frame in req.norm_frames]
-            if req.norm_frames else None
+            if req.norm_frames
+            else None
         )
-        frame_results, timings = session_analysis_service.analyze_session(frames, norm_frames=norm_frames)
+        frame_results, timings = session_analysis_service.analyze_session(
+            frames, norm_frames=norm_frames
+        )
         results = [
             FrameAnalysisResult(
                 start_stop=fr.start_stop,

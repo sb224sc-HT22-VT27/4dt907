@@ -133,7 +133,9 @@ def analyze_session(
     timings: Dict[str, float] = {}
     t_total = perf_counter()
 
-    feature_source = norm_frames if (norm_frames and len(norm_frames) == len(frames)) else frames
+    feature_source = (
+        norm_frames if (norm_frames and len(norm_frames) == len(frames)) else frames
+    )
 
     t = perf_counter()
     features_batch = [_build_features(f) for f in feature_source]
@@ -141,10 +143,14 @@ def analyze_session(
 
     t = perf_counter()
     try:
-        raw_start_stop = start_stop_model_service.predict_batch(features_batch, "champion")
+        raw_start_stop = start_stop_model_service.predict_batch(
+            features_batch, "champion"
+        )
         _log.info(
             "start_stop: %d frames → %d exercise, %d non-exercise",
-            len(raw_start_stop), sum(raw_start_stop), raw_start_stop.count(0),
+            len(raw_start_stop),
+            sum(raw_start_stop),
+            raw_start_stop.count(0),
         )
         if sum(raw_start_stop) == 0:
             _log.warning("start_stop returned all-0 — falling back to all-exercise")
@@ -200,13 +206,18 @@ def _score_exercise_segments(
             except Exception as exc:
                 _log.error(
                     "GoodBad scoring failed for segment [%d:%d]: %s",
-                    seg_start, seg_end, exc,
+                    seg_start,
+                    seg_end,
+                    exc,
                 )
                 score = None
 
             _log.info(
                 "GoodBad segment [%d:%d] (%d frames): score=%.4f",
-                seg_start, seg_end, seg_end - seg_start, score,
+                seg_start,
+                seg_end,
+                seg_end - seg_start,
+                score,
             )
             for j in range(seg_start, seg_end):
                 results[j].good_bad_score = score
