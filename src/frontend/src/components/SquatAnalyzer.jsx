@@ -27,43 +27,6 @@ const SQUAT_LANDMARK_NAMES = {
     28: "right_ankle",
 };
 
-// All 33 MediaPipe landmark names in index order.
-const ALL_LANDMARK_NAMES = [
-    "nose", // 0
-    "left_eye_inner", // 1
-    "left_eye", // 2
-    "left_eye_outer", // 3
-    "right_eye_inner", // 4
-    "right_eye", // 5
-    "right_eye_outer", // 6
-    "left_ear", // 7
-    "right_ear", // 8
-    "mouth_left", // 9
-    "mouth_right", // 10
-    "left_shoulder", // 11
-    "right_shoulder", // 12
-    "left_elbow", // 13
-    "right_elbow", // 14
-    "left_wrist", // 15
-    "right_wrist", // 16
-    "left_pinky", // 17
-    "right_pinky", // 18
-    "left_index", // 19
-    "right_index", // 20
-    "left_thumb", // 21
-    "right_thumb", // 22
-    "left_hip", // 23
-    "right_hip", // 24
-    "left_knee", // 25
-    "right_knee", // 26
-    "left_ankle", // 27
-    "right_ankle", // 28
-    "left_heel", // 29
-    "right_heel", // 30
-    "left_foot_index", // 31
-    "right_foot_index", // 32
-];
-
 // Canonical joint order used by the GRU z-predictor model.
 // MUST match the alphabetically-sorted column order produced by the training
 // notebook: sorted([c for c in cols if c.endswith('_x') or c.endswith('_y')])
@@ -332,7 +295,7 @@ function Skeleton3DViewer({ frames, liveFrameRef }) {
         return () => clearInterval(playTimerRef.current);
     }, [playing, frames.length]);
 
-    function drawFrame(frameData, isLive = false) {
+    const drawFrame = useCallback((frameData, isLive = false) => {
         const canvas = canvasRef.current;
         if (!canvas || !frameData) return;
         const ctx = canvas.getContext("2d");
@@ -483,7 +446,7 @@ function Skeleton3DViewer({ frames, liveFrameRef }) {
             W - 6,
             H - 6,
         );
-    }
+    }, [displayedFrameIdx, frames.length]);
 
     // Non-live: draw whenever anything changes (frame scrub, drag, zoom).
     useEffect(() => {
@@ -501,7 +464,7 @@ function Skeleton3DViewer({ frames, liveFrameRef }) {
         }
         rafId = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(rafId);
-    }, [liveFrameRef]); // re-runs only when live mode toggled
+    }, [liveFrameRef, drawFrame]); // re-runs only when live mode toggled
 
     // Drag to rotate
 
@@ -768,12 +731,10 @@ export default function SquatAnalyzer() {
     const [status, setStatus] = useState("idle");
     const [result, setResult] = useState(null);
     const [goodBadThreshold, setGoodBadThreshold] = useState(0.5);
-    const [pipelineTime, setPipelineTime] = useState(null);
     const [pipelineTimings, setPipelineTimings] = useState(null);
     const [errorMsg, setErrorMsg] = useState("");
     const [uploadedFileName, setUploadedFileName] = useState("");
     const [videoPaused, setVideoPaused] = useState(false);
-    const [allKeypoints, setAllKeypoints] = useState([]);
     const [sessionLog, setSessionLog] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [predictedZByName, setPredictedZByName] = useState({});
@@ -846,7 +807,6 @@ export default function SquatAnalyzer() {
                 .getContext("2d")
                 .clearRect(0, 0, canvas.width, canvas.height);
         }
-        setAllKeypoints([]);
         setResult(null);
         setVideoPaused(false);
         setPredictedZByName({});
@@ -866,7 +826,6 @@ export default function SquatAnalyzer() {
         setErrorMsg("");
         setQualityError(null);
         setQualityIssues([]);
-        setPipelineTime(null);
         setPipelineTimings(null);
     }, []);
 
@@ -880,22 +839,8 @@ export default function SquatAnalyzer() {
         setUploadedFileName("");
         setErrorMsg("");
         setQualityError(null);
-        setPipelineTime(null);
         setPipelineTimings(null);
     }, [stopCapture]);
-
-    function mapAllKeypoints(landmarks) {
-        return landmarks.map((lm, i) => ({
-            index: i,
-            name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
-            x: lm.x,
-            y: lm.y,
-            predictedZ:
-                predictedZByNameRef.current[
-                    ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`
-                ] ?? null,
-        }));
-    }
 
     const switchMode = useCallback(
         (newMode) => {
@@ -904,7 +849,6 @@ export default function SquatAnalyzer() {
             setResult(null);
             setErrorMsg("");
             setUploadedFileName("");
-            setAllKeypoints([]);
             const canvas = canvasRef.current;
             if (canvas)
                 canvas
@@ -953,7 +897,6 @@ export default function SquatAnalyzer() {
             if (!res.ok) throw new Error("Session analysis failed");
             const data = await res.json();
             const elapsed = Date.now() - t0;
-            setPipelineTime(elapsed);
             setPipelineTimings(data.timings ? { ...data.timings, round_trip_ms: elapsed } : null);
             const entries = frames.map((kp3d, i) => ({
                 timestamp: Date.now() + i,
@@ -1068,7 +1011,6 @@ export default function SquatAnalyzer() {
             stopAll();
             setResult(null);
             setErrorMsg("");
-            setAllKeypoints([]);
             setUploadedFileName(file.name);
             setStatus("loading");
 
@@ -1115,7 +1057,6 @@ export default function SquatAnalyzer() {
                         x: offsetX,
                         y: offsetY,
                     });
-                    setAllKeypoints(mapAllKeypoints(detection.landmarks[0]));
                     if (warnings.length > 0) setQualityIssues(warnings);
                     if (blocking.length > 0) {
                         setQualityError({ issues: blocking });

@@ -18,6 +18,21 @@ class Keypoint3D(BaseModel):
     score: Optional[float] = None
 
 
+class SquatClassifyRequest(BaseModel):
+    """Payload for single-frame squat depth classification."""
+
+    keypoints_3d: List[Keypoint3D]
+
+
+class SquatClassifyResponse(BaseModel):
+    """Single-frame squat depth classification result."""
+
+    classification: str
+    left_knee_angle: float
+    right_knee_angle: float
+    confidence: Optional[float] = None
+
+
 class SessionAnalysisRequest(BaseModel):
     """All frames from a recorded session sent at once for the full pipeline."""
 

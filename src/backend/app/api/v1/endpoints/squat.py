@@ -12,13 +12,34 @@ from fastapi import APIRouter, HTTPException
 
 from app.schemas.squat import (
     FrameAnalysisResult,
+    SquatClassifyRequest,
+    SquatClassifyResponse,
     SessionAnalysisRequest,
     SessionAnalysisResponse,
 )
 from app.services import session_analysis_service
+from app.services.squat_service import classify_squat
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.post("/squat/classify", response_model=SquatClassifyResponse)
+def squat_classify(req: SquatClassifyRequest):
+    """Classify depth for a single squat frame from 3-D keypoints."""
+    try:
+        classification, left_angle, right_angle, confidence = classify_squat(
+            [kp.model_dump() for kp in req.keypoints_3d]
+        )
+        return SquatClassifyResponse(
+            classification=classification,
+            left_knee_angle=left_angle,
+            right_knee_angle=right_angle,
+            confidence=confidence,
+        )
+    except Exception:
+        logger.exception("Squat classification failed")
+        raise HTTPException(status_code=503, detail="Service unavailable")
 
 
 @router.post("/squat/analyze-session", response_model=SessionAnalysisResponse)
