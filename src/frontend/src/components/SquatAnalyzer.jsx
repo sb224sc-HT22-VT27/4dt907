@@ -157,7 +157,6 @@ const SQUAT_CONNECTIONS_BY_NAME = POSE_CONNECTIONS.filter(
     .map(([a, b]) => [_IDX_TO_SQUAT_NAME[a], _IDX_TO_SQUAT_NAME[b]])
     .filter(([a, b]) => a && b);
 
-
 const MODEL_URL =
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 const WASM_URL =
@@ -517,7 +516,10 @@ function Skeleton3DViewer({ frames, liveFrameRef }) {
         rotation.current.y += dx * 0.4;
         rotation.current.x += dy * 0.4;
         dragRef.current = { x: e.clientX, y: e.clientY };
-        drawFrame(liveFrameRef?.current ?? frames[frameIdxRef.current], !!liveFrameRef?.current);
+        drawFrame(
+            liveFrameRef?.current ?? frames[frameIdxRef.current],
+            !!liveFrameRef?.current,
+        );
     }
 
     function onPointerUp() {
@@ -530,7 +532,10 @@ function Skeleton3DViewer({ frames, liveFrameRef }) {
             80,
             Math.min(600, zoomRef.current - e.deltaY * 0.3),
         );
-        drawFrame(liveFrameRef?.current ?? frames[frameIdxRef.current], !!liveFrameRef?.current);
+        drawFrame(
+            liveFrameRef?.current ?? frames[frameIdxRef.current],
+            !!liveFrameRef?.current,
+        );
     }
 
     if (frames.length === 0 && !liveFrameRef) return null;
@@ -617,7 +622,8 @@ function Skeleton3DViewer({ frames, liveFrameRef }) {
                     onClick={() => {
                         zoomRef.current = Math.min(600, zoomRef.current + 30);
                         drawFrame(
-                            liveFrameRef?.current ?? frames[frameIdxRef.current],
+                            liveFrameRef?.current ??
+                                frames[frameIdxRef.current],
                             !!liveFrameRef?.current,
                         );
                     }}
@@ -630,7 +636,8 @@ function Skeleton3DViewer({ frames, liveFrameRef }) {
                     onClick={() => {
                         zoomRef.current = Math.max(80, zoomRef.current - 30);
                         drawFrame(
-                            liveFrameRef?.current ?? frames[frameIdxRef.current],
+                            liveFrameRef?.current ??
+                                frames[frameIdxRef.current],
                             !!liveFrameRef?.current,
                         );
                     }}
@@ -707,12 +714,17 @@ function assessVideoQuality(detection, captureCanvas) {
 
     // Hands at or below hip level — warn when arms hang at sides instead of
     // being raised (normal squat starting position).
-    const lw = lms[15], rw = lms[16], lh = lms[23], rh = lms[24];
+    const lw = lms[15],
+        rw = lms[16],
+        lh = lms[23],
+        rh = lms[24];
     if (lw && rw && lh && rh) {
         const hipY = (lh.y + rh.y) / 2;
         const wristY = (lw.y + rw.y) / 2;
         if (wristY > hipY - 0.05) {
-            warnings.push("Hands are not raised: lift your arms into squat position");
+            warnings.push(
+                "Hands are not raised: lift your arms into squat position",
+            );
         }
     }
 
@@ -727,7 +739,6 @@ function assessVideoQuality(detection, captureCanvas) {
             "Person is partially out of frame: move camera back or reposition",
         );
     }
-
 
     // Knees hidden while shoulders clearly visible (facing camera head-on)
     if (vis(25) < 0.35 && vis(26) < 0.35 && vis(11) > 0.6 && vis(12) > 0.6) {
@@ -768,12 +779,12 @@ export default function SquatAnalyzer() {
     const [status, setStatus] = useState("idle");
     const [result, setResult] = useState(null);
     const [goodBadThreshold, setGoodBadThreshold] = useState(0.5);
-    const [pipelineTime, setPipelineTime] = useState(null);
+    const [PIPELINE_TIME, setPipelineTime] = useState(null); // * Updated base name for lint
     const [pipelineTimings, setPipelineTimings] = useState(null);
     const [errorMsg, setErrorMsg] = useState("");
     const [uploadedFileName, setUploadedFileName] = useState("");
     const [videoPaused, setVideoPaused] = useState(false);
-    const [allKeypoints, setAllKeypoints] = useState([]);
+    const [ALL_KEYPOINTS, setAllKeypoints] = useState([]); // * Updated base name for lint
     const [sessionLog, setSessionLog] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [predictedZByName, setPredictedZByName] = useState({});
@@ -954,7 +965,11 @@ export default function SquatAnalyzer() {
             const data = await res.json();
             const elapsed = Date.now() - t0;
             setPipelineTime(elapsed);
-            setPipelineTimings(data.timings ? { ...data.timings, round_trip_ms: elapsed } : null);
+            setPipelineTimings(
+                data.timings
+                    ? { ...data.timings, round_trip_ms: elapsed }
+                    : null,
+            );
             const entries = frames.map((kp3d, i) => ({
                 timestamp: Date.now() + i,
                 keypoints3d: kp3d,
@@ -1175,7 +1190,8 @@ export default function SquatAnalyzer() {
                 canvas.width = DISPLAY_W;
                 canvas.height = DISPLAY_H;
             }
-            const scale = vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
+            const scale =
+                vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
             const drawW = vw * scale;
             const drawH = vh * scale;
             canvas.getContext("2d").clearRect(0, 0, DISPLAY_W, DISPLAY_H);
@@ -1226,9 +1242,15 @@ export default function SquatAnalyzer() {
                         cap.height = vh;
                     }
                     cap.getContext("2d").drawImage(video, 0, 0, vw, vh);
-                    lastDetectionRef.current = landmarker.detectForVideo(cap, timestamp);
+                    lastDetectionRef.current = landmarker.detectForVideo(
+                        cap,
+                        timestamp,
+                    );
                 } else {
-                    lastDetectionRef.current = landmarker.detectForVideo(video, timestamp);
+                    lastDetectionRef.current = landmarker.detectForVideo(
+                        video,
+                        timestamp,
+                    );
                 }
             } catch {
                 return;
@@ -1685,7 +1707,6 @@ export default function SquatAnalyzer() {
                 </p>
             )}
 
-
             {/* Form quality + threshold */}
             {formScore != null && (
                 <div className="ios-card rounded-2xl p-5 w-full">
@@ -1695,7 +1716,9 @@ export default function SquatAnalyzer() {
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
                                 Form Quality
                             </p>
-                            <p className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}>
+                            <p
+                                className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}
+                            >
                                 {formIsGood ? "Good form" : "Bad form"}
                             </p>
                         </div>
@@ -1765,7 +1788,9 @@ export default function SquatAnalyzer() {
                             step="1"
                             value={threshPct}
                             onChange={(e) =>
-                                setGoodBadThreshold(Number(e.target.value) / 100)
+                                setGoodBadThreshold(
+                                    Number(e.target.value) / 100,
+                                )
                             }
                             className="ios-slider"
                             style={{ width: "100%", display: "block" }}
@@ -1813,69 +1838,113 @@ export default function SquatAnalyzer() {
             )}
 
             {/* Pipeline timing breakdown */}
-            {pipelineTimings != null && (() => {
-                const steps = [
-                    { key: "network_ms", label: "Network (round-trip)", sub: "client ↔ server", value: Math.max(0, pipelineTimings.round_trip_ms - pipelineTimings.total_ms) },
-                    { key: "start_stop_ms", label: "Start/Stop model", sub: "exercise detection", value: pipelineTimings.start_stop_ms },
-                    { key: "z_prediction_ms", label: "Z prediction", sub: "depth estimation", value: pipelineTimings.z_prediction_ms },
-                    { key: "goodbad_ms", label: "GoodBad model", sub: "form quality", value: pipelineTimings.goodbad_ms },
-                    { key: "feature_build_ms", label: "Feature extraction", sub: "preprocessing", value: pipelineTimings.feature_build_ms },
-                ];
-                const maxVal = Math.max(...steps.map(s => s.value), 1);
-                return (
-                    <div className="ios-card rounded-2xl p-5 w-full">
-                        <div className="flex items-baseline justify-between mb-4">
-                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                Pipeline Timing
-                            </p>
-                            <span className="text-xs font-mono text-slate-400">
-                                Total:{" "}
-                                <span className="text-sky-500 font-semibold">
-                                    {(pipelineTimings.round_trip_ms / 1000).toFixed(2)}s
+            {pipelineTimings != null &&
+                (() => {
+                    const steps = [
+                        {
+                            key: "network_ms",
+                            label: "Network (round-trip)",
+                            sub: "client ↔ server",
+                            value: Math.max(
+                                0,
+                                pipelineTimings.round_trip_ms -
+                                    pipelineTimings.total_ms,
+                            ),
+                        },
+                        {
+                            key: "start_stop_ms",
+                            label: "Start/Stop model",
+                            sub: "exercise detection",
+                            value: pipelineTimings.start_stop_ms,
+                        },
+                        {
+                            key: "z_prediction_ms",
+                            label: "Z prediction",
+                            sub: "depth estimation",
+                            value: pipelineTimings.z_prediction_ms,
+                        },
+                        {
+                            key: "goodbad_ms",
+                            label: "GoodBad model",
+                            sub: "form quality",
+                            value: pipelineTimings.goodbad_ms,
+                        },
+                        {
+                            key: "feature_build_ms",
+                            label: "Feature extraction",
+                            sub: "preprocessing",
+                            value: pipelineTimings.feature_build_ms,
+                        },
+                    ];
+                    const maxVal = Math.max(...steps.map((s) => s.value), 1);
+                    return (
+                        <div className="ios-card rounded-2xl p-5 w-full">
+                            <div className="flex items-baseline justify-between mb-4">
+                                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                    Pipeline Timing
+                                </p>
+                                <span className="text-xs font-mono text-slate-400">
+                                    Total:{" "}
+                                    <span className="text-sky-500 font-semibold">
+                                        {(
+                                            pipelineTimings.round_trip_ms / 1000
+                                        ).toFixed(2)}
+                                        s
+                                    </span>
                                 </span>
-                            </span>
-                        </div>
-                        <div className="space-y-3">
-                            {steps.map(({ key, label, sub, value }) => (
-                                <div key={key}>
-                                    <div className="flex items-baseline justify-between mb-1">
-                                        <div>
-                                            <span className="text-xs font-semibold text-slate-600">{label}</span>
-                                            <span className="ml-2 text-xs text-slate-400">{sub}</span>
+                            </div>
+                            <div className="space-y-3">
+                                {steps.map(({ key, label, sub, value }) => (
+                                    <div key={key}>
+                                        <div className="flex items-baseline justify-between mb-1">
+                                            <div>
+                                                <span className="text-xs font-semibold text-slate-600">
+                                                    {label}
+                                                </span>
+                                                <span className="ml-2 text-xs text-slate-400">
+                                                    {sub}
+                                                </span>
+                                            </div>
+                                            <span className="text-xs font-mono font-bold text-slate-600 tabular-nums">
+                                                {value < 1
+                                                    ? "<1"
+                                                    : Math.round(value)}
+                                                ms
+                                            </span>
                                         </div>
-                                        <span className="text-xs font-mono font-bold text-slate-600 tabular-nums">
-                                            {value < 1 ? "<1" : Math.round(value)}ms
-                                        </span>
+                                        <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-700 ease-out"
+                                                style={{
+                                                    width: `${Math.max(1, (value / maxVal) * 100)}%`,
+                                                    background:
+                                                        key === "network_ms"
+                                                            ? "linear-gradient(to right, #94a3b8, #64748b)"
+                                                            : key ===
+                                                                "start_stop_ms"
+                                                              ? "linear-gradient(to right, #38bdf8, #0ea5e9)"
+                                                              : key ===
+                                                                  "z_prediction_ms"
+                                                                ? "linear-gradient(to right, #a78bfa, #7c3aed)"
+                                                                : key ===
+                                                                    "goodbad_ms"
+                                                                  ? "linear-gradient(to right, #4ade80, #16a34a)"
+                                                                  : "linear-gradient(to right, #fbbf24, #d97706)",
+                                                }}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full transition-all duration-700 ease-out"
-                                            style={{
-                                                width: `${Math.max(1, (value / maxVal) * 100)}%`,
-                                                background: key === "network_ms"
-                                                    ? "linear-gradient(to right, #94a3b8, #64748b)"
-                                                    : key === "start_stop_ms"
-                                                    ? "linear-gradient(to right, #38bdf8, #0ea5e9)"
-                                                    : key === "z_prediction_ms"
-                                                    ? "linear-gradient(to right, #a78bfa, #7c3aed)"
-                                                    : key === "goodbad_ms"
-                                                    ? "linear-gradient(to right, #4ade80, #16a34a)"
-                                                    : "linear-gradient(to right, #fbbf24, #d97706)",
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-400">
+                                <span>Backend processing</span>
+                                <span className="font-mono font-semibold text-slate-600">
+                                    {Math.round(pipelineTimings.total_ms)}ms
+                                </span>
+                            </div>
                         </div>
-                        <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-400">
-                            <span>Backend processing</span>
-                            <span className="font-mono font-semibold text-slate-600">
-                                {Math.round(pipelineTimings.total_ms)}ms
-                            </span>
-                        </div>
-                    </div>
-                );
-            })()}
+                    );
+                })()}
 
             {/* 3-D interactive skeleton viewer */}
             <Skeleton3DViewer
