@@ -157,12 +157,6 @@ const SQUAT_CONNECTIONS_BY_NAME = POSE_CONNECTIONS.filter(
     .map(([a, b]) => [_IDX_TO_SQUAT_NAME[a], _IDX_TO_SQUAT_NAME[b]])
     .filter(([a, b]) => a && b);
 
-const CLASSIFICATION_COLORS = {
-    Deep: "text-green-600",
-    Shallow: "text-amber-600",
-    Invalid: "text-red-600",
-};
-
 const MODEL_URL =
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 const WASM_URL =
@@ -509,7 +503,10 @@ function Skeleton3DViewer({ frames, liveFrame }) {
         rotation.current.y += dx * 0.4;
         rotation.current.x += dy * 0.4;
         dragRef.current = { x: e.clientX, y: e.clientY };
-        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+        drawFrame(
+            liveFrameRef?.current ?? frames[frameIdxRef.current],
+            !!liveFrameRef?.current,
+        );
     }
 
     function onPointerUp() {
@@ -522,7 +519,10 @@ function Skeleton3DViewer({ frames, liveFrame }) {
             80,
             Math.min(600, zoomRef.current - e.deltaY * 0.3),
         );
-        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+        drawFrame(
+            liveFrameRef?.current ?? frames[frameIdxRef.current],
+            !!liveFrameRef?.current,
+        );
     }
 
     if (frames.length === 0 && !liveFrame) return null;
@@ -609,8 +609,9 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                     onClick={() => {
                         zoomRef.current = Math.min(600, zoomRef.current + 30);
                         drawFrame(
-                            liveFrame ?? frames[frameIdxRef.current],
-                            !!liveFrame,
+                            liveFrameRef?.current ??
+                                frames[frameIdxRef.current],
+                            !!liveFrameRef?.current,
                         );
                     }}
                     className="ios-btn w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-slate-600"
@@ -622,8 +623,9 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                     onClick={() => {
                         zoomRef.current = Math.max(80, zoomRef.current - 30);
                         drawFrame(
-                            liveFrame ?? frames[frameIdxRef.current],
-                            !!liveFrame,
+                            liveFrameRef?.current ??
+                                frames[frameIdxRef.current],
+                            !!liveFrameRef?.current,
                         );
                     }}
                     className="ios-btn w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-slate-600"
@@ -703,10 +705,17 @@ function assessVideoQuality(detection, captureCanvas) {
         rw = lms[16],
         lh = lms[23],
         rh = lms[24];
+    const lw = lms[15],
+        rw = lms[16],
+        lh = lms[23],
+        rh = lms[24];
     if (lw && rw && lh && rh) {
         const hipY = (lh.y + rh.y) / 2;
         const wristY = (lw.y + rw.y) / 2;
         if (wristY > hipY - 0.05) {
+            warnings.push(
+                "Hands are not raised: lift your arms into squat position",
+            );
             warnings.push(
                 "Hands are not raised: lift your arms into squat position",
             );
@@ -724,9 +733,6 @@ function assessVideoQuality(detection, captureCanvas) {
             "Person is partially out of frame: move camera back or reposition",
         );
     }
-
-    // "Too far" check removed — bounding box shrinks naturally during a squat,
-    // causing false positives. MediaPipe visibility already reflects true range.
 
     // Knees hidden while shoulders clearly visible (facing camera head-on)
     if (vis(25) < 0.35 && vis(26) < 0.35 && vis(11) > 0.6 && vis(12) > 0.6) {
@@ -767,10 +773,12 @@ export default function SquatAnalyzer() {
     const [status, setStatus] = useState("idle");
     const [result, setResult] = useState(null);
     const [goodBadThreshold, setGoodBadThreshold] = useState(0.5);
+    const [PIPELINE_TIME, setPipelineTime] = useState(null); // * Updated base name for lint
+    const [pipelineTimings, setPipelineTimings] = useState(null);
     const [errorMsg, setErrorMsg] = useState("");
     const [uploadedFileName, setUploadedFileName] = useState("");
     const [videoPaused, setVideoPaused] = useState(false);
-    const [allKeypoints, setAllKeypoints] = useState([]);
+    const [ALL_KEYPOINTS, setAllKeypoints] = useState([]); // * Updated base name for lint
     const [sessionLog, setSessionLog] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [predictedZByName, setPredictedZByName] = useState({});
@@ -944,10 +952,12 @@ export default function SquatAnalyzer() {
             });
             if (!res.ok) throw new Error("Session analysis failed");
             const data = await res.json();
-            const ones = data.results.filter((r) => r.start_stop === 1).length;
-            const zeros = data.results.filter((r) => r.start_stop === 0).length;
-            console.log(
-                `[analyze-session] ${data.results.length} frames → ${ones} exercise (1), ${zeros} non-exercise (0)`,
+            const elapsed = Date.now() - t0;
+            setPipelineTime(elapsed);
+            setPipelineTimings(
+                data.timings
+                    ? { ...data.timings, round_trip_ms: elapsed }
+                    : null,
             );
             const entries = frames.map((kp3d, i) => ({
                 timestamp: Date.now() + i,
@@ -1188,16 +1198,42 @@ export default function SquatAnalyzer() {
                 rafRef.current = requestAnimationFrame(detect);
                 return;
             }
-            if (video.paused || video.ended) {
-                rafRef.current = requestAnimationFrame(detect);
-                return;
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            const DISPLAY_W = 640;
+            const DISPLAY_H = 480;
+            if (canvas.width !== DISPLAY_W || canvas.height !== DISPLAY_H) {
+                canvas.width = DISPLAY_W;
+                canvas.height = DISPLAY_H;
             }
-            if (video.videoWidth === 0 || video.videoHeight === 0) {
-                rafRef.current = requestAnimationFrame(detect);
-                return;
-            }
-            if (timestamp <= lastTimestampRef.current) {
-                rafRef.current = requestAnimationFrame(detect);
+            const scale =
+                vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
+            const drawW = vw * scale;
+            const drawH = vh * scale;
+            canvas.getContext("2d").clearRect(0, 0, DISPLAY_W, DISPLAY_H);
+            const detection = lastDetectionRef.current;
+            if (detection)
+                drawSkeleton(canvas, drawW, drawH, detection, {
+                    x: (DISPLAY_W - drawW) / 2,
+                    y: (DISPLAY_H - drawH) / 2,
+                });
+            rafRef.current = requestAnimationFrame(draw);
+        }
+        rafRef.current = requestAnimationFrame(draw);
+
+        // --- setInterval: inference at ~20 Hz, decoupled from paint ---
+        function runDetection() {
+            const video = videoRef.current;
+            const landmarker = landmarkerRef.current;
+            if (
+                !video ||
+                !landmarker ||
+                video.readyState < 2 ||
+                video.paused ||
+                video.ended ||
+                !video.videoWidth ||
+                !video.videoHeight
+            )
                 return;
             }
             lastTimestampRef.current = timestamp;
@@ -1206,44 +1242,32 @@ export default function SquatAnalyzer() {
             const vw = video.videoWidth;
             const vh = video.videoHeight;
 
-            // Gate detection
-            // Uploaded video: detect exactly once per video frame by watching
-            // currentTime. This keeps the overlay perfectly in sync without
-            // running MediaPipe on duplicate frames (which wastes CPU and causes
-            // playback stutters).
-            // Webcam: fall back to the rAF-based throttle.
-            const isVideoUpload = inputMode === "upload";
-            const videoTime = video.currentTime;
-            const shouldDetect = isVideoUpload
-                ? videoTime !== lastDetectedVideoTime
-                : frameCounter % DETECT_EVERY === 0;
+            qualityFrameCountRef.current += 1;
+            const qualityDue =
+                qualityFrameCountRef.current > 15 &&
+                qualityFrameCountRef.current % 20 === 0;
 
-            if (shouldDetect) {
-                if (isVideoUpload) lastDetectedVideoTime = videoTime;
-
-                // Draw the current frame into an intermediate canvas so the browser
-                // applies any rotation metadata before MediaPipe sees the pixels.
-                try {
-                    const cap = captureCanvasRef.current;
-                    if (cap && vw > 0 && vh > 0) {
-                        if (cap.width !== vw || cap.height !== vh) {
-                            cap.width = vw;
-                            cap.height = vh;
-                        }
-                        cap.getContext("2d").drawImage(video, 0, 0, vw, vh);
-                        lastDetectionRef.current = landmarker.detectForVideo(
-                            cap,
-                            timestamp,
-                        );
-                    } else {
-                        lastDetectionRef.current = landmarker.detectForVideo(
-                            video,
-                            timestamp,
-                        );
+            try {
+                const cap = captureCanvasRef.current;
+                if ((isVideoUpload || qualityDue) && cap && vw > 0 && vh > 0) {
+                    if (cap.width !== vw || cap.height !== vh) {
+                        cap.width = vw;
+                        cap.height = vh;
                     }
-                } catch {
-                    // Transient error — skip this frame, keep loop alive.
+                    cap.getContext("2d").drawImage(video, 0, 0, vw, vh);
+                    lastDetectionRef.current = landmarker.detectForVideo(
+                        cap,
+                        timestamp,
+                    );
+                } else {
+                    lastDetectionRef.current = landmarker.detectForVideo(
+                        video,
+                        timestamp,
+                    );
                 }
+            } catch {
+                return;
+            }
 
                 // Update ring buffer and live 3-D skeleton on every detection
                 const det = lastDetectionRef.current;
@@ -1767,42 +1791,6 @@ export default function SquatAnalyzer() {
                 </p>
             )}
 
-            {/* Classification result */}
-            {result && (
-                <div className="ios-card rounded-2xl p-5 text-center w-full">
-                    <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">
-                        Classification
-                    </p>
-                    <p className={`text-4xl font-bold mb-4 ${colorClass}`}>
-                        {result.classification}
-                    </p>
-                    <div className="flex justify-around text-sm">
-                        <div>
-                            <p className="text-slate-400 text-xs">Left knee</p>
-                            <p className="font-mono text-slate-700 font-semibold">
-                                {result.left_knee_angle?.toFixed(1)}°
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-slate-400 text-xs">Right knee</p>
-                            <p className="font-mono text-slate-700 font-semibold">
-                                {result.right_knee_angle?.toFixed(1)}°
-                            </p>
-                        </div>
-                        {result.confidence != null && (
-                            <div>
-                                <p className="text-slate-400 text-xs">
-                                    Confidence
-                                </p>
-                                <p className="font-mono text-slate-700 font-semibold">
-                                    {(result.confidence * 100).toFixed(0)}%
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
             {/* Form quality + threshold */}
             {formScore != null && (
                 <div className="ios-card rounded-2xl p-5 w-full">
@@ -1812,6 +1800,9 @@ export default function SquatAnalyzer() {
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
                                 Form Quality
                             </p>
+                            <p
+                                className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}
+                            >
                             <p
                                 className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}
                             >
@@ -1887,6 +1878,9 @@ export default function SquatAnalyzer() {
                                 setGoodBadThreshold(
                                     Number(e.target.value) / 100,
                                 )
+                                setGoodBadThreshold(
+                                    Number(e.target.value) / 100,
+                                )
                             }
                             className="ios-slider"
                             style={{ width: "100%", display: "block" }}
@@ -1933,72 +1927,114 @@ export default function SquatAnalyzer() {
                 </div>
             )}
 
-            {/* Debug panel — 33 keypoints with x/y (MediaPipe) + predicted z (DL) */}
-            {(status === "running" || allKeypoints.length > 0) && (
-                <div className="ios-card rounded-2xl p-4 w-full">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                        Keypoints
-                        {status === "running" && (
-                            <span className="ml-2 normal-case font-normal text-slate-300">
-                                live
-                            </span>
-                        )}
-                    </p>
-                    <p className="text-xs text-slate-300 mb-3">
-                        x · y from MediaPipe &nbsp;·&nbsp; z from DL model
-                        <span className="ml-2 text-sky-400 font-semibold">
-                            (squat joints highlighted)
-                        </span>
-                    </p>
-                    {allKeypoints.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic">
-                            Waiting for pose detection…
-                        </p>
-                    ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-0.5 gap-x-4 text-xs font-mono max-h-56 overflow-y-auto pr-1">
-                            {allKeypoints.map((kp) => {
-                                const isSquat = SQUAT_INDICES.has(kp.index);
-                                return (
-                                    <div
-                                        key={kp.index}
-                                        className={`flex items-baseline gap-1.5 py-0.5 ${
-                                            isSquat
-                                                ? "text-sky-600 font-bold"
-                                                : "text-slate-400"
-                                        }`}
-                                    >
-                                        <span className="w-5 text-right text-slate-300">
-                                            {kp.index}
-                                        </span>
-                                        <span className="w-28 truncate">
-                                            {kp.name}
-                                        </span>
-                                        <span className="tabular-nums">
-                                            {kp.x.toFixed(3)}
-                                        </span>
-                                        <span className="tabular-nums">
-                                            {kp.y.toFixed(3)}
-                                        </span>
-                                        {isSquat && (
-                                            <span
-                                                className={`tabular-nums ${
-                                                    kp.predictedZ == null
-                                                        ? "text-slate-500 italic"
-                                                        : "text-emerald-500"
-                                                }`}
-                                            >
-                                                {kp.predictedZ == null
-                                                    ? "n/a"
-                                                    : kp.predictedZ.toFixed(3)}
+            {/* Pipeline timing breakdown */}
+            {pipelineTimings != null &&
+                (() => {
+                    const steps = [
+                        {
+                            key: "network_ms",
+                            label: "Network (round-trip)",
+                            sub: "client ↔ server",
+                            value: Math.max(
+                                0,
+                                pipelineTimings.round_trip_ms -
+                                    pipelineTimings.total_ms,
+                            ),
+                        },
+                        {
+                            key: "start_stop_ms",
+                            label: "Start/Stop model",
+                            sub: "exercise detection",
+                            value: pipelineTimings.start_stop_ms,
+                        },
+                        {
+                            key: "z_prediction_ms",
+                            label: "Z prediction",
+                            sub: "depth estimation",
+                            value: pipelineTimings.z_prediction_ms,
+                        },
+                        {
+                            key: "goodbad_ms",
+                            label: "GoodBad model",
+                            sub: "form quality",
+                            value: pipelineTimings.goodbad_ms,
+                        },
+                        {
+                            key: "feature_build_ms",
+                            label: "Feature extraction",
+                            sub: "preprocessing",
+                            value: pipelineTimings.feature_build_ms,
+                        },
+                    ];
+                    const maxVal = Math.max(...steps.map((s) => s.value), 1);
+                    return (
+                        <div className="ios-card rounded-2xl p-5 w-full">
+                            <div className="flex items-baseline justify-between mb-4">
+                                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                    Pipeline Timing
+                                </p>
+                                <span className="text-xs font-mono text-slate-400">
+                                    Total:{" "}
+                                    <span className="text-sky-500 font-semibold">
+                                        {(
+                                            pipelineTimings.round_trip_ms / 1000
+                                        ).toFixed(2)}
+                                        s
+                                    </span>
+                                </span>
+                            </div>
+                            <div className="space-y-3">
+                                {steps.map(({ key, label, sub, value }) => (
+                                    <div key={key}>
+                                        <div className="flex items-baseline justify-between mb-1">
+                                            <div>
+                                                <span className="text-xs font-semibold text-slate-600">
+                                                    {label}
+                                                </span>
+                                                <span className="ml-2 text-xs text-slate-400">
+                                                    {sub}
+                                                </span>
+                                            </div>
+                                            <span className="text-xs font-mono font-bold text-slate-600 tabular-nums">
+                                                {value < 1
+                                                    ? "<1"
+                                                    : Math.round(value)}
+                                                ms
                                             </span>
-                                        )}
+                                        </div>
+                                        <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-700 ease-out"
+                                                style={{
+                                                    width: `${Math.max(1, (value / maxVal) * 100)}%`,
+                                                    background:
+                                                        key === "network_ms"
+                                                            ? "linear-gradient(to right, #94a3b8, #64748b)"
+                                                            : key ===
+                                                                "start_stop_ms"
+                                                              ? "linear-gradient(to right, #38bdf8, #0ea5e9)"
+                                                              : key ===
+                                                                  "z_prediction_ms"
+                                                                ? "linear-gradient(to right, #a78bfa, #7c3aed)"
+                                                                : key ===
+                                                                    "goodbad_ms"
+                                                                  ? "linear-gradient(to right, #4ade80, #16a34a)"
+                                                                  : "linear-gradient(to right, #fbbf24, #d97706)",
+                                                }}
+                                            />
+                                        </div>
                                     </div>
-                                );
-                            })}
+                                ))}
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-400">
+                                <span>Backend processing</span>
+                                <span className="font-mono font-semibold text-slate-600">
+                                    {Math.round(pipelineTimings.total_ms)}ms
+                                </span>
+                            </div>
                         </div>
-                    )}
-                </div>
-            )}
+                    );
+                })()}
 
             {/* 3-D interactive skeleton viewer */}
             <Skeleton3DViewer
