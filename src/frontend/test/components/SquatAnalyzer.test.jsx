@@ -237,8 +237,10 @@ describe("SquatAnalyzer - image upload validation", () => {
                 this.naturalHeight = 720;
                 this.onload = null;
                 this.onerror = null;
+                this._src = "";
             }
-            set src(_value) {
+            set src(value) {
+                this._src = value;
                 Promise.resolve().then(() => this.onload?.());
             }
         }
