@@ -158,7 +158,13 @@ def _fetch_scaler(run_id: Optional[str]):
         client = MlflowClient()
         artifacts = client.list_artifacts(run_id)
         scaler_path = next(
-            (a.path for a in artifacts if a.path.startswith("scaler_goodbad")),
+            (
+                a.path
+                for a in artifacts
+                if a.path.startswith("scaler_scoring")
+                or a.path.startswith("scaler_goodbad")
+                or a.path.startswith("scaler")
+            ),
             None,
         )
         if not scaler_path:

@@ -141,6 +141,7 @@ const WASM_URL =
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm";
 const ESM_URL =
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
+const MAX_SQUAT_SCORE = 4;
 
 /**
  * Create a new PoseLandmarker for continuous video/webcam detection.
@@ -1818,10 +1819,10 @@ export default function SquatAnalyzer() {
                                 Squat score
                             </p>
                             <p className="text-lg font-bold text-slate-700">
-                                {squatScore} / 4
+                                {squatScore} / {MAX_SQUAT_SCORE}
                             </p>
                             <p className="text-xs text-slate-500">
-                                0 = good, 4 = bad
+                                0 = good, {MAX_SQUAT_SCORE} = bad
                             </p>
                         </div>
                     )}
