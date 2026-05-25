@@ -1071,7 +1071,7 @@ export default function SquatAnalyzer() {
                 ctx.fillRect(0, 0, DISPLAY_W, DISPLAY_H);
                 ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
 
-                const detection = imageLandmarker.detect(img);
+                const detection = imageLandmarker.detect(canvas);
 
                 if (detection.landmarks?.length > 0) {
                     // Quality check — canvas has raw image pixels before skeleton draw
@@ -1079,14 +1079,66 @@ export default function SquatAnalyzer() {
                         detection,
                         canvas,
                     );
-                    drawSkeleton(canvas, drawW, drawH, detection, {
-                        x: offsetX,
-                        y: offsetY,
+                    drawSkeleton(canvas, DISPLAY_W, DISPLAY_H, detection, {
+                        x: 0,
+                        y: 0,
                     });
                     setAllKeypoints(mapAllKeypoints(detection.landmarks[0]));
                     if (warnings.length > 0) setQualityIssues(warnings);
                     if (blocking.length > 0) {
                         setQualityError({ issues: blocking });
+                    }
+
+                    const kp3d = filterSquatKeypoints3d(
+                        detection.worldLandmarks?.[0] ?? [],
+                    );
+                    const normKp = filterSquatKeypoints3d(
+                        detection.landmarks?.[0] ?? [],
+                    );
+                    if (kp3d.length > 0) {
+                        const body = { frames: [kp3d] };
+                        if (normKp.length === kp3d.length) {
+                            body.norm_frames = [normKp];
+                        }
+
+                        const t0 = Date.now();
+                        const res = await fetch(
+                            apiUrl("/api/v1/squat/analyze-session"),
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(body),
+                            },
+                        );
+                        if (!res.ok) throw new Error("Image analysis failed");
+                        const data = await res.json();
+                        const elapsed = Date.now() - t0;
+                        setPipelineTime(elapsed);
+                        setPipelineTimings(
+                            data.timings
+                                ? { ...data.timings, round_trip_ms: elapsed }
+                                : null,
+                        );
+
+                        const firstResult = data.results?.[0] ?? {};
+                        const entry = {
+                            timestamp: Date.now(),
+                            keypoints3d: kp3d,
+                            predictedZ: firstResult.predicted_z ?? {},
+                            startStop: firstResult.start_stop ?? 1,
+                            classification: null,
+                            confidence: null,
+                        };
+                        sessionLogRef.current = [entry];
+                        setSessionLog([entry]);
+
+                        if (firstResult.good_bad_score != null) {
+                            setResult({
+                                goodBadScore: firstResult.good_bad_score,
+                            });
+                        }
+                        setStatus("finished");
+                        return;
                     }
                 }
                 setStatus("idle");

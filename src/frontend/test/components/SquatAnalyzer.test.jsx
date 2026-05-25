@@ -8,6 +8,7 @@ import SquatAnalyzer from "../../src/components/SquatAnalyzer";
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
 const fetchMock = vi.fn();
+const detectImageMock = vi.fn().mockReturnValue({landmarks: [], worldLandmarks: []});
 
 // Silence MediaPipe ESM import (not available in jsdom)
 vi.mock("@mediapipe/tasks-vision", () => ({}));
@@ -19,7 +20,7 @@ vi.mock(
         PoseLandmarker: {
             createFromOptions: vi.fn().mockResolvedValue({
                 detectForVideo: vi.fn().mockReturnValue({landmarks: [], worldLandmarks: []}),
-                detect: vi.fn().mockReturnValue({landmarks: [], worldLandmarks: []}),
+                detect: detectImageMock,
                 close: vi.fn(),
             }),
         },
@@ -44,9 +45,6 @@ vi.mock("../apiBase", () => ({
     apiUrl: (path) => `http://localhost:8000${path}`,
 }));
 
-// Stub fetch globally
-fetchMock.fetch = vi.fn();
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Return a minimal successful classify response */
@@ -62,6 +60,28 @@ const classifyResponse = (classification = "Deep") =>
             }),
     });
 
+
+const analyzeSessionResponse = ({
+    start_stop = 1,
+    good_bad_score = 0.71,
+    predicted_z = {},
+} = {}) =>
+    Promise.resolve({
+        ok: true,
+        json: () =>
+            Promise.resolve({
+                results: [{start_stop, good_bad_score, predicted_z}],
+                timings: {
+                    feature_build_ms: 1,
+                    start_stop_ms: 1,
+                    smooth_ms: 0,
+                    z_prediction_ms: 0,
+                    goodbad_ms: 1,
+                    total_ms: 3,
+                },
+            }),
+    });
+
 // Without this, switchMode's canvas.getContext("2d").clearRect(...) throws.
 beforeAll(() => {
     HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
@@ -69,20 +89,27 @@ beforeAll(() => {
         beginPath: vi.fn(),
         moveTo: vi.fn(),
         lineTo: vi.fn(),
+        closePath: vi.fn(),
         stroke: vi.fn(),
         arc: vi.fn(),
         fill: vi.fn(),
         fillRect: vi.fn(),
         drawImage: vi.fn(),
+        fillText: vi.fn(),
     }));
 });
 
 beforeEach(() => {
     vi.clearAllMocks();
-    fetchMock.fetch.mockImplementation((url) => {
+    detectImageMock.mockReturnValue({landmarks: [], worldLandmarks: []});
+    fetchMock.mockImplementation((url) => {
         if (url.includes("/squat/classify")) return classifyResponse();
+        if (url.includes("/squat/analyze-session")) return analyzeSessionResponse();
+        if (url.includes("/model-info/start-stop"))
+            return Promise.resolve({ok: true, json: () => Promise.resolve({mae_total_average: 0.1})});
         return Promise.resolve({ ok: false });
     });
+    vi.stubGlobal("fetch", fetchMock);
 });
 
 afterEach(() => {
@@ -184,5 +211,66 @@ describe("SquatAnalyzer - image upload validation", () => {
                 screen.getByText(/please select an image file/i)
             ).toBeInTheDocument();
         });
+    });
+
+    it("runs analyze-session and shows 3-D replay for uploaded image with pose", async () => {
+        const landmarks = Array.from({length: 33}, (_, i) => ({
+            x: 0.25 + i * 0.005,
+            y: 0.2 + i * 0.005,
+            z: i * 0.001,
+            visibility: 0.99,
+        }));
+        const worldLandmarks = Array.from({length: 33}, (_, i) => ({
+            x: i * 0.01,
+            y: i * 0.01,
+            z: i * 0.01,
+        }));
+        detectImageMock.mockReturnValue({
+            landmarks: [landmarks],
+            worldLandmarks: [worldLandmarks],
+        });
+
+        const OriginalImage = global.Image;
+        class MockImage {
+            constructor() {
+                this.naturalWidth = 1280;
+                this.naturalHeight = 720;
+                this.onload = null;
+                this.onerror = null;
+            }
+            set src(_value) {
+                Promise.resolve().then(() => this.onload?.());
+            }
+        }
+        global.Image = MockImage;
+
+        const createObjectURLSpy = vi
+            .spyOn(URL, "createObjectURL")
+            .mockReturnValue("blob:mock-image");
+        const revokeObjectURLSpy = vi
+            .spyOn(URL, "revokeObjectURL")
+            .mockImplementation(() => {});
+
+        try {
+            render(<SquatAnalyzer />);
+            await userEvent.click(screen.getByRole("button", { name: /upload image/i }));
+
+            const input = document.querySelector("input[type='file'][accept='image/*']");
+            const imageFile = new File(["img"], "pose.png", {type: "image/png"});
+            fireEvent.change(input, {target: {files: [imageFile]}});
+
+            await waitFor(() => {
+                expect(fetchMock).toHaveBeenCalledWith(
+                    expect.stringMatching(/\/api\/v1\/squat\/analyze-session$/),
+                    expect.objectContaining({method: "POST"}),
+                );
+            });
+            expect(await screen.findByText(/3-d skeleton replay/i)).toBeInTheDocument();
+            expect(await screen.findByText(/1 frame recorded/i)).toBeInTheDocument();
+            expect(createObjectURLSpy).toHaveBeenCalled();
+            expect(revokeObjectURLSpy).toHaveBeenCalled();
+        } finally {
+            global.Image = OriginalImage;
+        }
     });
 });
