@@ -2,8 +2,6 @@
 
 import math
 
-import pytest
-
 from app.services.squat_service import calculate_knee_angle, classify_squat
 
 
@@ -59,14 +57,6 @@ def _full_kp3(left_angle, right_angle):
     return _bent_leg_kp3("left", left_angle) + _bent_leg_kp3("right", right_angle)
 
 
-@pytest.fixture(autouse=True)
-def _mock_predict_z(monkeypatch):
-    monkeypatch.setattr(
-        "app.services.squat_service.predict_z",
-        lambda _features, _variant="champion": (0.0, "models:/ZModel/1", "run_1"),
-    )
-
-
 def test_classify_squat_deep():
     kp3 = _full_kp3(80, 82)
     classification, left, right, confidence = classify_squat(kp3)
@@ -111,14 +101,16 @@ def test_classify_squat_returns_confidence():
     assert 0.0 <= confidence <= 1.0
 
 
-def test_classify_squat_uses_z_predictor(monkeypatch):
-    calls = {"count": 0}
-
-    def _fake_predict(features, variant):
-        calls["count"] += 1
-        return 0.0, "models:/ZModel/1", "run_1"
-
-    monkeypatch.setattr("app.services.squat_service.predict_z", _fake_predict)
-    kp3 = _full_kp3(85, 87)
-    classify_squat(kp3)
-    assert calls["count"] == 6
+def test_classify_squat_uses_input_z_values():
+    # Same x/y, but different z values should produce a non-straight knee angle.
+    kp3 = [
+        {"name": "left_hip", "x": 0.0, "y": 1.0, "z": 0.0},
+        {"name": "left_knee", "x": 0.0, "y": 0.0, "z": 0.0},
+        {"name": "left_ankle", "x": 0.0, "y": -1.0, "z": 1.0},
+        {"name": "right_hip", "x": 0.0, "y": 1.0, "z": 0.0},
+        {"name": "right_knee", "x": 0.0, "y": 0.0, "z": 0.0},
+        {"name": "right_ankle", "x": 0.0, "y": -1.0, "z": 1.0},
+    ]
+    _, left, right, _ = classify_squat(kp3)
+    assert left < 180.0
+    assert right < 180.0

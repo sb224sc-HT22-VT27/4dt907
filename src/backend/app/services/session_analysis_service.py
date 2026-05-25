@@ -1,12 +1,12 @@
 """app.services.session_analysis_service
 
-Full session analysis pipeline: Cut → Z-pred → GoodBad → Results.
+Full session analysis pipeline: Cut → MediaPipe Z → GoodBad → Results.
 
 Pipeline per session (all frames at once):
 1. Build per-frame feature vectors (39 floats: 13 joints × [x, y, z]).
 2. Run Start_Stop_Predictor_ModelV2 on all frames → [0/1, ...].
 3. Apply gap-fill smoothing: 0-runs < 10 frames between two 1-regions → 1.
-4. For every frame: predict z for all 13 joints.
+4. For every frame: use MediaPipe z for all 13 joints.
 5. Run GoodBad_ClassifierV2 on each continuous exercise segment → quality score [0,1].
 6. Return per-frame results.
 """
@@ -17,7 +17,6 @@ from typing import Dict, List, Optional, Tuple
 
 from app.services import start_stop_model_service
 from app.services import goodbad_model_service
-from app.services.z_model_service import predict_batch as predict_z_batch
 
 _log = _logging.getLogger(__name__)
 
@@ -50,32 +49,14 @@ def _build_features(kp3d: List[Dict]) -> List[float]:
     return feats
 
 
-def _predict_z_all_frames(frames: List[List[Dict]]) -> List[Dict[str, float]]:
-    """Predict z for all joints across all frames in a single batch model call."""
-    entries = []
+def _collect_frame_z_values(frames: List[List[Dict]]) -> List[Dict[str, float]]:
+    """Collect z for all model joints from MediaPipe frames."""
+    results: List[Dict[str, float]] = [{} for _ in frames]
     for i, kp3d in enumerate(frames):
         kp_map = {kp["name"]: kp for kp in kp3d}
         for name in _MODEL_JOINT_NAMES:
             kp = kp_map.get(name)
-            if kp:
-                entries.append((i, name, [float(kp["x"]), float(kp["y"])]))
-
-    results: List[Dict[str, float]] = [{} for _ in frames]
-    if entries:
-        try:
-            z_values = predict_z_batch([e[2] for e in entries], "champion")
-            for (i, name, _), z in zip(entries, z_values):
-                results[i][name] = z
-        except Exception as exc:
-            _log.error("z-batch prediction failed: %s", exc)
-
-    for i, kp3d in enumerate(frames):
-        kp_map = {kp["name"]: kp for kp in kp3d}
-        for name in _MODEL_JOINT_NAMES:
-            if name not in results[i]:
-                kp = kp_map.get(name)
-                results[i][name] = float(kp.get("z", 0.0)) if kp else 0.0
-
+            results[i][name] = float(kp.get("z", 0.0)) if kp else 0.0
     return results
 
 
@@ -165,7 +146,7 @@ def analyze_session(
     timings["smooth_ms"] = round((perf_counter() - t) * 1000, 1)
 
     t = perf_counter()
-    all_predicted_z = _predict_z_all_frames(frames)
+    all_predicted_z = _collect_frame_z_values(frames)
     timings["z_prediction_ms"] = round((perf_counter() - t) * 1000, 1)
 
     results: List[FrameResult] = [

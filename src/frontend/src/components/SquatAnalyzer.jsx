@@ -64,28 +64,6 @@ const ALL_LANDMARK_NAMES = [
     "right_foot_index", // 32
 ];
 
-// Canonical joint order used by the GRU z-predictor model.
-// MUST match the alphabetically-sorted column order produced by the training
-// notebook: sorted([c for c in cols if c.endswith('_x') or c.endswith('_y')])
-// and sorted([c for c in cols if c.endswith('_z')]).
-// Features per frame: [j0_x, j0_y, j1_x, j1_y, … ] → 13 × 2 = 26 floats.
-// z output: [j0_z, j1_z, … ] → 13 floats (same alphabetical order).
-const MODEL_JOINT_ORDER = [
-    { name: "left_ankle", idx: 27 },
-    { name: "left_elbow", idx: 13 },
-    { name: "left_hip", idx: 23 },
-    { name: "left_knee", idx: 25 },
-    { name: "left_shoulder", idx: 11 },
-    { name: "left_wrist", idx: 15 },
-    { name: "nose", idx: 0 },
-    { name: "right_ankle", idx: 28 },
-    { name: "right_elbow", idx: 14 },
-    { name: "right_hip", idx: 24 },
-    { name: "right_knee", idx: 26 },
-    { name: "right_shoulder", idx: 12 },
-    { name: "right_wrist", idx: 16 },
-];
-
 // Display/viewer joint order (used only for 3-D skeleton rendering).
 const SQUAT_JOINT_ORDER = [
     { name: "nose", idx: 0 },
@@ -163,21 +141,6 @@ const WASM_URL =
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm";
 const ESM_URL =
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
-
-// Number of frames the GRU model expects as a sequence window.
-const SEQ_LEN = 30;
-
-/**
- * Build a 26-float feature vector for one frame from MediaPipe world landmarks.
- * Columns: [j0_x, j0_y, j1_x, j1_y, …] in MODEL_JOINT_ORDER (alphabetical),
- * matching the sorted() column order used during training.
- */
-function buildFrameFeatures(worldLandmarks) {
-    return MODEL_JOINT_ORDER.flatMap(({ idx }) => {
-        const lm = worldLandmarks?.[idx];
-        return lm ? [lm.x, lm.y] : [0, 0];
-    });
-}
 
 /**
  * Create a new PoseLandmarker for continuous video/webcam detection.
@@ -765,9 +728,7 @@ export default function SquatAnalyzer() {
     const videoBlobUrlRef = useRef(null);
     const lastDetectionRef = useRef(null);
     const sessionLogRef = useRef([]);
-    // Ring buffer: array of 26-float feature vectors, oldest → newest
-    const frameBufferRef = useRef([]);
-    // All kp3d frames collected during a webcam recording session (world coords for z-pred/classify)
+    // All kp3d frames collected during a webcam recording session
     const recordedKpFramesRef = useRef([]);
     // Normalized image-space landmarks [0,1] collected in parallel — fed to start-stop model
     const recordedNormFramesRef = useRef([]);
@@ -787,14 +748,12 @@ export default function SquatAnalyzer() {
     const [ALL_KEYPOINTS, setAllKeypoints] = useState([]); // * Updated base name for lint
     const [sessionLog, setSessionLog] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
-    const [predictedZByName, setPredictedZByName] = useState({});
     const liveFrame3dRef = useRef(null);
     const [startStopMetrics, setStartStopMetrics] = useState(null);
     const [qualityIssues, setQualityIssues] = useState([]);
     const [qualityError, setQualityError] = useState(null);
 
     const sessionNameRef = useRef("");
-    const predictedZByNameRef = useRef({});
     const qualityIssueCountsRef = useRef({});
     const qualityFrameCountRef = useRef(0);
 
@@ -850,7 +809,6 @@ export default function SquatAnalyzer() {
         revokeBlobUrl();
         lastTimestampRef.current = -1;
         lastDetectionRef.current = null;
-        frameBufferRef.current = [];
         const canvas = canvasRef.current;
         if (canvas) {
             canvas
@@ -860,8 +818,6 @@ export default function SquatAnalyzer() {
         setAllKeypoints([]);
         setResult(null);
         setVideoPaused(false);
-        setPredictedZByName({});
-        predictedZByNameRef.current = {};
         liveFrame3dRef.current = null;
         qualityIssueCountsRef.current = {};
         qualityFrameCountRef.current = 0;
@@ -901,10 +857,7 @@ export default function SquatAnalyzer() {
             name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
             x: lm.x,
             y: lm.y,
-            predictedZ:
-                predictedZByNameRef.current[
-                    ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`
-                ] ?? null,
+            predictedZ: lm.z ?? null,
         }));
     }
 
@@ -1258,11 +1211,6 @@ export default function SquatAnalyzer() {
 
             const det = lastDetectionRef.current;
             if (det?.worldLandmarks?.length > 0) {
-                const frame = buildFrameFeatures(det.worldLandmarks[0]);
-                const buf = frameBufferRef.current;
-                buf.push(frame);
-                if (buf.length > SEQ_LEN) buf.shift();
-
                 const joints = {};
                 for (const { name, idx } of SQUAT_JOINT_ORDER) {
                     const lm = det.worldLandmarks[0][idx];
@@ -1270,7 +1218,7 @@ export default function SquatAnalyzer() {
                     joints[name] = {
                         x: lm.x,
                         y: lm.y,
-                        z: predictedZByNameRef.current[name] ?? lm.z ?? 0,
+                        z: lm.z ?? 0,
                     };
                 }
                 liveFrame3dRef.current = { classification: null, joints };
@@ -1306,10 +1254,6 @@ export default function SquatAnalyzer() {
             clearInterval(detectionInterval);
         };
     }, [status, inputMode]);
-
-    useEffect(() => {
-        predictedZByNameRef.current = predictedZByName;
-    }, [predictedZByName]);
 
     // Backend + session log
 
@@ -1381,8 +1325,7 @@ export default function SquatAnalyzer() {
     }
 
     // Viewer frames (memoised)
-    // Builds the 3-D viewer data from session log: x/y from MediaPipe world coords,
-    // z from DL model prediction (falls back to MediaPipe world z if unavailable).
+    // Builds the 3-D viewer data from session log.
 
     const viewerFrames = useMemo(() => {
         const toViewerFrame = (entry) => {
@@ -1859,8 +1802,8 @@ export default function SquatAnalyzer() {
                         },
                         {
                             key: "z_prediction_ms",
-                            label: "Z prediction",
-                            sub: "depth estimation",
+                            label: "MediaPipe Z mapping",
+                            sub: "depth reuse",
                             value: pipelineTimings.z_prediction_ms,
                         },
                         {
