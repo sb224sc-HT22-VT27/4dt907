@@ -1,6 +1,6 @@
 """app.services.session_analysis_service
 
-Full session analysis pipeline: Cut → MediaPipe Z → GoodBad → Results.
+Full session analysis pipeline: Cut → MediaPipe Z → GoodBad → Scoring → Results.
 
 Pipeline per session (all frames at once):
 1. Build per-frame feature vectors (39 floats: 13 joints × [x, y, z]).
@@ -96,7 +96,7 @@ class FrameResult:
         start_stop: int,
         predicted_z: Dict[str, float],
         good_bad_score: Optional[float] = None,
-        squat_score: Optional[int] = None,
+        squat_score: Optional[float] = None,
     ):
         self.start_stop = start_stop
         self.predicted_z = predicted_z
