@@ -62,6 +62,30 @@ const classifyResponse = (classification = "Deep") =>
             }),
     });
 
+
+const analyzeSessionResponse = (goodBadScore = 0.82) =>
+    Promise.resolve({
+        ok: true,
+        json: () =>
+            Promise.resolve({
+                results: [
+                    {
+                        start_stop: 0,
+                        predicted_z: { left_knee: 0.12, right_knee: 0.11 },
+                        good_bad_score: goodBadScore,
+                    },
+                ],
+                timings: {
+                    feature_build_ms: 1,
+                    start_stop_ms: 1,
+                    smooth_ms: 0,
+                    z_prediction_ms: 1,
+                    goodbad_ms: 1,
+                    total_ms: 4,
+                },
+            }),
+    });
+
 // Without this, switchMode's canvas.getContext("2d").clearRect(...) throws.
 beforeAll(() => {
     HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
@@ -69,17 +93,21 @@ beforeAll(() => {
         beginPath: vi.fn(),
         moveTo: vi.fn(),
         lineTo: vi.fn(),
+        closePath: vi.fn(),
         stroke: vi.fn(),
         arc: vi.fn(),
         fill: vi.fn(),
         fillRect: vi.fn(),
         drawImage: vi.fn(),
+        fillText: vi.fn(),
     }));
 });
 
 beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal("fetch", fetchMock.fetch);
     fetchMock.fetch.mockImplementation((url) => {
+        if (url.includes("/squat/analyze-session")) return analyzeSessionResponse();
         if (url.includes("/squat/classify")) return classifyResponse();
         return Promise.resolve({ ok: false });
     });
@@ -184,5 +212,70 @@ describe("SquatAnalyzer - image upload validation", () => {
                 screen.getByText(/please select an image file/i)
             ).toBeInTheDocument();
         });
+    });
+
+    it("analyzes uploaded image and shows form score + 3-D replay", async () => {
+        const mp = await import(
+            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm"
+        );
+        vi.spyOn(mp.PoseLandmarker, "createFromOptions").mockImplementation(
+            async (_vision, opts) => {
+                if (opts.runningMode === "IMAGE") {
+                    const lms = Array.from({ length: 33 }, (_, i) => ({
+                        x: 0.4 + i * 0.001,
+                        y: 0.3 + i * 0.001,
+                        z: 0.1,
+                        visibility: 0.9,
+                    }));
+                    return {
+                        detect: vi.fn().mockReturnValue({
+                            landmarks: [lms],
+                            worldLandmarks: [lms],
+                        }),
+                        close: vi.fn(),
+                    };
+                }
+                return {
+                    detectForVideo: vi.fn().mockReturnValue({
+                        landmarks: [],
+                        worldLandmarks: [],
+                    }),
+                    close: vi.fn(),
+                };
+            },
+        );
+
+        vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test-image");
+        vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+
+        class MockImage {
+            naturalWidth = 640;
+            naturalHeight = 480;
+
+            set src(_value) {
+                setTimeout(() => this.onload?.(), 0);
+            }
+        }
+        vi.stubGlobal("Image", MockImage);
+
+        render(<SquatAnalyzer />);
+        await userEvent.click(screen.getByText("Upload Image"));
+
+        const input = document.querySelector("input[type='file'][accept='image/*']");
+        const imageFile = new File(["image-data"], "pose.png", { type: "image/png" });
+        fireEvent.change(input, { target: { files: [imageFile] } });
+
+        await waitFor(() => {
+            expect(
+                fetchMock.fetch.mock.calls.some(
+                    ([url, options]) =>
+                        String(url).includes("/api/v1/squat/analyze-session") &&
+                        options?.method === "POST",
+                ),
+            ).toBe(true);
+        });
+
+        expect(await screen.findByText(/good form/i)).toBeInTheDocument();
+        expect(screen.getByText(/3-D Skeleton Replay/i)).toBeInTheDocument();
     });
 });

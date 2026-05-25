@@ -1121,6 +1121,12 @@ export default function SquatAnalyzer() {
                 const detection = imageLandmarker.detect(img);
 
                 if (detection.landmarks?.length > 0) {
+                    const kp3d = filterSquatKeypoints3d(
+                        detection.worldLandmarks?.[0] ?? [],
+                    );
+                    const normKp = filterSquatKeypoints3d(
+                        detection.landmarks?.[0] ?? [],
+                    );
                     // Quality check — canvas has raw image pixels before skeleton draw
                     const { blocking, warnings } = assessVideoQuality(
                         detection,
@@ -1134,6 +1140,46 @@ export default function SquatAnalyzer() {
                     if (warnings.length > 0) setQualityIssues(warnings);
                     if (blocking.length > 0) {
                         setQualityError({ issues: blocking });
+                        setStatus("idle");
+                        return;
+                    }
+
+                    if (kp3d.length > 0) {
+                        const t0 = Date.now();
+                        const res = await fetch(
+                            apiUrl("/api/v1/squat/analyze-session"),
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    frames: [kp3d],
+                                    norm_frames: [normKp],
+                                }),
+                            },
+                        );
+                        if (!res.ok) throw new Error("Session analysis failed");
+                        const data = await res.json();
+                        const elapsed = Date.now() - t0;
+                        setPipelineTime(elapsed);
+                        setPipelineTimings(
+                            data.timings
+                                ? { ...data.timings, round_trip_ms: elapsed }
+                                : null,
+                        );
+                        const first = data.results?.[0];
+                        const entry = {
+                            timestamp: Date.now(),
+                            keypoints3d: kp3d,
+                            predictedZ: first?.predicted_z ?? {},
+                            startStop: 1,
+                        };
+                        sessionLogRef.current = [entry];
+                        setSessionLog([entry]);
+                        if (first?.good_bad_score != null) {
+                            setResult({ goodBadScore: first.good_bad_score });
+                        }
+                        setStatus("finished");
+                        return;
                     }
                 }
                 setStatus("idle");
