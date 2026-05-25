@@ -218,7 +218,7 @@ def _score_exercise_segments(
                 squat_score = None
 
             _log.info(
-                "Exercise segment [%d:%d] (%d frames): good_bad=%s, squat_score=%s",
+                "Exercise segment [%d:%d] (%d frames): good_bad_score=%s, squat_score=%s",
                 seg_start,
                 seg_end,
                 seg_end - seg_start,

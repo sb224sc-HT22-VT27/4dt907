@@ -1420,6 +1420,8 @@ export default function SquatAnalyzer() {
 
     const formScore = result?.goodBadScore ?? null;
     const squatScore = result?.squatScore ?? null;
+    // Defensive UI guard: backend already returns [0..MAX_SQUAT_SCORE], but we clamp
+    // to keep the card stable if an unexpected payload reaches the client.
     const normalizedSquatScore =
         squatScore == null
             ? null

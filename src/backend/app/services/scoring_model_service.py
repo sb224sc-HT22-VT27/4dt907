@@ -26,7 +26,9 @@ if _initial_tracking_uri:
     mlflow.set_tracking_uri(_initial_tracking_uri)
     mlflow.set_registry_uri(_initial_tracking_uri)
 
+# Number of frames each session segment is resampled to before inference.
 _DEFAULT_C_FRAMES = 10
+# Expected number of engineered features per frame for the scoring model input.
 _DEFAULT_N_FEATURES = 61
 
 
