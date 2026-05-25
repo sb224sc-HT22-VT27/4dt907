@@ -59,6 +59,10 @@ def _rule_based(left_angle: float, right_angle: float) -> Tuple[str, float]:
     return "Invalid", 0.70
 
 
+def _with_default_z(kp: Dict) -> Dict:
+    return {**kp, "z": float(kp.get("z", 0.0))}
+
+
 def classify_squat(
     keypoints_3d: list,
 ) -> Tuple[str, float, float, Optional[float]]:
@@ -89,32 +93,14 @@ def classify_squat(
         return "Invalid", 0.0, 0.0, None
 
     left_angle = calculate_knee_angle(
-        {
-            **kp3["left_hip"],
-            "z": float(kp3["left_hip"].get("z", 0.0)),
-        },
-        {
-            **kp3["left_knee"],
-            "z": float(kp3["left_knee"].get("z", 0.0)),
-        },
-        {
-            **kp3["left_ankle"],
-            "z": float(kp3["left_ankle"].get("z", 0.0)),
-        },
+        _with_default_z(kp3["left_hip"]),
+        _with_default_z(kp3["left_knee"]),
+        _with_default_z(kp3["left_ankle"]),
     )
     right_angle = calculate_knee_angle(
-        {
-            **kp3["right_hip"],
-            "z": float(kp3["right_hip"].get("z", 0.0)),
-        },
-        {
-            **kp3["right_knee"],
-            "z": float(kp3["right_knee"].get("z", 0.0)),
-        },
-        {
-            **kp3["right_ankle"],
-            "z": float(kp3["right_ankle"].get("z", 0.0)),
-        },
+        _with_default_z(kp3["right_hip"]),
+        _with_default_z(kp3["right_knee"]),
+        _with_default_z(kp3["right_ankle"]),
     )
 
     classification, confidence = _rule_based(left_angle, right_angle)
