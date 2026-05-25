@@ -1132,7 +1132,10 @@ export default function SquatAnalyzer() {
                         sessionLogRef.current = [entry];
                         setSessionLog([entry]);
 
-                        if (firstResult.good_bad_score != null) {
+                        if (
+                            firstResult.good_bad_score !== null &&
+                            firstResult.good_bad_score !== undefined
+                        ) {
                             setResult({
                                 goodBadScore: firstResult.good_bad_score,
                             });
