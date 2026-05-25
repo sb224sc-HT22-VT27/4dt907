@@ -9,7 +9,7 @@ Pipeline per session (all frames at once):
 4. For every frame: use MediaPipe z for all 13 joints.
 5. Run GoodBad_ClassifierV2 on each continuous exercise segment → quality score [0,1].
 6. Run squat scoring model on each continuous exercise segment → score [0,4].
-6. Return per-frame results.
+7. Return per-frame results.
 """
 
 import logging as _logging
@@ -218,7 +218,7 @@ def _score_exercise_segments(
                 squat_score = None
 
             _log.info(
-                "GoodBad segment [%d:%d] (%d frames): score=%s, squat_score=%s",
+                "Exercise segment [%d:%d] (%d frames): good_bad=%s, squat_score=%s",
                 seg_start,
                 seg_end,
                 seg_end - seg_start,
