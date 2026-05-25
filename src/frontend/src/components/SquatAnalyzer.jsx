@@ -166,7 +166,7 @@ const ESM_URL =
 
 // Number of frames the GRU model expects as a sequence window.
 const SEQ_LEN = 30;
-const EXERCISE_FRAME = 1;
+const STATIC_IMAGE_FRAME = 1;
 
 /**
  * Build a 26-float feature vector for one frame from MediaPipe world landmarks.
@@ -1172,11 +1172,14 @@ export default function SquatAnalyzer() {
                             timestamp: Date.now(),
                             keypoints3d: kp3d,
                             predictedZ: first?.predicted_z ?? {},
-                            startStop: EXERCISE_FRAME,
+                            startStop: STATIC_IMAGE_FRAME,
                         };
                         sessionLogRef.current = [entry];
                         setSessionLog([entry]);
-                        if (first?.good_bad_score != null) {
+                        if (
+                            first?.good_bad_score !== null &&
+                            first?.good_bad_score !== undefined
+                        ) {
                             setResult({ goodBadScore: first.good_bad_score });
                         }
                         setStatus("finished");
