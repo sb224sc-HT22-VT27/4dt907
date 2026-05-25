@@ -23,7 +23,7 @@ router = APIRouter()
 
 @router.post("/squat/analyze-session", response_model=SessionAnalysisResponse)
 def squat_analyze_session(req: SessionAnalysisRequest):
-    """    Full pipeline: Cut (start/stop) → Z-pred → GoodBad → Scoring → Results.
+    """Full pipeline: Cut (start/stop) → Z-pred → GoodBad → Scoring → Results.
 
     All frames are sent at once. The backend runs Start_Stop_Predictor_ModelV2,
     smooths short gaps (< 10 frames), predicts z for every joint, and scores

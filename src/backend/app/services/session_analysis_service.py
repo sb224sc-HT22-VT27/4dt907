@@ -9,7 +9,7 @@ Pipeline per session (all frames at once):
 4. For every frame: predict z for all 13 joints.
 5. Run GoodBad_ClassifierV2 on each continuous exercise segment → quality score [0,1].
 6. Run scoring model on each continuous exercise segment → squat score [0,4].
-6. Return per-frame results.
+7. Return per-frame results.
 """
 
 import logging as _logging
