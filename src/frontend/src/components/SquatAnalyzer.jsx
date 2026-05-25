@@ -979,10 +979,15 @@ export default function SquatAnalyzer() {
             sessionLogRef.current = entries;
             setSessionLog(entries);
             const firstWithScore = data.results.find(
-                (r) => r.start_stop === 1 && r.good_bad_score != null,
+                (r) =>
+                    r.start_stop === 1 &&
+                    (r.good_bad_score != null || r.squat_score != null),
             );
             if (firstWithScore) {
-                setResult({ goodBadScore: firstWithScore.good_bad_score });
+                setResult({
+                    goodBadScore: firstWithScore.good_bad_score,
+                    squatScore: firstWithScore.squat_score,
+                });
             }
             setStatus("finished");
         } catch {
@@ -1415,6 +1420,7 @@ export default function SquatAnalyzer() {
     const formIsGood = formScore != null && formScore >= goodBadThreshold;
     const formPct = formScore != null ? Math.round(formScore * 100) : 0;
     const threshPct = Math.round(goodBadThreshold * 100);
+    const squatScore = result?.squatScore ?? null;
 
     return (
         <div className="flex flex-col items-center gap-5 px-6 py-8 max-w-3xl mx-auto">
@@ -1721,6 +1727,15 @@ export default function SquatAnalyzer() {
                             >
                                 {formIsGood ? "Good form" : "Bad form"}
                             </p>
+                            {squatScore != null && (
+                                <p className="text-sm text-slate-500 mt-1">
+                                    Score:{" "}
+                                    <span className="font-semibold text-slate-700 tabular-nums">
+                                        {squatScore.toFixed(2)} / 4
+                                    </span>{" "}
+                                    (0 good, 4 bad)
+                                </p>
+                            )}
                         </div>
                         <div
                             className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold ios-card ${
@@ -1868,6 +1883,12 @@ export default function SquatAnalyzer() {
                             label: "GoodBad model",
                             sub: "form quality",
                             value: pipelineTimings.goodbad_ms,
+                        },
+                        {
+                            key: "scoring_ms",
+                            label: "Scoring model",
+                            sub: "0 good → 4 bad",
+                            value: pipelineTimings.scoring_ms ?? 0,
                         },
                         {
                             key: "feature_build_ms",

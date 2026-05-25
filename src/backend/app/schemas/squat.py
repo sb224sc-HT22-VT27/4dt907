@@ -31,6 +31,7 @@ class FrameAnalysisResult(BaseModel):
     start_stop: int
     predicted_z: Dict[str, float]
     good_bad_score: Optional[float] = None
+    squat_score: Optional[float] = None
 
 
 class SessionAnalysisResponse(BaseModel):
