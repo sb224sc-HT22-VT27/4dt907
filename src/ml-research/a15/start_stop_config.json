@@ -1,0 +1,18 @@
+{
+  "note": "LSTM_Dense_Uni",
+  "seed": "42",
+  "seq_length": "5",
+  "hidden_size": "128",
+  "lr": "0.0005",
+  "batch_size": "64",
+  "epochs": "30",
+  "patience": "5",
+  "num_layers": "2",
+  "dropout": "0.1",
+  "input_size": "39",
+  "use_scaling": "False",
+  "activation": "identity",
+  "init": "default",
+  "bidirectional": "False",
+  "rnn_type": "LSTM"
+}
