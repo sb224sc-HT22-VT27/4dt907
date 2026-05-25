@@ -1420,6 +1420,10 @@ export default function SquatAnalyzer() {
 
     const formScore = result?.goodBadScore ?? null;
     const squatScore = result?.squatScore ?? null;
+    const normalizedSquatScore =
+        squatScore == null
+            ? null
+            : Math.max(0, Math.min(MAX_SQUAT_SCORE, squatScore));
     const formIsGood = formScore != null && formScore >= goodBadThreshold;
     const formPct = formScore != null ? Math.round(formScore * 100) : 0;
     const threshPct = Math.round(goodBadThreshold * 100);
@@ -1813,13 +1817,13 @@ export default function SquatAnalyzer() {
                         </>
                     )}
 
-                    {squatScore != null && (
+                    {normalizedSquatScore != null && (
                         <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                                 Squat score
                             </p>
                             <p className="text-lg font-bold text-slate-700">
-                                {squatScore} / {MAX_SQUAT_SCORE}
+                                {normalizedSquatScore} / {MAX_SQUAT_SCORE}
                             </p>
                             <p className="text-xs text-slate-500">
                                 0 = good, {MAX_SQUAT_SCORE} = bad
