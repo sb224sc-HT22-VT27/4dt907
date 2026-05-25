@@ -7,6 +7,8 @@ FastAPI backend service for 4dt907 ML data-intensive system.
 - **Squat classification** — `POST /api/v1/squat/classify` accepts MediaPipe 3-D keypoints,
   calculates knee angles (law of cosines) and returns `Deep` / `Shallow` / `Invalid` with a
   confidence score. Uses MediaPipe z values directly.
+- **Squat session scoring** — `POST /api/v1/squat/analyze-session` runs the session pipeline
+  and returns both a Good/Bad probability and a squat score in the range `0..4` (`0` good, `4` bad).
 - **Expert-score prediction** — `POST /api/v1/predict/champion` and `/latest` (MLflow model)
 - **Weakest-link classification** — `POST /api/v1/weakest-link/champion` and `/latest`
 - **Z-predictor** — `POST /api/v1/z-predictor/champion` and `/latest`
@@ -135,7 +137,8 @@ Use the docker compose file to build entire project which uses the local Dockerf
 
 The `/api/v1/predict/*` and `/api/v1/weakest-link/*` endpoints load models from MLflow
 (DagsHub) at startup. Set `MLFLOW_TRACKING_URI` and the appropriate `MODEL_URI_*` /
-`WEAKLINK_MODEL_URI_*` / `Z_MODEL_URI_*` environment variables (see `.env.example`).
+`WEAKLINK_MODEL_URI_*` / `Z_MODEL_URI_*` / `SQUAT_SCORING_MODEL_URI_*` environment
+variables (see `.env.example`).
 
 ## Project Structure
 

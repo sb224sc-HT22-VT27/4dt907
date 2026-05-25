@@ -932,10 +932,15 @@ export default function SquatAnalyzer() {
             sessionLogRef.current = entries;
             setSessionLog(entries);
             const firstWithScore = data.results.find(
-                (r) => r.start_stop === 1 && r.good_bad_score != null,
+                (r) =>
+                    r.start_stop === 1 &&
+                    (r.good_bad_score != null || r.squat_score != null),
             );
             if (firstWithScore) {
-                setResult({ goodBadScore: firstWithScore.good_bad_score });
+                setResult({
+                    goodBadScore: firstWithScore.good_bad_score ?? null,
+                    squatScore: firstWithScore.squat_score ?? null,
+                });
             }
             setStatus("finished");
         } catch {
@@ -1133,11 +1138,14 @@ export default function SquatAnalyzer() {
                         setSessionLog([entry]);
 
                         if (
-                            firstResult.good_bad_score !== null &&
-                            firstResult.good_bad_score !== undefined
+                            (firstResult.good_bad_score !== null &&
+                                firstResult.good_bad_score !== undefined) ||
+                            (firstResult.squat_score !== null &&
+                                firstResult.squat_score !== undefined)
                         ) {
                             setResult({
-                                goodBadScore: firstResult.good_bad_score,
+                                goodBadScore: firstResult.good_bad_score ?? null,
+                                squatScore: firstResult.squat_score ?? null,
                             });
                         }
                         setStatus("finished");
@@ -1410,6 +1418,7 @@ export default function SquatAnalyzer() {
     // Render
 
     const formScore = result?.goodBadScore ?? null;
+    const squatScore = result?.squatScore ?? null;
     const formIsGood = formScore != null && formScore >= goodBadThreshold;
     const formPct = formScore != null ? Math.round(formScore * 100) : 0;
     const threshPct = Math.round(goodBadThreshold * 100);
@@ -1706,8 +1715,10 @@ export default function SquatAnalyzer() {
             )}
 
             {/* Form quality + threshold */}
-            {formScore != null && (
+            {(formScore != null || squatScore != null) && (
                 <div className="ios-card rounded-2xl p-5 w-full">
+                    {formScore != null && (
+                        <>
                     {/* Header row */}
                     <div className="flex items-center justify-between mb-4">
                         <div>
@@ -1798,6 +1809,22 @@ export default function SquatAnalyzer() {
                             <span>Good</span>
                         </div>
                     </div>
+                        </>
+                    )}
+
+                    {squatScore != null && (
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                Squat score
+                            </p>
+                            <p className="text-lg font-bold text-slate-700">
+                                {squatScore} / 4
+                            </p>
+                            <p className="text-xs text-slate-500">
+                                0 = good, 4 = bad
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -1853,25 +1880,31 @@ export default function SquatAnalyzer() {
                             key: "start_stop_ms",
                             label: "Start/Stop model",
                             sub: "exercise detection",
-                            value: pipelineTimings.start_stop_ms,
+                            value: pipelineTimings.start_stop_ms ?? 0,
                         },
                         {
                             key: "z_prediction_ms",
                             label: "MediaPipe Z mapping",
                             sub: "depth reuse",
-                            value: pipelineTimings.z_prediction_ms,
+                            value: pipelineTimings.z_prediction_ms ?? 0,
                         },
                         {
                             key: "goodbad_ms",
                             label: "GoodBad model",
                             sub: "form quality",
-                            value: pipelineTimings.goodbad_ms,
+                            value: pipelineTimings.goodbad_ms ?? 0,
+                        },
+                        {
+                            key: "scoring_ms",
+                            label: "Scoring model",
+                            sub: "0–4 squat score",
+                            value: pipelineTimings.scoring_ms ?? 0,
                         },
                         {
                             key: "feature_build_ms",
                             label: "Feature extraction",
                             sub: "preprocessing",
-                            value: pipelineTimings.feature_build_ms,
+                            value: pipelineTimings.feature_build_ms ?? 0,
                         },
                     ];
                     const maxVal = Math.max(...steps.map((s) => s.value), 1);
@@ -1927,6 +1960,9 @@ export default function SquatAnalyzer() {
                                                                 : key ===
                                                                     "goodbad_ms"
                                                                   ? "linear-gradient(to right, #4ade80, #16a34a)"
+                                                                  : key ===
+                                                                     "scoring_ms"
+                                                                   ? "linear-gradient(to right, #f97316, #ea580c)"
                                                                   : "linear-gradient(to right, #fbbf24, #d97706)",
                                                 }}
                                             />

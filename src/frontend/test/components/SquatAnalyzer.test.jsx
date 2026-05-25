@@ -64,13 +64,14 @@ const classifyResponse = (classification = "Deep") =>
 const analyzeSessionResponse = ({
     start_stop = 1,
     good_bad_score = 0.71,
+    squat_score = 2,
     predicted_z = {},
 } = {}) =>
     Promise.resolve({
         ok: true,
         json: () =>
             Promise.resolve({
-                results: [{start_stop, good_bad_score, predicted_z}],
+                results: [{start_stop, good_bad_score, squat_score, predicted_z}],
                 timings: {
                     feature_build_ms: 1,
                     start_stop_ms: 1,
@@ -269,6 +270,8 @@ describe("SquatAnalyzer - image upload validation", () => {
             });
             expect(await screen.findByText(/3-d skeleton replay/i)).toBeInTheDocument();
             expect(await screen.findByText(/1 frame recorded/i)).toBeInTheDocument();
+            expect(await screen.findByText(/^squat score$/i)).toBeInTheDocument();
+            expect(await screen.findByText(/2 \/ 4/i)).toBeInTheDocument();
             expect(createObjectURLSpy).toHaveBeenCalled();
             expect(revokeObjectURLSpy).toHaveBeenCalled();
         } finally {

@@ -47,6 +47,7 @@ def squat_analyze_session(req: SessionAnalysisRequest):
                 start_stop=fr.start_stop,
                 predicted_z=fr.predicted_z,
                 good_bad_score=fr.good_bad_score,
+                squat_score=fr.squat_score,
             )
             for fr in frame_results
         ]
