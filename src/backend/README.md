@@ -6,7 +6,7 @@ FastAPI backend service for 4dt907 ML data-intensive system.
 
 - **Squat classification** — `POST /api/v1/squat/classify` accepts MediaPipe 3-D keypoints,
   calculates knee angles (law of cosines) and returns `Deep` / `Shallow` / `Invalid` with a
-  confidence score. Uses the MLflow-hosted z-predictor model to reconstruct z from x/y.
+  confidence score. Uses MediaPipe z values directly.
 - **Expert-score prediction** — `POST /api/v1/predict/champion` and `/latest` (MLflow model)
 - **Weakest-link classification** — `POST /api/v1/weakest-link/champion` and `/latest`
 - **Z-predictor** — `POST /api/v1/z-predictor/champion` and `/latest`
@@ -112,7 +112,7 @@ black .
 #### Z-Predictor
 
 Predicts the z-axis (depth) value for a set of MediaPipe 2-D keypoints using an MLflow-hosted
-regression model. The squat classifier calls this internally to improve depth estimation.
+regression model.
 
 - `POST /api/v1/z-predictor/champion` — production z-predictor model
 - `POST /api/v1/z-predictor/latest` — development z-predictor model

@@ -3,7 +3,7 @@
 Squat analysis endpoint (v1).
 
 Accepts 3-D joint coordinates from the React frontend, runs the full
-Start/Stop → Z-pred → GoodBad pipeline, and returns per-frame results.
+Start/Stop → MediaPipe Z → GoodBad pipeline, and returns per-frame results.
 """
 
 import logging
@@ -23,10 +23,10 @@ router = APIRouter()
 
 @router.post("/squat/analyze-session", response_model=SessionAnalysisResponse)
 def squat_analyze_session(req: SessionAnalysisRequest):
-    """Full pipeline: Cut (start/stop) → Z-pred → GoodBad → Results.
+    """Full pipeline: Cut (start/stop) → MediaPipe Z → GoodBad → Results.
 
     All frames are sent at once. The backend runs Start_Stop_Predictor_ModelV2,
-    smooths short gaps (< 10 frames), predicts z for every joint, and scores
+    smooths short gaps (< 10 frames), reuses MediaPipe z for every joint, and scores
     form quality for each continuous exercise segment.
 
     Non-exercise frames are returned with ``start_stop=0`` and
