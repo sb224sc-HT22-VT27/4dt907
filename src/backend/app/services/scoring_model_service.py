@@ -1,11 +1,14 @@
 """app.services.scoring_model_service
 
-Model loading + prediction utilities for squat scoring model.
+Model loading + prediction utilities for squat scoring.
+
+Produces a squat score in the range [0, 4], where:
+  0.0 → good form
+  4.0 → bad form
 """
 
 import logging
 import os
-import tempfile
 import threading
 from typing import Dict, List, Optional, Tuple
 
@@ -26,9 +29,7 @@ if _initial_tracking_uri:
     mlflow.set_tracking_uri(_initial_tracking_uri)
     mlflow.set_registry_uri(_initial_tracking_uri)
 
-# Number of frames each session segment is resampled to before inference.
 _DEFAULT_C_FRAMES = 10
-# Expected number of engineered features per frame for the scoring model input.
 _DEFAULT_N_FEATURES = 61
 
 
@@ -44,8 +45,6 @@ def _direct_uri_for_variant(variant: str) -> Optional[str]:
         return _clean_uri(os.getenv("SCORING_MODEL_URI_PROD"))
     if v in {"latest", "dev", "development"}:
         return _clean_uri(os.getenv("SCORING_MODEL_URI_DEV"))
-    if v in {"backup"}:
-        return _clean_uri(os.getenv("SCORING_MODEL_URI_BACKUP"))
     return None
 
 
@@ -95,7 +94,6 @@ def _resolve_alias_to_version_uri(model_name: str, alias: str) -> str:
 
 
 def _load_model_with_alias_fallback(uri: str):
-    """Load via mlflow.pyfunc (works with mlflow-skinny)."""
     try:
         return mlflow.pyfunc.load_model(uri), uri
     except RestException as e:
@@ -156,17 +154,12 @@ def _fetch_scaler(run_id: Optional[str]):
         return None
     try:
         import joblib
+        import tempfile
 
         client = MlflowClient()
         artifacts = client.list_artifacts(run_id)
         scaler_path = next(
-            (
-                a.path
-                for a in artifacts
-                if a.path.startswith("scaler_scoring")
-                or a.path.startswith("scaler_goodbad")
-                or a.path.startswith("scaler")
-            ),
+            (a.path for a in artifacts if a.path.startswith("scaler_score")),
             None,
         )
         if not scaler_path:
@@ -198,26 +191,13 @@ def get_model(variant: str = "champion"):
         return model, uri_used, run_id, c_frames, n_features, scaler
 
 
-def _normalize_score(raw: np.ndarray) -> Optional[int]:
-    arr = np.asarray(raw, dtype=np.float32)
-    if arr.size == 0:
-        return None
-    if arr.ndim >= 2 and arr.shape[-1] > 1:
-        value = float(np.argmax(arr[0]))
-    else:
-        value = float(arr.reshape(-1)[0])
-    if not np.isfinite(value):
-        return None
-    return int(round(float(np.clip(value, 0.0, 4.0))))
-
-
 def predict_session(
     exercise_frames: List[List[Dict]],
     variant: str = "champion",
-) -> Optional[int]:
-    """Score a squat segment with an integer score in [0, 4]."""
+) -> Optional[float]:
+    """Score a single squat repetition on a 0..4 scale (0 good, 4 bad)."""
     if not exercise_frames:
-        return None
+        return 2.0
 
     try:
         model, _, _, c_frames, n_features, scaler = get_model(variant)
@@ -234,10 +214,12 @@ def predict_session(
             flat = scaler.transform(flat).astype(np.float32)
             fixed = flat.reshape(c_frames, n_features)
 
-        raw = model.predict(fixed[None])
-        score = _normalize_score(raw)
-        _log.info("Scoring prediction=%s", score)
+        X = fixed[None]
+        raw = model.predict(X)
+        score = float(np.asarray(raw, dtype=np.float32).flatten()[0])
+        score = float(np.clip(score, 0.0, 4.0))
         return score
+
     except Exception as exc:
         _log.error("Scoring prediction failed: %s", exc, exc_info=True)
         return None

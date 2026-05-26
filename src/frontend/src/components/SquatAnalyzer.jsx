@@ -143,13 +143,6 @@ const ESM_URL =
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
 const MAX_SQUAT_SCORE = 4;
 
-function normalizeSquatScore(value) {
-    if (value == null) return null;
-    const n = Number(value);
-    if (!Number.isFinite(n)) return null;
-    return Math.max(0, Math.min(MAX_SQUAT_SCORE, Math.round(n)));
-}
-
 /**
  * Create a new PoseLandmarker for continuous video/webcam detection.
  */
@@ -941,12 +934,13 @@ export default function SquatAnalyzer() {
             setSessionLog(entries);
             const firstWithScore = data.results.find(
                 (r) =>
+                    r.start_stop === 1 &&
                     (r.good_bad_score != null || r.squat_score != null),
             );
             if (firstWithScore) {
                 setResult({
-                    goodBadScore: firstWithScore.good_bad_score ?? null,
-                    squatScore: normalizeSquatScore(firstWithScore.squat_score),
+                    goodBadScore: firstWithScore.good_bad_score,
+                    squatScore: firstWithScore.squat_score,
                 });
             }
             setStatus("finished");
@@ -1158,10 +1152,9 @@ export default function SquatAnalyzer() {
                                 firstResult.squat_score !== undefined)
                         ) {
                             setResult({
-                                goodBadScore: firstResult.good_bad_score ?? null,
-                                squatScore: normalizeSquatScore(
-                                    firstResult.squat_score,
-                                ),
+                                goodBadScore:
+                                    firstResult.good_bad_score ?? null,
+                                squatScore: firstResult.squat_score ?? null,
                             });
                         }
                         setStatus("finished");
@@ -1434,11 +1427,10 @@ export default function SquatAnalyzer() {
     // Render
 
     const formScore = result?.goodBadScore ?? null;
-    const squatScore = normalizeSquatScore(result?.squatScore);
-    const normalizedSquatScore = squatScore;
     const formIsGood = formScore != null && formScore >= goodBadThreshold;
     const formPct = formScore != null ? Math.round(formScore * 100) : 0;
     const threshPct = Math.round(goodBadThreshold * 100);
+    const squatScore = result?.squatScore ?? null;
 
     return (
         <div className="flex flex-col items-center gap-5 px-6 py-8 max-w-3xl mx-auto">
@@ -1736,111 +1728,112 @@ export default function SquatAnalyzer() {
                 <div className="ios-card rounded-2xl p-5 w-full">
                     {formScore != null && (
                         <>
-                    {/* Header row */}
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
-                                Form Quality
-                            </p>
-                            <p
-                                className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}
-                            >
-                                {formIsGood ? "Good form" : "Bad form"}
-                            </p>
-                        </div>
-                        <div
-                            className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold ios-card ${
-                                formIsGood ? "text-green-500" : "text-red-500"
-                            }`}
-                            style={{
-                                background: formIsGood
-                                    ? "radial-gradient(circle at 35% 30%, rgba(220,252,231,0.95), rgba(187,247,208,0.85))"
-                                    : "radial-gradient(circle at 35% 30%, rgba(254,226,226,0.95), rgba(252,165,165,0.70))",
-                                border: formIsGood
-                                    ? "1px solid rgba(74,222,128,0.35)"
-                                    : "1px solid rgba(248,113,113,0.35)",
-                            }}
-                        >
-                            {formIsGood ? "✓" : "✗"}
-                        </div>
-                    </div>
+                            {/* Header row */}
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
+                                        Form Quality
+                                    </p>
+                                    <p
+                                        className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}
+                                    >
+                                        {formIsGood ? "Good form" : "Bad form"}
+                                    </p>
+                                    {squatScore != null && (
+                                        <p className="text-sm text-slate-500 mt-1">
+                                            Score:{" "}
+                                            <span className="font-semibold text-slate-700 tabular-nums">
+                                                {squatScore.toFixed(2)} / 4
+                                            </span>{" "}
+                                            (0 good, 4 bad)
+                                        </p>
+                                    )}
+                                </div>
+                                <div
+                                    className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold ios-card ${
+                                        formIsGood
+                                            ? "text-green-500"
+                                            : "text-red-500"
+                                    }`}
+                                    style={{
+                                        background: formIsGood
+                                            ? "radial-gradient(circle at 35% 30%, rgba(220,252,231,0.95), rgba(187,247,208,0.85))"
+                                            : "radial-gradient(circle at 35% 30%, rgba(254,226,226,0.95), rgba(252,165,165,0.70))",
+                                        border: formIsGood
+                                            ? "1px solid rgba(74,222,128,0.35)"
+                                            : "1px solid rgba(248,113,113,0.35)",
+                                    }}
+                                >
+                                    {formIsGood ? "✓" : "✗"}
+                                </div>
+                            </div>
 
-                    {/* Score bar with threshold marker */}
-                    <div className="mb-5">
-                        <div className="flex justify-between text-xs mb-2">
-                            <span className="text-slate-400">Score</span>
-                            <span className="font-bold text-slate-600 tabular-nums">
-                                {formPct}%
-                            </span>
-                        </div>
-                        <div className="relative h-3 rounded-full bg-slate-100 overflow-visible">
-                            <div
-                                className="h-full rounded-full transition-all duration-700 ease-out"
-                                style={{
-                                    width: `${formPct}%`,
-                                    background: formIsGood
-                                        ? "linear-gradient(to right, #fbbf24, #4ade80)"
-                                        : "linear-gradient(to right, #f87171, #fbbf24)",
-                                    boxShadow: formIsGood
-                                        ? "0 0 12px rgba(74,222,128,0.4)"
-                                        : "0 0 12px rgba(248,113,113,0.35)",
-                                }}
-                            />
-                            {/* Threshold marker line */}
-                            <div
-                                className="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-slate-500 opacity-60"
-                                style={{ left: `calc(${threshPct}% - 1px)` }}
-                            />
-                        </div>
-                        <p className="text-xs text-slate-300 text-right mt-1 tabular-nums">
-                            threshold at {threshPct}%
-                        </p>
-                    </div>
+                            {/* Score bar with threshold marker */}
+                            <div className="mb-5">
+                                <div className="flex justify-between text-xs mb-2">
+                                    <span className="text-slate-400">
+                                        Score
+                                    </span>
+                                    <span className="font-bold text-slate-600 tabular-nums">
+                                        {formPct}%
+                                    </span>
+                                </div>
+                                <div className="relative h-3 rounded-full bg-slate-100 overflow-visible">
+                                    <div
+                                        className="h-full rounded-full transition-all duration-700 ease-out"
+                                        style={{
+                                            width: `${formPct}%`,
+                                            background: formIsGood
+                                                ? "linear-gradient(to right, #fbbf24, #4ade80)"
+                                                : "linear-gradient(to right, #f87171, #fbbf24)",
+                                            boxShadow: formIsGood
+                                                ? "0 0 12px rgba(74,222,128,0.4)"
+                                                : "0 0 12px rgba(248,113,113,0.35)",
+                                        }}
+                                    />
+                                    {/* Threshold marker line */}
+                                    <div
+                                        className="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-slate-500 opacity-60"
+                                        style={{
+                                            left: `calc(${threshPct}% - 1px)`,
+                                        }}
+                                    />
+                                </div>
+                                <p className="text-xs text-slate-300 text-right mt-1 tabular-nums">
+                                    threshold at {threshPct}%
+                                </p>
+                            </div>
 
-                    {/* Threshold slider */}
-                    <div>
-                        <div className="flex justify-between text-xs mb-2">
-                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                Threshold
-                            </span>
-                            <span className="font-bold text-slate-600 tabular-nums">
-                                {threshPct}%
-                            </span>
-                        </div>
-                        <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="1"
-                            value={threshPct}
-                            onChange={(e) =>
-                                setGoodBadThreshold(
-                                    Number(e.target.value) / 100,
-                                )
-                            }
-                            className="ios-slider"
-                            style={{ width: "100%", display: "block" }}
-                        />
-                        <div className="flex justify-between text-xs text-slate-300 mt-2">
-                            <span>Bad</span>
-                            <span>Good</span>
-                        </div>
-                    </div>
+                            {/* Threshold slider */}
+                            <div>
+                                <div className="flex justify-between text-xs mb-2">
+                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                        Threshold
+                                    </span>
+                                    <span className="font-bold text-slate-600 tabular-nums">
+                                        {threshPct}%
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    value={threshPct}
+                                    onChange={(e) =>
+                                        setGoodBadThreshold(
+                                            Number(e.target.value) / 100,
+                                        )
+                                    }
+                                    className="ios-slider"
+                                    style={{ width: "100%", display: "block" }}
+                                />
+                                <div className="flex justify-between text-xs text-slate-300 mt-2">
+                                    <span>Bad</span>
+                                    <span>Good</span>
+                                </div>
+                            </div>
                         </>
-                    )}
-
-                    {normalizedSquatScore != null && (
-                        <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
-                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                                Squat score
-                            </p>
-                            <p className="text-lg font-bold text-slate-700">
-                                {normalizedSquatScore} / {MAX_SQUAT_SCORE}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                                0 = good, {MAX_SQUAT_SCORE} = bad
-                            </p>
-                        </div>
                     )}
                 </div>
             )}
@@ -1914,7 +1907,7 @@ export default function SquatAnalyzer() {
                         {
                             key: "scoring_ms",
                             label: "Scoring model",
-                            sub: "0–4 squat score",
+                            sub: "0 good → 4 bad",
                             value: pipelineTimings.scoring_ms ?? 0,
                         },
                         {
@@ -1978,9 +1971,9 @@ export default function SquatAnalyzer() {
                                                                     "goodbad_ms"
                                                                   ? "linear-gradient(to right, #4ade80, #16a34a)"
                                                                   : key ===
-                                                                     "scoring_ms"
-                                                                   ? "linear-gradient(to right, #f97316, #ea580c)"
-                                                                  : "linear-gradient(to right, #fbbf24, #d97706)",
+                                                                      "scoring_ms"
+                                                                    ? "linear-gradient(to right, #f97316, #ea580c)"
+                                                                    : "linear-gradient(to right, #fbbf24, #d97706)",
                                                 }}
                                             />
                                         </div>

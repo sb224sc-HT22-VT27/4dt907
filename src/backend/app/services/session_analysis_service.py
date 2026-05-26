@@ -96,7 +96,7 @@ class FrameResult:
         start_stop: int,
         predicted_z: Dict[str, float],
         good_bad_score: Optional[float] = None,
-        squat_score: Optional[int] = None,
+        squat_score: Optional[float] = None,
     ):
         self.start_stop = start_stop
         self.predicted_z = predicted_z
@@ -161,8 +161,8 @@ def analyze_session(
     goodbad_ms, scoring_ms = _score_exercise_segments(
         norm_frames or frames, smoothed, results
     )
-    timings["goodbad_ms"] = round(goodbad_ms, 1)
-    timings["scoring_ms"] = round(scoring_ms, 1)
+    timings["goodbad_ms"] = goodbad_ms
+    timings["scoring_ms"] = scoring_ms
 
     timings["total_ms"] = round((perf_counter() - t_total) * 1000, 1)
 
@@ -192,7 +192,9 @@ def _score_exercise_segments(
             seg_frames = source_frames[seg_start:seg_end]
             try:
                 t = perf_counter()
-                score = goodbad_model_service.predict_session(seg_frames, "champion")
+                goodbad_score = goodbad_model_service.predict_session(
+                    seg_frames, "champion"
+                )
                 total_goodbad_ms += (perf_counter() - t) * 1000
             except Exception as exc:
                 _log.error(
@@ -201,7 +203,8 @@ def _score_exercise_segments(
                     seg_end,
                     exc,
                 )
-                score = None
+                goodbad_score = None
+
             try:
                 t = perf_counter()
                 squat_score = scoring_model_service.predict_session(
@@ -218,16 +221,16 @@ def _score_exercise_segments(
                 squat_score = None
 
             _log.info(
-                "Exercise segment [%d:%d] (%d frames): good_bad_score=%s, squat_score=%s",
+                "Segment [%d:%d] (%d frames): good_bad=%s squat_score=%s",
                 seg_start,
                 seg_end,
                 seg_end - seg_start,
-                score,
+                goodbad_score,
                 squat_score,
             )
             for j in range(seg_start, seg_end):
-                results[j].good_bad_score = score
+                results[j].good_bad_score = goodbad_score
                 results[j].squat_score = squat_score
         else:
             i += 1
-    return total_goodbad_ms, total_scoring_ms
+    return round(total_goodbad_ms, 1), round(total_scoring_ms, 1)
