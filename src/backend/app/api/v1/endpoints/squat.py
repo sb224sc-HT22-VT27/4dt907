@@ -52,6 +52,6 @@ def squat_analyze_session(req: SessionAnalysisRequest):
             for fr in frame_results
         ]
         return SessionAnalysisResponse(results=results, timings=timings)
-    except Exception:
+    except Exception as exc:
         logger.exception("Session analysis failed")
-        raise HTTPException(status_code=503, detail="Service unavailable")
+        raise HTTPException(status_code=503, detail=str(exc))

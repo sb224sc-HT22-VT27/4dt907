@@ -32,6 +32,62 @@ if _initial_tracking_uri:
 _DEFAULT_C_FRAMES = 10
 _DEFAULT_N_FEATURES = 61
 
+# Joint order from kinect_good_preprocessed_not_cut_A11_mediapipe CSV columns.
+# Confirmed by reading A1_kinect.csv header — matches FEAT_COLS in the A15 notebook.
+# Different from goodbad_model_service._JOINT_NAMES (Kinect SDK order).
+_A15_JOINTS: List[str] = [
+    "nose",
+    "left_shoulder", "left_elbow", "right_shoulder", "right_elbow",
+    "left_wrist", "right_wrist",
+    "left_hip", "right_hip",
+    "left_knee", "right_knee",
+    "left_ankle", "right_ankle",
+]
+_A15_FEAT_COLS: List[str] = [
+    f"{j}_3d_{ax}" for j in _A15_JOINTS for ax in ["x", "y", "z"]
+]
+
+
+def _a15_build_base(kp3d: List[Dict]) -> List[float]:
+    # MediaPipe JS world_landmarks vs A11 training CSV (Kinect/MediaPipe Python) differences:
+    #   x: JS uses camera frame (person's left = positive x); training uses body frame (left = negative x). Negate x.
+    #   y: JS uses y-down; training uses y-up. Negate y.
+    #   z: JS z is camera-depth (large, −0.3 to −0.5); training z is body-forward (tiny, ~0.005–0.06). Zero out z.
+    kp_map = {kp["name"]: kp for kp in kp3d}
+    feats: List[float] = []
+    for name in _A15_JOINTS:
+        kp = kp_map.get(name)
+        feats.append(-float(kp["x"]) if kp else 0.0)
+        feats.append(-float(kp["y"]) if kp else 0.0)
+        feats.append(0.0)
+    return feats
+
+
+def _a15_pos(arr: np.ndarray, joint: str) -> np.ndarray:
+    idxs = [_A15_FEAT_COLS.index(f"{joint}_3d_{ax}") for ax in ["x", "y", "z"]]
+    return arr[:, idxs]
+
+
+def _a15_add_features(base_arr: np.ndarray) -> np.ndarray:
+    """16 distance + 6 angle features using A15 column-order index lookup."""
+    ls = _a15_pos(base_arr, "left_shoulder")
+    rs = _a15_pos(base_arr, "right_shoulder")
+    scale = float(np.linalg.norm(rs - ls, axis=1).mean()) + 1e-8
+    extras: List[np.ndarray] = []
+    for j1, j2 in goodbad_model_service._KEY_DIST_PAIRS:
+        p1, p2 = _a15_pos(base_arr, j1), _a15_pos(base_arr, j2)
+        extras.append(np.linalg.norm(p2 - p1, axis=1, keepdims=True) / scale)
+    for ja, jv, jb in goodbad_model_service._KEY_ANGLE_TRIPLES:
+        pa = _a15_pos(base_arr, ja)
+        pv = _a15_pos(base_arr, jv)
+        pb = _a15_pos(base_arr, jb)
+        va, vb = pa - pv, pb - pv
+        cos = np.sum(va * vb, axis=1) / (
+            np.linalg.norm(va, axis=1) * np.linalg.norm(vb, axis=1) + 1e-8
+        )
+        extras.append(cos.reshape(-1, 1))
+    return np.hstack([base_arr] + extras).astype(np.float32)
+
 
 def _clean_uri(value: Optional[str]) -> Optional[str]:
     if not value:
@@ -195,18 +251,18 @@ def predict_session(
     exercise_frames: List[List[Dict]],
     variant: str = "champion",
 ) -> Optional[float]:
-    """Score a single squat repetition on a 0..4 scale (0 good, 4 bad)."""
+    """Score a single squat repetition on a 0..4 scale."""
     if not exercise_frames:
-        return 2.0
+        return None
 
     try:
         model, _, _, c_frames, n_features, scaler = get_model(variant)
 
         base = np.array(
-            [goodbad_model_service._build_base_features(f) for f in exercise_frames],
+            [_a15_build_base(f) for f in exercise_frames],
             dtype=np.float32,
         )
-        enriched = goodbad_model_service._add_dist_angle_features(base)
+        enriched = _a15_add_features(base)
         fixed = goodbad_model_service._resample_to_fixed(enriched, c_frames)
 
         if scaler is not None:
@@ -216,8 +272,8 @@ def predict_session(
 
         X = fixed[None]
         raw = model.predict(X)
-        score = float(np.asarray(raw, dtype=np.float32).flatten()[0])
-        score = float(np.clip(score, 0.0, 4.0))
+        score = float(np.clip(float(np.asarray(raw, dtype=np.float32).flatten()[0]), 0.0, 4.0))
+        _log.info("Scoring: %d frames → %.3f", len(exercise_frames), score)
         return score
 
     except Exception as exc:

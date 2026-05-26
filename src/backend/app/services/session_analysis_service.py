@@ -159,7 +159,7 @@ def analyze_session(
     ]
 
     goodbad_ms, scoring_ms = _score_exercise_segments(
-        norm_frames or frames, smoothed, results
+        norm_frames or frames, smoothed, results, scoring_frames=frames
     )
     timings["goodbad_ms"] = goodbad_ms
     timings["scoring_ms"] = scoring_ms
@@ -173,11 +173,15 @@ def _score_exercise_segments(
     source_frames: List[List[Dict]],
     smoothed: List[int],
     results: List[FrameResult],
+    scoring_frames: Optional[List[List[Dict]]] = None,
 ) -> Tuple[float, float]:
-    """Run GoodBad_ClassifierV2 on each continuous exercise segment in-place.
+    """Run GoodBad_ClassifierV2 and scoring model on each exercise segment.
 
-    source_frames must be image-normalised keypoints (x, y ∈ [0,1]).
+    source_frames: keypoints for goodbad (image-normalised [0,1]).
+    scoring_frames: world-space keypoints for scoring model (hip-centred, metres).
+                    Falls back to source_frames if None.
     """
+    sc_source = scoring_frames if scoring_frames is not None else source_frames
     n = len(smoothed)
     total_goodbad_ms = 0.0
     total_scoring_ms = 0.0
@@ -208,15 +212,17 @@ def _score_exercise_segments(
             try:
                 t = perf_counter()
                 squat_score = scoring_model_service.predict_session(
-                    seg_frames, "champion"
+                    sc_source[seg_start:seg_end], "champion"
                 )
                 total_scoring_ms += (perf_counter() - t) * 1000
             except Exception as exc:
                 _log.error(
-                    "Scoring model failed for segment [%d:%d]: %s",
+                    "Scoring model failed for segment [%d:%d] (%d frames): %s",
                     seg_start,
                     seg_end,
+                    seg_end - seg_start,
                     exc,
+                    exc_info=True,
                 )
                 squat_score = None
 
