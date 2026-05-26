@@ -28,7 +28,9 @@ def test_analyze_session_reuses_mediapipe_z(monkeypatch):
     }
     frames = [_make_frame(z_values)]
 
-    results, timings = session_analysis_service.analyze_session(frames, norm_frames=frames)
+    results, timings = session_analysis_service.analyze_session(
+        frames, norm_frames=frames
+    )
 
     assert results[0].predicted_z == z_values
     assert results[0].good_bad_score == 0.91
