@@ -19,8 +19,10 @@ def test_direct_uri_for_variant_uri_backup(monkeypatch):
 
 
 def test_normalize_score_rounds_and_clamps():
-    assert scoring_model_service._normalize_score(np.array([[4.6]], dtype=np.float32)) == 4.0
-    assert scoring_model_service._normalize_score(np.array([[-2.0]], dtype=np.float32)) == 0.0
+    assert scoring_model_service._normalize_score(np.array([[4.6]], dtype=np.float32)) == 4
+    assert scoring_model_service._normalize_score(np.array([[-2.0]], dtype=np.float32)) == 0
+    assert scoring_model_service._normalize_score(np.array([[2.49]], dtype=np.float32)) == 2
+    assert scoring_model_service._normalize_score(np.array([[2.5]], dtype=np.float32)) == 2
 
 
 def test_normalize_score_argmax_for_multiclass():

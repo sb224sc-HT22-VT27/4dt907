@@ -143,6 +143,13 @@ const ESM_URL =
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
 const MAX_SQUAT_SCORE = 4;
 
+function normalizeSquatScore(value) {
+    if (value == null) return null;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return Math.max(0, Math.min(MAX_SQUAT_SCORE, Math.round(n)));
+}
+
 /**
  * Create a new PoseLandmarker for continuous video/webcam detection.
  */
@@ -934,13 +941,12 @@ export default function SquatAnalyzer() {
             setSessionLog(entries);
             const firstWithScore = data.results.find(
                 (r) =>
-                    r.start_stop === 1 &&
                     (r.good_bad_score != null || r.squat_score != null),
             );
             if (firstWithScore) {
                 setResult({
                     goodBadScore: firstWithScore.good_bad_score ?? null,
-                    squatScore: firstWithScore.squat_score ?? null,
+                    squatScore: normalizeSquatScore(firstWithScore.squat_score),
                 });
             }
             setStatus("finished");
@@ -1126,7 +1132,14 @@ export default function SquatAnalyzer() {
                                 : null,
                         );
 
-                        const firstResult = data.results?.[0] ?? {};
+                        const firstResult =
+                            data.results?.find(
+                                (r) =>
+                                    r.good_bad_score != null ||
+                                    r.squat_score != null,
+                            ) ??
+                            data.results?.[0] ??
+                            {};
                         const entry = {
                             timestamp: Date.now(),
                             keypoints3d: kp3d,
@@ -1146,7 +1159,9 @@ export default function SquatAnalyzer() {
                         ) {
                             setResult({
                                 goodBadScore: firstResult.good_bad_score ?? null,
-                                squatScore: firstResult.squat_score ?? null,
+                                squatScore: normalizeSquatScore(
+                                    firstResult.squat_score,
+                                ),
                             });
                         }
                         setStatus("finished");
@@ -1419,13 +1434,8 @@ export default function SquatAnalyzer() {
     // Render
 
     const formScore = result?.goodBadScore ?? null;
-    const squatScore = result?.squatScore ?? null;
-    // Defensive UI guard: backend already returns [0..MAX_SQUAT_SCORE], but we clamp
-    // to keep the card stable if an unexpected payload reaches the client.
-    const normalizedSquatScore =
-        squatScore == null
-            ? null
-            : Math.max(0, Math.min(MAX_SQUAT_SCORE, squatScore));
+    const squatScore = normalizeSquatScore(result?.squatScore);
+    const normalizedSquatScore = squatScore;
     const formIsGood = formScore != null && formScore >= goodBadThreshold;
     const formPct = formScore != null ? Math.round(formScore * 100) : 0;
     const threshPct = Math.round(goodBadThreshold * 100);

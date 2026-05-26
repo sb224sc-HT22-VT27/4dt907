@@ -198,7 +198,7 @@ def get_model(variant: str = "champion"):
         return model, uri_used, run_id, c_frames, n_features, scaler
 
 
-def _normalize_score(raw: np.ndarray) -> Optional[float]:
+def _normalize_score(raw: np.ndarray) -> Optional[int]:
     arr = np.asarray(raw, dtype=np.float32)
     if arr.size == 0:
         return None
@@ -208,14 +208,14 @@ def _normalize_score(raw: np.ndarray) -> Optional[float]:
         value = float(arr.reshape(-1)[0])
     if not np.isfinite(value):
         return None
-    return float(np.clip(value, 0.0, 4.0))
+    return int(round(float(np.clip(value, 0.0, 4.0))))
 
 
 def predict_session(
     exercise_frames: List[List[Dict]],
     variant: str = "champion",
-) -> Optional[float]:
-    """Score a squat segment with an float score in [0.0, 4.0]."""
+) -> Optional[int]:
+    """Score a squat segment with an integer score in [0, 4]."""
     if not exercise_frames:
         return None
 

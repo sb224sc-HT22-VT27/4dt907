@@ -278,4 +278,69 @@ describe("SquatAnalyzer - image upload validation", () => {
             globalThis.Image = OriginalImage;
         }
     });
+
+    it("shows rounded squat score for processed image results", async () => {
+        fetchMock.mockImplementation((url) => {
+            if (url.includes("/squat/classify")) return classifyResponse();
+            if (url.includes("/squat/analyze-session")) {
+                return analyzeSessionResponse({
+                    start_stop: 0,
+                    good_bad_score: null,
+                    squat_score: 2.8,
+                });
+            }
+            if (url.includes("/model-info/start-stop")) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({mae_total_average: 0.1}),
+                });
+            }
+            return Promise.resolve({ok: false});
+        });
+
+        const landmarks = Array.from({length: 33}, (_, i) => ({
+            x: 0.25 + i * 0.005,
+            y: 0.2 + i * 0.005,
+            z: i * 0.001,
+            visibility: 0.99,
+        }));
+        const worldLandmarks = Array.from({length: 33}, (_, i) => ({
+            x: i * 0.01,
+            y: i * 0.01,
+            z: i * 0.01,
+        }));
+        detectImageMock.mockReturnValue({
+            landmarks: [landmarks],
+            worldLandmarks: [worldLandmarks],
+        });
+
+        const OriginalImage = globalThis.Image;
+        class MockImage {
+            constructor() {
+                this.naturalWidth = 1280;
+                this.naturalHeight = 720;
+                this.onload = null;
+                this.onerror = null;
+                this._src = "";
+            }
+            set src(value) {
+                this._src = value;
+                Promise.resolve().then(() => this.onload?.());
+            }
+        }
+        globalThis.Image = MockImage;
+
+        try {
+            render(<SquatAnalyzer />);
+            await userEvent.click(screen.getByRole("button", {name: /upload image/i}));
+            const input = document.querySelector("input[type='file'][accept='image/*']");
+            const imageFile = new File(["img"], "pose.png", {type: "image/png"});
+            fireEvent.change(input, {target: {files: [imageFile]}});
+
+            expect(await screen.findByText(/^squat score$/i)).toBeInTheDocument();
+            expect(await screen.findByText(/3 \/ 4/i)).toBeInTheDocument();
+        } finally {
+            globalThis.Image = OriginalImage;
+        }
+    });
 });

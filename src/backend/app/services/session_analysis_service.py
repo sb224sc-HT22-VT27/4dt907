@@ -96,7 +96,7 @@ class FrameResult:
         start_stop: int,
         predicted_z: Dict[str, float],
         good_bad_score: Optional[float] = None,
-        squat_score: Optional[float] = None,
+        squat_score: Optional[int] = None,
     ):
         self.start_stop = start_stop
         self.predicted_z = predicted_z
