@@ -231,7 +231,7 @@ describe("SquatAnalyzer - image upload validation", () => {
             worldLandmarks: [worldLandmarks],
         });
 
-        const OriginalImage = global.Image;
+        const OriginalImage = globalThis.Image;
         class MockImage {
             constructor() {
                 this.naturalWidth = 1280;
@@ -245,7 +245,7 @@ describe("SquatAnalyzer - image upload validation", () => {
                 Promise.resolve().then(() => this.onload?.());
             }
         }
-        global.Image = MockImage;
+        globalThis.Image = MockImage;
 
         const createObjectURLSpy = vi
             .spyOn(URL, "createObjectURL")
@@ -275,7 +275,7 @@ describe("SquatAnalyzer - image upload validation", () => {
             expect(createObjectURLSpy).toHaveBeenCalled();
             expect(revokeObjectURLSpy).toHaveBeenCalled();
         } finally {
-            global.Image = OriginalImage;
+            globalThis.Image = OriginalImage;
         }
     });
 });

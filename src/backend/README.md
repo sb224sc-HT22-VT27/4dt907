@@ -137,7 +137,7 @@ Use the docker compose file to build entire project which uses the local Dockerf
 
 The `/api/v1/predict/*` and `/api/v1/weakest-link/*` endpoints load models from MLflow
 (DagsHub) at startup. Set `MLFLOW_TRACKING_URI` and the appropriate `MODEL_URI_*` /
-`WEAKLINK_MODEL_URI_*` / `Z_MODEL_URI_*` / `SQUAT_SCORING_MODEL_URI_*` environment
+`WEAKLINK_MODEL_URI_*` / `Z_MODEL_URI_*` / `SCORING_MODEL_URI_*` environment
 variables (see `.env.example`).
 
 ## Project Structure

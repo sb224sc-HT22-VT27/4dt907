@@ -41,11 +41,11 @@ def _clean_uri(value: Optional[str]) -> Optional[str]:
 def _direct_uri_for_variant(variant: str) -> Optional[str]:
     v = (variant or "").lower().strip()
     if v in {"champion", "best", "prod", "production"}:
-        return _clean_uri(os.getenv("SQUAT_SCORING_MODEL_URI_PROD"))
+        return _clean_uri(os.getenv("SCORING_MODEL_URI_PROD"))
     if v in {"latest", "dev", "development"}:
-        return _clean_uri(os.getenv("SQUAT_SCORING_MODEL_URI_DEV"))
+        return _clean_uri(os.getenv("SCORING_MODEL_URI_DEV"))
     if v in {"backup"}:
-        return _clean_uri(os.getenv("SQUAT_SCORING_MODEL_URI_BACKUP"))
+        return _clean_uri(os.getenv("SCORING_MODEL_URI_BACKUP"))
     return None
 
 
@@ -208,7 +208,7 @@ def _normalize_score(raw: np.ndarray) -> Optional[float]:
         value = float(arr.reshape(-1)[0])
     if not np.isfinite(value):
         return None
-    return float(value)
+    return float(np.clip(value, 0.0, 4.0))
 
 
 def predict_session(

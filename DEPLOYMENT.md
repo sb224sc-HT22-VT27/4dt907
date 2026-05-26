@@ -157,9 +157,9 @@ services:
    | `Z_MODEL_URI_PROD` | Z-predictor production model URI |
    | `Z_MODEL_URI_DEV` | Z-predictor development model URI |
    | `Z_MODEL_URI_BACKUP` | Z-predictor backup model URI |
-   | `SQUAT_SCORING_MODEL_URI_PROD` | Squat scoring production model URI (0 good → 4 bad) |
-   | `SQUAT_SCORING_MODEL_URI_DEV` | Squat scoring development model URI |
-   | `SQUAT_SCORING_MODEL_URI_BACKUP` | Squat scoring backup model URI |
+   | `SCORING_MODEL_URI_PROD` | Squat scoring production model URI (0 good → 4 bad) |
+   | `SCORING_MODEL_URI_DEV` | Squat scoring development model URI |
+   | `SCORING_MODEL_URI_BACKUP` | Squat scoring backup model URI |
    | `PRODUCTION_URL` | Your Vercel frontend URL (for CORS), e.g. `https://your-project.vercel.app` |
 
 4. Deploy the service and note the external URL (e.g. `https://4dt907-backend.onrender.com`).
