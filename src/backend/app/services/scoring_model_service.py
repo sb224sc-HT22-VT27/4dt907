@@ -37,11 +37,18 @@ _DEFAULT_N_FEATURES = 61
 # Different from goodbad_model_service._JOINT_NAMES (Kinect SDK order).
 _A15_JOINTS: List[str] = [
     "nose",
-    "left_shoulder", "left_elbow", "right_shoulder", "right_elbow",
-    "left_wrist", "right_wrist",
-    "left_hip", "right_hip",
-    "left_knee", "right_knee",
-    "left_ankle", "right_ankle",
+    "left_shoulder",
+    "left_elbow",
+    "right_shoulder",
+    "right_elbow",
+    "left_wrist",
+    "right_wrist",
+    "left_hip",
+    "right_hip",
+    "left_knee",
+    "right_knee",
+    "left_ankle",
+    "right_ankle",
 ]
 _A15_FEAT_COLS: List[str] = [
     f"{j}_3d_{ax}" for j in _A15_JOINTS for ax in ["x", "y", "z"]
@@ -50,9 +57,11 @@ _A15_FEAT_COLS: List[str] = [
 
 def _a15_build_base(kp3d: List[Dict]) -> List[float]:
     # MediaPipe JS world_landmarks vs A11 training CSV (Kinect/MediaPipe Python) differences:
-    #   x: JS uses camera frame (person's left = positive x); training uses body frame (left = negative x). Negate x.
+    #   x: JS uses camera frame (person's left = positive x);
+    # training uses body frame (left = negative x). Negate x.
     #   y: JS uses y-down; training uses y-up. Negate y.
-    #   z: JS z is camera-depth (large, −0.3 to −0.5); training z is body-forward (tiny, ~0.005–0.06). Zero out z.
+    #   z: JS z is camera-depth (large, −0.3 to −0.5);
+    # training z is body-forward (tiny, ~0.005–0.06). Zero out z.
     kp_map = {kp["name"]: kp for kp in kp3d}
     feats: List[float] = []
     for name in _A15_JOINTS:
@@ -272,7 +281,9 @@ def predict_session(
 
         X = fixed[None]
         raw = model.predict(X)
-        score = float(np.clip(float(np.asarray(raw, dtype=np.float32).flatten()[0]), 0.0, 4.0))
+        score = float(
+            np.clip(float(np.asarray(raw, dtype=np.float32).flatten()[0]), 0.0, 4.0)
+        )
         _log.info("Scoring: %d frames → %.3f", len(exercise_frames), score)
         return score
 
