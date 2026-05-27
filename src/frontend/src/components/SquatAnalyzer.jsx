@@ -142,6 +142,7 @@ const WASM_URL =
 const ESM_URL =
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
 const MAX_SQUAT_SCORE = 4;
+const ANALYZE_SESSION_TIMEOUT_MS = 90_000;
 
 /**
  * Create a new PoseLandmarker for continuous video/webcam detection.
@@ -754,6 +755,33 @@ export default function SquatAnalyzer() {
     const [qualityIssues, setQualityIssues] = useState([]);
     const [qualityError, setQualityError] = useState(null);
 
+    const analyzeSession = useCallback(async (body) => {
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(
+            () => ctrl.abort(),
+            ANALYZE_SESSION_TIMEOUT_MS,
+        );
+        try {
+            const res = await fetch(apiUrl("/api/v1/squat/analyze-session"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+                signal: ctrl.signal,
+            });
+            if (!res.ok) throw new Error("Session analysis failed.");
+            return await res.json();
+        } catch (err) {
+            if (err?.name === "AbortError") {
+                throw new Error(
+                    "Analysis timed out. Please retry, shorten the clip, or check backend availability.",
+                );
+            }
+            throw err;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }, []);
+
     const sessionNameRef = useRef("");
     const qualityIssueCountsRef = useRef({});
     const qualityFrameCountRef = useRef(0);
@@ -910,13 +938,7 @@ export default function SquatAnalyzer() {
             if (normFrames.length === frames.length)
                 body.norm_frames = normFrames;
             const t0 = Date.now();
-            const res = await fetch(apiUrl("/api/v1/squat/analyze-session"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-            });
-            if (!res.ok) throw new Error("Session analysis failed");
-            const data = await res.json();
+            const data = await analyzeSession(body);
             const elapsed = Date.now() - t0;
             setPipelineTime(elapsed);
             setPipelineTimings(
@@ -944,11 +966,13 @@ export default function SquatAnalyzer() {
                 });
             }
             setStatus("finished");
-        } catch {
-            setErrorMsg("Failed to analyze recording. Try again.");
+        } catch (err) {
+            setErrorMsg(
+                err?.message || "Failed to analyze recording. Try again.",
+            );
             setStatus("error");
         }
-    }, [stopCapture]);
+    }, [analyzeSession, stopCapture]);
 
     // Video-ended auto-finish
 
@@ -990,10 +1014,8 @@ export default function SquatAnalyzer() {
 
     // Video upload
 
-    const handleVideoChange = useCallback(
-        async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
+    const handleVideoFile = useCallback(
+        async (file) => {
             if (!file.type.startsWith("video/")) {
                 setErrorMsg("Please select a video file.");
                 setStatus("error");
@@ -1027,13 +1049,28 @@ export default function SquatAnalyzer() {
         },
         [stopAll],
     );
-
-    // Image upload
-
-    const handleImageChange = useCallback(
+    const handleVideoChange = useCallback(
         async (e) => {
             const file = e.target.files?.[0];
             if (!file) return;
+            await handleVideoFile(file);
+        },
+        [handleVideoFile],
+    );
+    const handleVideoDrop = useCallback(
+        async (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer?.files?.[0];
+            if (!file || status === "loading" || status === "analyzing") return;
+            await handleVideoFile(file);
+        },
+        [handleVideoFile, status],
+    );
+
+    // Image upload
+
+    const handleImageFile = useCallback(
+        async (file) => {
             if (!file.type.startsWith("image/")) {
                 setErrorMsg("Please select an image file.");
                 setStatus("error");
@@ -1108,16 +1145,7 @@ export default function SquatAnalyzer() {
                         }
 
                         const t0 = Date.now();
-                        const res = await fetch(
-                            apiUrl("/api/v1/squat/analyze-session"),
-                            {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify(body),
-                            },
-                        );
-                        if (!res.ok) throw new Error("Image analysis failed");
-                        const data = await res.json();
+                        const data = await analyzeSession(body);
                         const elapsed = Date.now() - t0;
                         setPipelineTime(elapsed);
                         setPipelineTimings(
@@ -1164,14 +1192,31 @@ export default function SquatAnalyzer() {
                 setStatus("idle");
             } catch (err) {
                 setStatus("error");
-                setErrorMsg(String(err));
+                setErrorMsg(err?.message || String(err));
             } finally {
                 imageLandmarker?.close?.();
                 URL.revokeObjectURL(blobUrl);
                 if (imageInputRef.current) imageInputRef.current.value = "";
             }
         },
-        [stopAll],
+        [analyzeSession, stopAll],
+    );
+    const handleImageChange = useCallback(
+        async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            await handleImageFile(file);
+        },
+        [handleImageFile],
+    );
+    const handleImageDrop = useCallback(
+        async (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer?.files?.[0];
+            if (!file || status === "loading" || status === "analyzing") return;
+            await handleImageFile(file);
+        },
+        [handleImageFile, status],
     );
 
     const togglePlayPause = useCallback(() => {
@@ -1584,7 +1629,11 @@ export default function SquatAnalyzer() {
 
             {/* Controls — video upload */}
             {inputMode === "upload" && (
-                <div className="flex flex-col items-center gap-2">
+                <div
+                    className="flex flex-col items-center gap-2"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleVideoDrop}
+                >
                     <input
                         ref={fileInputRef}
                         type="file"
@@ -1633,12 +1682,21 @@ export default function SquatAnalyzer() {
                             {uploadedFileName}
                         </p>
                     )}
+                    {status !== "running" && (
+                        <p className="text-slate-400 text-xs">
+                            or drop a video file here
+                        </p>
+                    )}
                 </div>
             )}
 
             {/* Controls — image upload */}
             {inputMode === "image" && (
-                <div className="flex flex-col items-center gap-2">
+                <div
+                    className="flex flex-col items-center gap-2"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleImageDrop}
+                >
                     <input
                         ref={imageInputRef}
                         type="file"
@@ -1658,6 +1716,9 @@ export default function SquatAnalyzer() {
                             {uploadedFileName}
                         </p>
                     )}
+                    <p className="text-slate-400 text-xs">
+                        or drop an image file here
+                    </p>
                 </div>
             )}
 

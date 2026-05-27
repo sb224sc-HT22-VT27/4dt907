@@ -223,6 +223,21 @@ describe("SquatAnalyzer - video upload validation", () => {
             ).toBeInTheDocument();
         });
     });
+
+    it("shows an error when a non-video file is dropped", async () => {
+        render(<SquatAnalyzer />);
+        await userEvent.click(screen.getByText("Upload Video"));
+
+        const dropZone = screen.getByText(/or drop a video file here/i);
+        const badFile = new File(["data"], "photo.png", { type: "image/png" });
+        fireEvent.drop(dropZone, { dataTransfer: { files: [badFile] } });
+
+        await waitFor(() => {
+            expect(
+                screen.getByText(/please select a video file/i),
+            ).toBeInTheDocument();
+        });
+    });
 });
 
 describe("SquatAnalyzer - image upload validation", () => {
@@ -235,6 +250,21 @@ describe("SquatAnalyzer - image upload validation", () => {
         );
         const badFile = new File(["data"], "clip.mp4", { type: "video/mp4" });
         fireEvent.change(input, { target: { files: [badFile] } });
+
+        await waitFor(() => {
+            expect(
+                screen.getByText(/please select an image file/i),
+            ).toBeInTheDocument();
+        });
+    });
+
+    it("shows an error when a non-image file is dropped", async () => {
+        render(<SquatAnalyzer />);
+        await userEvent.click(screen.getByText("Upload Image"));
+
+        const dropZone = screen.getByText(/or drop an image file here/i);
+        const badFile = new File(["data"], "clip.mp4", { type: "video/mp4" });
+        fireEvent.drop(dropZone, { dataTransfer: { files: [badFile] } });
 
         await waitFor(() => {
             expect(
