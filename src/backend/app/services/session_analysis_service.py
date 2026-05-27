@@ -1,6 +1,6 @@
 """app.services.session_analysis_service
 
-Full session analysis pipeline: Cut → MediaPipe Z → GoodBad → Results.
+Full session analysis pipeline: Cut → MediaPipe Z → GoodBad → Scoring → Results.
 
 Pipeline per session (all frames at once):
 1. Build per-frame feature vectors (39 floats: 13 joints × [x, y, z]).
@@ -8,7 +8,8 @@ Pipeline per session (all frames at once):
 3. Apply gap-fill smoothing: 0-runs < 10 frames between two 1-regions → 1.
 4. For every frame: use MediaPipe z for all 13 joints.
 5. Run GoodBad_ClassifierV2 on each continuous exercise segment → quality score [0,1].
-6. Return per-frame results.
+6. Run squat scoring model on each continuous exercise segment → score [0,4].
+7. Return per-frame results.
 """
 
 import logging as _logging
@@ -17,6 +18,7 @@ from typing import Dict, List, Optional, Tuple
 
 from app.services import start_stop_model_service
 from app.services import goodbad_model_service
+from app.services import scoring_model_service
 
 _log = _logging.getLogger(__name__)
 
@@ -87,17 +89,19 @@ def _smooth_start_stop(predictions: List[int], gap_threshold: int = 10) -> List[
 
 
 class FrameResult:
-    __slots__ = ("start_stop", "predicted_z", "good_bad_score")
+    __slots__ = ("start_stop", "predicted_z", "good_bad_score", "squat_score")
 
     def __init__(
         self,
         start_stop: int,
         predicted_z: Dict[str, float],
         good_bad_score: Optional[float] = None,
+        squat_score: Optional[float] = None,
     ):
         self.start_stop = start_stop
         self.predicted_z = predicted_z
         self.good_bad_score = good_bad_score
+        self.squat_score = squat_score
 
 
 def analyze_session(
@@ -154,9 +158,11 @@ def analyze_session(
         for ss, pz in zip(smoothed, all_predicted_z)
     ]
 
-    t = perf_counter()
-    _score_exercise_segments(norm_frames or frames, smoothed, results)
-    timings["goodbad_ms"] = round((perf_counter() - t) * 1000, 1)
+    goodbad_ms, scoring_ms = _score_exercise_segments(
+        norm_frames or frames, smoothed, results, scoring_frames=frames
+    )
+    timings["goodbad_ms"] = goodbad_ms
+    timings["scoring_ms"] = scoring_ms
 
     timings["total_ms"] = round((perf_counter() - t_total) * 1000, 1)
 
@@ -167,12 +173,18 @@ def _score_exercise_segments(
     source_frames: List[List[Dict]],
     smoothed: List[int],
     results: List[FrameResult],
-) -> None:
-    """Run GoodBad_ClassifierV2 on each continuous exercise segment in-place.
+    scoring_frames: Optional[List[List[Dict]]] = None,
+) -> Tuple[float, float]:
+    """Run GoodBad_ClassifierV2 and scoring model on each exercise segment.
 
-    source_frames must be image-normalised keypoints (x, y ∈ [0,1]).
+    source_frames: keypoints for goodbad (image-normalised [0,1]).
+    scoring_frames: world-space keypoints for scoring model (hip-centred, metres).
+                    Falls back to source_frames if None.
     """
+    sc_source = scoring_frames if scoring_frames is not None else source_frames
     n = len(smoothed)
+    total_goodbad_ms = 0.0
+    total_scoring_ms = 0.0
     i = 0
     while i < n:
         if smoothed[i] == 1:
@@ -183,7 +195,11 @@ def _score_exercise_segments(
 
             seg_frames = source_frames[seg_start:seg_end]
             try:
-                score = goodbad_model_service.predict_session(seg_frames, "champion")
+                t = perf_counter()
+                goodbad_score = goodbad_model_service.predict_session(
+                    seg_frames, "champion"
+                )
+                total_goodbad_ms += (perf_counter() - t) * 1000
             except Exception as exc:
                 _log.error(
                     "GoodBad scoring failed for segment [%d:%d]: %s",
@@ -191,16 +207,36 @@ def _score_exercise_segments(
                     seg_end,
                     exc,
                 )
-                score = None
+                goodbad_score = None
+
+            try:
+                t = perf_counter()
+                squat_score = scoring_model_service.predict_session(
+                    sc_source[seg_start:seg_end], "champion"
+                )
+                total_scoring_ms += (perf_counter() - t) * 1000
+            except Exception as exc:
+                _log.error(
+                    "Scoring model failed for segment [%d:%d] (%d frames): %s",
+                    seg_start,
+                    seg_end,
+                    seg_end - seg_start,
+                    exc,
+                    exc_info=True,
+                )
+                squat_score = None
 
             _log.info(
-                "GoodBad segment [%d:%d] (%d frames): score=%.4f",
+                "Segment [%d:%d] (%d frames): good_bad=%s squat_score=%s",
                 seg_start,
                 seg_end,
                 seg_end - seg_start,
-                score,
+                goodbad_score,
+                squat_score,
             )
             for j in range(seg_start, seg_end):
-                results[j].good_bad_score = score
+                results[j].good_bad_score = goodbad_score
+                results[j].squat_score = squat_score
         else:
             i += 1
+    return round(total_goodbad_ms, 1), round(total_scoring_ms, 1)
