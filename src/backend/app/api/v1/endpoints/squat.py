@@ -3,7 +3,7 @@
 Squat analysis endpoint (v1).
 
 Accepts 3-D joint coordinates from the React frontend, runs the full
-Start/Stop → MediaPipe Z → GoodBad pipeline, and returns per-frame results.
+Start/Stop → MediaPipe Z → GoodBad → Scoring pipeline, and returns per-frame results.
 """
 
 import logging
@@ -23,7 +23,7 @@ router = APIRouter()
 
 @router.post("/squat/analyze-session", response_model=SessionAnalysisResponse)
 def squat_analyze_session(req: SessionAnalysisRequest):
-    """Full pipeline: Cut (start/stop) → MediaPipe Z → GoodBad → Results.
+    """Full pipeline: Cut (start/stop) → MediaPipe Z → GoodBad → Scoring → Results.
 
     All frames are sent at once. The backend runs Start_Stop_Predictor_ModelV2,
     smooths short gaps (< 10 frames), reuses MediaPipe z for every joint, and scores
@@ -47,10 +47,11 @@ def squat_analyze_session(req: SessionAnalysisRequest):
                 start_stop=fr.start_stop,
                 predicted_z=fr.predicted_z,
                 good_bad_score=fr.good_bad_score,
+                squat_score=fr.squat_score,
             )
             for fr in frame_results
         ]
         return SessionAnalysisResponse(results=results, timings=timings)
-    except Exception:
+    except Exception as exc:
         logger.exception("Session analysis failed")
-        raise HTTPException(status_code=503, detail="Service unavailable")
+        raise HTTPException(status_code=503, detail=str(exc))
