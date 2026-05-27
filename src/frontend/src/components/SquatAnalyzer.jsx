@@ -244,7 +244,7 @@ function project3D(x, y, z, rxDeg, ryDeg, scale, cx, cy) {
     return { px: cx + x2 * scale, py: cy + y2 * scale, depth: z2 };
 }
 
-function Skeleton3DViewer({ frames, liveFrame }) {
+function Skeleton3DViewer({ frames, liveFrameRef }) {
     const canvasRef = useRef(null);
     const [playing, setPlaying] = useState(false);
     const [frameIdx, setFrameIdx] = useState(0);
@@ -448,10 +448,23 @@ function Skeleton3DViewer({ frames, liveFrame }) {
         );
     }
 
-    // Draw whenever frameIdx, rotation, zoom, or liveFrame changes
+    // Non-live: draw whenever anything changes (frame scrub, drag, zoom).
     useEffect(() => {
-        drawFrame(liveFrame ?? frames[displayedFrameIdx], !!liveFrame);
-    }); // run on every render — canvas state is imperative
+        if (liveFrameRef) return; // live rAF loop handles drawing
+        drawFrame(frames[displayedFrameIdx], false);
+    }); // no deps — runs on every render
+
+    // Live: own rAF so detection updates never trigger React re-renders.
+    useEffect(() => {
+        if (!liveFrameRef) return;
+        let rafId;
+        function tick() {
+            drawFrame(liveFrameRef.current, true);
+            rafId = requestAnimationFrame(tick);
+        }
+        rafId = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(rafId);
+    }, [liveFrameRef]); // re-runs only when live mode toggled
 
     // Drag to rotate
 
@@ -489,7 +502,7 @@ function Skeleton3DViewer({ frames, liveFrame }) {
         );
     }
 
-    if (frames.length === 0 && !liveFrame) return null;
+    if (frames.length === 0 && !liveFrameRef) return null;
 
     return (
         <div className="ios-card rounded-2xl p-4 w-full flex flex-col items-center gap-3">
@@ -669,17 +682,10 @@ function assessVideoQuality(detection, captureCanvas) {
         rw = lms[16],
         lh = lms[23],
         rh = lms[24];
-    const lw = lms[15],
-        rw = lms[16],
-        lh = lms[23],
-        rh = lms[24];
     if (lw && rw && lh && rh) {
         const hipY = (lh.y + rh.y) / 2;
         const wristY = (lw.y + rw.y) / 2;
         if (wristY > hipY - 0.05) {
-            warnings.push(
-                "Hands are not raised: lift your arms into squat position",
-            );
             warnings.push(
                 "Hands are not raised: lift your arms into squat position",
             );
@@ -828,6 +834,8 @@ export default function SquatAnalyzer() {
         setErrorMsg("");
         setQualityError(null);
         setQualityIssues([]);
+        setPipelineTime(null);
+        setPipelineTimings(null);
     }, []);
 
     // Full reset: stop capture + discard data (used when switching modes).
@@ -840,6 +848,8 @@ export default function SquatAnalyzer() {
         setUploadedFileName("");
         setErrorMsg("");
         setQualityError(null);
+        setPipelineTime(null);
+        setPipelineTimings(null);
     }, [stopCapture]);
 
     function mapAllKeypoints(landmarks) {
@@ -899,6 +909,7 @@ export default function SquatAnalyzer() {
             const body = { frames };
             if (normFrames.length === frames.length)
                 body.norm_frames = normFrames;
+            const t0 = Date.now();
             const res = await fetch(apiUrl("/api/v1/squat/analyze-session"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -917,8 +928,6 @@ export default function SquatAnalyzer() {
                 timestamp: Date.now() + i,
                 keypoints3d: kp3d,
                 predictedZ: data.results[i]?.predicted_z ?? {},
-                classification: data.results[i]?.classification ?? null,
-                confidence: data.results[i]?.confidence ?? null,
                 startStop: data.results[i]?.start_stop ?? 1,
             }));
             sessionLogRef.current = entries;
@@ -1084,11 +1093,6 @@ export default function SquatAnalyzer() {
                     if (warnings.length > 0) setQualityIssues(warnings);
                     if (blocking.length > 0) {
                         setQualityError({ issues: blocking });
-                    } else {
-                        const kp3d = filterSquatKeypoints3d(
-                            detection.worldLandmarks?.[0] ?? [],
-                        );
-                        sendFrame(kp3d);
                     }
 
                     const kp3d = filterSquatKeypoints3d(
@@ -1184,30 +1188,23 @@ export default function SquatAnalyzer() {
 
     // Detection loop
     //
-    // Uploaded video: MediaPipe runs once per video frame (currentTime gating).
-    // Webcam: MediaPipe throttled to ~20 Hz (every 3 rAF frames).
-    // Backend + z-prediction: every 15 detections (~1–2 Hz).
-    // Overlay canvas: always redrawn at full rAF rate from latest detection.
+    // Drawing and detection are intentionally separated:
+    // - rAF loop: draws the skeleton overlay at 60 fps, never blocked by inference.
+    // - setInterval loop: runs MediaPipe inference at ~20 Hz independently.
+    //   Because detectForVideo is synchronous (~20-50 ms), putting it in the rAF
+    //   callback would block painting and cause visible lag.
 
     useEffect(() => {
         if (status !== "running") return;
 
-        // frameCounter: every rAF tick.
-        // lastDetectedVideoTime: used to gate detection to one-per-video-frame for uploads.
-        let frameCounter = 0;
         let lastDetectedVideoTime = -1;
 
-        // Webcam: throttle MediaPipe to ~20 Hz (rAF runs at ~60 Hz).
-        // Video upload: detect once per video frame via currentTime gating instead.
-        const DETECT_EVERY = 3;
-
-        function detect(timestamp) {
+        // --- rAF: draw overlay only (fast, never blocked by inference) ---
+        function draw() {
             const video = videoRef.current;
             const canvas = canvasRef.current;
-            const landmarker = landmarkerRef.current;
-
-            if (!video || !canvas || !landmarker || video.readyState < 2) {
-                rafRef.current = requestAnimationFrame(detect);
+            if (!video || !canvas) {
+                rafRef.current = requestAnimationFrame(draw);
                 return;
             }
             const vw = video.videoWidth;
@@ -1247,10 +1244,13 @@ export default function SquatAnalyzer() {
                 !video.videoHeight
             )
                 return;
-            }
-            lastTimestampRef.current = timestamp;
-            frameCounter++;
 
+            const isVideoUpload = inputMode === "upload";
+            const videoTime = video.currentTime;
+            if (isVideoUpload && videoTime === lastDetectedVideoTime) return;
+            if (isVideoUpload) lastDetectedVideoTime = videoTime;
+
+            const timestamp = performance.now();
             const vw = video.videoWidth;
             const vh = video.videoHeight;
 
@@ -1295,106 +1295,41 @@ export default function SquatAnalyzer() {
                 }
                 liveFrame3dRef.current = { classification: null, joints };
 
-                    // Collect every detected frame for batch send on stop/end.
-                    // World coords → z-prediction + classification.
-                    // Normalized image coords [0,1] → start-stop model (trained on these).
-                    recordedKpFramesRef.current.push(
-                        filterSquatKeypoints3d(det.worldLandmarks[0]),
+                recordedKpFramesRef.current.push(
+                    filterSquatKeypoints3d(det.worldLandmarks[0]),
+                );
+                if (det.landmarks?.[0]) {
+                    recordedNormFramesRef.current.push(
+                        filterSquatKeypoints3d(det.landmarks[0]),
                     );
-                    if (det.landmarks?.[0]) {
-                        recordedNormFramesRef.current.push(
-                            filterSquatKeypoints3d(det.landmarks[0]),
-                        );
-                    }
-                }
-
-                // Update 2-D keypoints panel (uses normalized landmarks, not world coords)
-                if (det?.landmarks?.length > 0) {
-                    setAllKeypoints(mapAllKeypoints(det.landmarks[0]));
-                }
-
-                // Quality assessment — skip 15-frame grace period
-                if (det?.landmarks?.length > 0) {
-                    qualityFrameCountRef.current++;
-                    if (qualityFrameCountRef.current > 15) {
-                        const { blocking, warnings } = assessVideoQuality(
-                            det,
-                            captureCanvasRef.current,
-                        );
-                        const issues = [...blocking, ...warnings];
-                        // Only blocking issues count toward the gate
-                        blocking.forEach((issue) => {
-                            qualityIssueCountsRef.current[issue] =
-                                (qualityIssueCountsRef.current[issue] || 0) + 1;
-                        });
-                        // Show all issues (blocking + advisory) in the live overlay
-                        // and explicitly clear stale warnings when none remain.
-                        if (qualityFrameCountRef.current % 8 === 0) {
-                            setQualityIssues(issues);
-                        }
-                    }
                 }
             }
 
-            // Redraw skeleton overlay at full rAF rate
-            // Always uses the freshest detection result, so the overlay never
-            // drifts behind the video even if detection ran on a previous tick.
-            const detection = lastDetectionRef.current;
-            const DISPLAY_W = 640;
-            const DISPLAY_H = 480;
-            if (canvas.width !== DISPLAY_W || canvas.height !== DISPLAY_H) {
-                canvas.width = DISPLAY_W;
-                canvas.height = DISPLAY_H;
-            }
-            const scale =
-                vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
-            const drawW = vw * scale;
-            const drawH = vh * scale;
-            const offsetX = (DISPLAY_W - drawW) / 2;
-            const offsetY = (DISPLAY_H - drawH) / 2;
-            canvas.getContext("2d").clearRect(0, 0, DISPLAY_W, DISPLAY_H);
-            if (detection)
-                drawSkeleton(canvas, drawW, drawH, detection, {
-                    x: offsetX,
-                    y: offsetY,
+            if (qualityDue && det?.landmarks?.length > 0) {
+                const { blocking, warnings } = assessVideoQuality(
+                    det,
+                    captureCanvasRef.current,
+                );
+                blocking.forEach((issue) => {
+                    qualityIssueCountsRef.current[issue] =
+                        (qualityIssueCountsRef.current[issue] || 0) + 1;
                 });
-
-            rafRef.current = requestAnimationFrame(detect);
+                setQualityIssues([...blocking, ...warnings]);
+            }
         }
 
-        rafRef.current = requestAnimationFrame(detect);
-        return () => cancelAnimationFrame(rafRef.current);
+        // 50 ms ≈ 20 Hz; if inference takes longer the interval self-throttles.
+        const detectionInterval = setInterval(runDetection, 50);
+
+        return () => {
+            cancelAnimationFrame(rafRef.current);
+            clearInterval(detectionInterval);
+        };
     }, [status, inputMode]);
 
     // Backend + session log
 
     sessionNameRef.current = sessionName;
-
-    async function sendFrame(keypoints3d) {
-        let data = null;
-        try {
-            const res = await fetch(apiUrl("/api/v1/squat/classify"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ keypoints_3d: keypoints3d }),
-            });
-            if (res.ok) data = await res.json();
-        } catch {
-            /* network errors silently ignored */
-        }
-
-        if (data) setResult(data);
-
-        const entry = {
-            timestamp: Date.now(),
-            keypoints3d,
-            predictedZ: { ...predictedZByNameRef.current },
-            classification: data?.classification ?? null,
-            confidence: data?.confidence ?? null,
-        };
-        sessionLogRef.current = [...sessionLogRef.current, entry];
-        setSessionLog(sessionLogRef.current);
-    }
 
     // Manual save to Supabase
 
@@ -1491,9 +1426,11 @@ export default function SquatAnalyzer() {
 
     // Render
 
-    const colorClass = result
-        ? (CLASSIFICATION_COLORS[result.classification] ?? "text-slate-700")
-        : "";
+    const formScore = result?.goodBadScore ?? null;
+    const formIsGood = formScore != null && formScore >= goodBadThreshold;
+    const formPct = formScore != null ? Math.round(formScore * 100) : 0;
+    const threshPct = Math.round(goodBadThreshold * 100);
+    const squatScore = result?.squatScore ?? null;
 
     const formScore = result?.goodBadScore ?? null;
     const formIsGood = formScore != null && formScore >= goodBadThreshold;
@@ -2062,7 +1999,7 @@ export default function SquatAnalyzer() {
             {/* 3-D interactive skeleton viewer */}
             <Skeleton3DViewer
                 frames={viewerFrames}
-                liveFrame={status === "running" ? liveFrame3d : null}
+                liveFrameRef={status === "running" ? liveFrame3dRef : null}
             />
         </div>
     );
