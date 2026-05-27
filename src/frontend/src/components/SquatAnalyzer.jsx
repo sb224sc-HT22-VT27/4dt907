@@ -856,6 +856,9 @@ export default function SquatAnalyzer() {
 
     // Discards accumulated session data (call explicitly for "new session").
     const clearSession = useCallback(() => {
+        stopCapture("idle");
+        recordedKpFramesRef.current = [];
+        recordedNormFramesRef.current = [];
         sessionLogRef.current = [];
         setSessionLog([]);
         setUploadedFileName("");
@@ -864,7 +867,7 @@ export default function SquatAnalyzer() {
         setQualityIssues([]);
         setPipelineTime(null);
         setPipelineTimings(null);
-    }, []);
+    }, [stopCapture]);
 
     // Full reset: stop capture + discard data (used when switching modes).
     const stopAll = useCallback(() => {
@@ -1798,7 +1801,7 @@ export default function SquatAnalyzer() {
                                     <p
                                         className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}
                                     >
-                                        {formIsGood ? "Good form" : "Bad form"}
+                                        {formIsGood ? "Squat" : "Not Squat"}
                                     </p>
                                     {squatScore != null && (
                                         <p className="text-sm text-slate-500 mt-1">
