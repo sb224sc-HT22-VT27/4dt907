@@ -1,0 +1,18 @@
+{
+  "note": "ACNN_v1",
+  "model_type": "cnn",
+  "n_filters": "8",
+  "kernel_size": "3",
+  "pool_size": "2",
+  "fc_h": "16",
+  "dropout": "0.3",
+  "lr": "0.001",
+  "batch_size": "64",
+  "epochs": "80",
+  "patience": "10",
+  "use_scaling": "True",
+  "c_frames": "10",
+  "n_features": "61",
+  "input_dim": "610",
+  "n_params": "2145"
+}

@@ -1,0 +1,21 @@
+{
+  "note": "ADense_v3_large",
+  "model_type": "dense",
+  "config": {
+    "note": "ADense_v3_large",
+    "model_type": "dense",
+    "h1": 18,
+    "h2": 9,
+    "dropout": 0.2,
+    "lr": 0.001,
+    "batch_size": 32,
+    "epochs": 120,
+    "patience": 15,
+    "use_scaling": true
+  },
+  "mean_mae": 0.4142801821231842,
+  "mean_mse": 0.30589855909347535,
+  "pearson_r": 0.6804015738469706,
+  "ckpt_path": "saved_models_a15/best_ADense_v3_large.pth",
+  "scaler_path": "saved_models_a15/scaler_ADense_v3_large.joblib"
+}
