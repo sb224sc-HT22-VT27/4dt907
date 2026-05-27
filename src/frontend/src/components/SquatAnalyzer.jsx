@@ -1432,12 +1432,6 @@ export default function SquatAnalyzer() {
     const threshPct = Math.round(goodBadThreshold * 100);
     const squatScore = result?.squatScore ?? null;
 
-    const formScore = result?.goodBadScore ?? null;
-    const formIsGood = formScore != null && formScore >= goodBadThreshold;
-    const formPct = formScore != null ? Math.round(formScore * 100) : 0;
-    const threshPct = Math.round(goodBadThreshold * 100);
-    const squatScore = result?.squatScore ?? null;
-
     return (
         <div className="flex flex-col items-center gap-5 px-6 py-8 max-w-3xl mx-auto">
             {/* Header */}
