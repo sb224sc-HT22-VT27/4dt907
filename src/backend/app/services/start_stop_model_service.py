@@ -243,7 +243,7 @@ def predict_batch(
         int((logits > 0.0).sum()),
         int((logits <= 0.0).sum()),
     )
-    return [int(l > 0.0) for l in logits]
+    return [int(logit > 0.0) for logit in logits]
 
 
 def get_mae_total_average(variant: str = "champion") -> Optional[float]:

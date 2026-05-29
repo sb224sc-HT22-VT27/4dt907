@@ -3,15 +3,13 @@
 Squat analysis service.
 
 Pipeline:
-1. Predict z from x/y using the MLflow-hosted z-predictor model.
-2. Calculate knee angles from reconstructed 3-D keypoints.
+1. Use MediaPipe-provided 3-D keypoints directly.
+2. Calculate knee angles from 3-D keypoints.
 3. Classify squat depth using rule-based thresholds.
 """
 
 import math
 from typing import Dict, Optional, Tuple
-
-from app.services.z_model_service import predict_one as predict_z
 
 
 # Geometry helpers
@@ -61,14 +59,8 @@ def _rule_based(left_angle: float, right_angle: float) -> Tuple[str, float]:
     return "Invalid", 0.70
 
 
-def _with_predicted_z(kp: Dict) -> Dict:
-    """Return keypoint with z predicted from x/y using the z-predictor model."""
-    try:
-        z_value, _uri, _run_id = predict_z([float(kp["x"]), float(kp["y"])], "champion")
-        return {**kp, "z": float(z_value)}
-    except Exception:
-        # Preserve existing z if z-predictor is unavailable.
-        return {**kp, "z": float(kp.get("z", 0.0))}
+def _with_default_z(kp: Dict) -> Dict:
+    return {**kp, "z": float(kp.get("z", 0.0))}
 
 
 def classify_squat(
@@ -100,18 +92,15 @@ def classify_squat(
     if not all(k in kp3 for k in required):
         return "Invalid", 0.0, 0.0, None
 
-    kp3["left_hip"] = _with_predicted_z(kp3["left_hip"])
-    kp3["left_knee"] = _with_predicted_z(kp3["left_knee"])
-    kp3["left_ankle"] = _with_predicted_z(kp3["left_ankle"])
-    kp3["right_hip"] = _with_predicted_z(kp3["right_hip"])
-    kp3["right_knee"] = _with_predicted_z(kp3["right_knee"])
-    kp3["right_ankle"] = _with_predicted_z(kp3["right_ankle"])
-
     left_angle = calculate_knee_angle(
-        kp3["left_hip"], kp3["left_knee"], kp3["left_ankle"]
+        _with_default_z(kp3["left_hip"]),
+        _with_default_z(kp3["left_knee"]),
+        _with_default_z(kp3["left_ankle"]),
     )
     right_angle = calculate_knee_angle(
-        kp3["right_hip"], kp3["right_knee"], kp3["right_ankle"]
+        _with_default_z(kp3["right_hip"]),
+        _with_default_z(kp3["right_knee"]),
+        _with_default_z(kp3["right_ankle"]),
     )
 
     classification, confidence = _rule_based(left_angle, right_angle)

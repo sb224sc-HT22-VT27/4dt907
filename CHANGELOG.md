@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **SquatAnalyzer drag-and-drop uploads** — users can now drop files directly in the Upload Video
+  and Upload Image tabs (in addition to choosing files via button click).
+
+### Fixed
+
+- **Session analysis timeout handling in frontend** — `SquatAnalyzer.jsx` now aborts stalled
+  `POST /api/v1/squat/analyze-session` requests after a timeout and shows an actionable error
+  instead of potentially staying in an infinite loading state.
+
 ---
 
 ## [0.13.0] – 2026-05-13
