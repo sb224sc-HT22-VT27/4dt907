@@ -20,8 +20,8 @@ Jupyter notebooks for ML experiments and assignment reporting. Each assignment h
 | $A11$ | LSTM squat activity classification | Trained bidirectional LSTM to classify squat segments (cut vs. uncut); 25 experiments on DagsHub covering optimizers, layer counts, sequence lengths, dropout, and feature scaling; 10-fold CV |
 | $A12$ | Session analysis pipeline | Integrated Start_Stop_Predictor_ModelV2 for per-frame exercise detection; end-to-end analyze-session endpoint; frontend switched from real-time streaming to record-and-send |
 | $A13$ | Good vs Bad Exercise Classifier | Trained `GoodBad_ClassifierV2` using the A12 Start/Stop model to segment sequences; augmentation (mirror, rotate, scale, noise); feature engineering with 16 inter-joint distances + 6 joint angles; fixed-length resampling to 10 frames |
-| $A14$ | - | - |
-| $A15$ | - | - |
+| $A14$ | Good vs Ugly Exercise Classifier | This was not implementedwith a model but rather with a Rule-based approach |
+| $A15$ | Squat Exercise Scoring Classifier | - |
 | $A16$ | - | - |
 
 Models are tracked in MLflow on DagsHub using a utils file, ml_utils.py.
@@ -30,7 +30,9 @@ Models are tracked in MLflow on DagsHub using a utils file, ml_utils.py.
 
 A2 (Regression Model) - Regression model to predict aimoscore
 A3 (Weaklink Model) - Model that predicts th weakest link
-A9 (Z Prediction Model) - Model that predicts z from x,y
+A9 (Z Prediction Model) - Model that predicts z from x,y (Unused to in application to clear up response times)
+A13 (Good vs Bad Classifier) - Model that classifies good vs bad exercise
+A15 (Squat Scoring Classifier) - Model that scores squat exercises
 
 ## Setup
 
