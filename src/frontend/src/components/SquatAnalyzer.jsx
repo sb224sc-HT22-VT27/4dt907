@@ -1451,8 +1451,8 @@ export default function SquatAnalyzer() {
                     Squat Analyzer
                 </h2>
                 <p className="text-slate-500 text-sm mt-1">
-                    MediaPipe detects all 33 body landmarks. Squat depth is
-                    classified by the Python backend.
+                    MediaPipe detects body landmarks. Classifies if squat and
+                    gives a score based on these landmarks.
                 </p>
             </div>
 
@@ -1743,12 +1743,12 @@ export default function SquatAnalyzer() {
                             <div className="flex items-center justify-between mb-4">
                                 <div>
                                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
-                                        Form Quality
+                                        Exercise Quality
                                     </p>
                                     <p
                                         className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}
                                     >
-                                        {formIsGood ? "Good form" : "Bad form"}
+                                        {formIsGood ? "A squat" : "Not a squat"}
                                     </p>
                                     {squatScore != null && (
                                         <p className="text-sm text-slate-500 mt-1">
@@ -1783,7 +1783,7 @@ export default function SquatAnalyzer() {
                             <div className="mb-5">
                                 <div className="flex justify-between text-xs mb-2">
                                     <span className="text-slate-400">
-                                        Score
+                                        Probability of squat
                                     </span>
                                     <span className="font-bold text-slate-600 tabular-nums">
                                         {formPct}%
@@ -1902,12 +1902,6 @@ export default function SquatAnalyzer() {
                             label: "Start/Stop model",
                             sub: "exercise detection",
                             value: pipelineTimings.start_stop_ms ?? 0,
-                        },
-                        {
-                            key: "z_prediction_ms",
-                            label: "MediaPipe Z mapping",
-                            sub: "depth reuse",
-                            value: pipelineTimings.z_prediction_ms ?? 0,
                         },
                         {
                             key: "goodbad_ms",
