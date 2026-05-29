@@ -735,6 +735,8 @@ export default function SquatAnalyzer() {
     const recordedNormFramesRef = useRef([]);
     // Offscreen canvas used to feed orientation-corrected frames to MediaPipe
     const captureCanvasRef = useRef(null);
+    // AbortController for in-flight analyze-session fetch — aborted when a new session starts
+    const analysisAbortRef = useRef(null);
 
     const [inputMode, setInputMode] = useState("webcam");
     const [sessionName, setSessionName] = useState("");
@@ -826,20 +828,11 @@ export default function SquatAnalyzer() {
         setStatus(nextStatus);
     }, []);
 
-    // Discards accumulated session data (call explicitly for "new session").
-    const clearSession = useCallback(() => {
-        sessionLogRef.current = [];
-        setSessionLog([]);
-        setUploadedFileName("");
-        setErrorMsg("");
-        setQualityError(null);
-        setQualityIssues([]);
-        setPipelineTime(null);
-        setPipelineTimings(null);
-    }, []);
-
     // Full reset: stop capture + discard data (used when switching modes).
     const stopAll = useCallback(() => {
+        // Cancel any in-flight backend fetch so it can't overwrite the next session's result.
+        analysisAbortRef.current?.abort();
+        analysisAbortRef.current = null;
         stopCapture("idle");
         recordedKpFramesRef.current = [];
         recordedNormFramesRef.current = [];
@@ -851,6 +844,11 @@ export default function SquatAnalyzer() {
         setPipelineTime(null);
         setPipelineTimings(null);
     }, [stopCapture]);
+
+    // Discards accumulated session data (call explicitly for "new session").
+    const clearSession = useCallback(() => {
+        stopAll();
+    }, [stopAll]);
 
     function mapAllKeypoints(landmarks) {
         return landmarks.map((lm, i) => ({
@@ -905,6 +903,10 @@ export default function SquatAnalyzer() {
                 return;
             }
         }
+        // Register a fresh AbortController so stopAll() can cancel this fetch if the
+        // user starts a new session before this response arrives.
+        const abort = new AbortController();
+        analysisAbortRef.current = abort;
         try {
             const body = { frames };
             if (normFrames.length === frames.length)
@@ -914,6 +916,7 @@ export default function SquatAnalyzer() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
+                signal: abort.signal,
             });
             if (!res.ok) throw new Error("Session analysis failed");
             const data = await res.json();
@@ -944,7 +947,9 @@ export default function SquatAnalyzer() {
                 });
             }
             setStatus("finished");
-        } catch {
+        } catch (err) {
+            // AbortError means a new session started — don't touch UI state.
+            if (err?.name === "AbortError") return;
             setErrorMsg("Failed to analyze recording. Try again.");
             setStatus("error");
         }
@@ -1005,9 +1010,15 @@ export default function SquatAnalyzer() {
             setUploadedFileName(file.name);
             setStatus("loading");
             try {
-                if (!landmarkerRef.current) {
-                    landmarkerRef.current = await createVideoLandmarker();
+                // Always recreate the landmarker so MediaPipe's temporal filter
+                // (which smooths landmarks across frames) starts clean for each video.
+                // Without this, pose keypoints for the first ~5 frames of a new video
+                // are blended with the previous video's final pose, skewing the score.
+                if (landmarkerRef.current) {
+                    landmarkerRef.current.close();
+                    landmarkerRef.current = null;
                 }
+                landmarkerRef.current = await createVideoLandmarker();
                 revokeBlobUrl();
                 const blobUrl = URL.createObjectURL(file);
                 videoBlobUrlRef.current = blobUrl;
