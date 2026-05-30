@@ -1943,8 +1943,12 @@ export default function SquatAnalyzer() {
 
             {/* Pipeline timing breakdown */}
             {pipelineTimings != null && (
-                <label className="mb-3 inline-flex items-center gap-2 text-sm text-slate-600 select-none">
+                <label
+                    htmlFor="show-pipeline-timing"
+                    className="mb-3 inline-flex items-center gap-2 text-sm text-slate-600 select-none"
+                >
                     <input
+                        id="show-pipeline-timing"
                         type="checkbox"
                         checked={showPipelineTimings}
                         onChange={(e) => setShowPipelineTimings(e.target.checked)}
