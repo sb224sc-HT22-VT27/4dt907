@@ -86,7 +86,6 @@ def test_init_mlflow_sets_uri(monkeypatch):
     assert uri == "http://mlflow:5050"
 
 
-
 """_is_models_alias_uri tests"""
 
 

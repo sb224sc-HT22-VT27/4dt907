@@ -64,43 +64,21 @@ const ALL_LANDMARK_NAMES = [
     "right_foot_index", // 32
 ];
 
-// Canonical joint order used by the GRU z-predictor model.
-// MUST match the alphabetically-sorted column order produced by the training
-// notebook: sorted([c for c in cols if c.endswith('_x') or c.endswith('_y')])
-// and sorted([c for c in cols if c.endswith('_z')]).
-// Features per frame: [j0_x, j0_y, j1_x, j1_y, … ] → 13 × 2 = 26 floats.
-// z output: [j0_z, j1_z, … ] → 13 floats (same alphabetical order).
-const MODEL_JOINT_ORDER = [
-    { name: "left_ankle",     idx: 27 },
-    { name: "left_elbow",     idx: 13 },
-    { name: "left_hip",       idx: 23 },
-    { name: "left_knee",      idx: 25 },
-    { name: "left_shoulder",  idx: 11 },
-    { name: "left_wrist",     idx: 15 },
-    { name: "nose",           idx: 0  },
-    { name: "right_ankle",    idx: 28 },
-    { name: "right_elbow",    idx: 14 },
-    { name: "right_hip",      idx: 24 },
-    { name: "right_knee",     idx: 26 },
-    { name: "right_shoulder", idx: 12 },
-    { name: "right_wrist",    idx: 16 },
-];
-
 // Display/viewer joint order (used only for 3-D skeleton rendering).
 const SQUAT_JOINT_ORDER = [
-    { name: "nose",           idx: 0  },
-    { name: "left_shoulder",  idx: 11 },
-    { name: "left_elbow",     idx: 13 },
+    { name: "nose", idx: 0 },
+    { name: "left_shoulder", idx: 11 },
+    { name: "left_elbow", idx: 13 },
     { name: "right_shoulder", idx: 12 },
-    { name: "right_elbow",    idx: 14 },
-    { name: "left_wrist",     idx: 15 },
-    { name: "right_wrist",    idx: 16 },
-    { name: "left_hip",       idx: 23 },
-    { name: "right_hip",      idx: 24 },
-    { name: "left_knee",      idx: 25 },
-    { name: "right_knee",     idx: 26 },
-    { name: "left_ankle",     idx: 27 },
-    { name: "right_ankle",    idx: 28 },
+    { name: "right_elbow", idx: 14 },
+    { name: "left_wrist", idx: 15 },
+    { name: "right_wrist", idx: 16 },
+    { name: "left_hip", idx: 23 },
+    { name: "right_hip", idx: 24 },
+    { name: "left_knee", idx: 25 },
+    { name: "right_knee", idx: 26 },
+    { name: "left_ankle", idx: 27 },
+    { name: "right_ankle", idx: 28 },
 ];
 // Full body skeleton connections (MediaPipe BlazePose topology).
 const POSE_CONNECTIONS = [
@@ -157,34 +135,14 @@ const SQUAT_CONNECTIONS_BY_NAME = POSE_CONNECTIONS.filter(
     .map(([a, b]) => [_IDX_TO_SQUAT_NAME[a], _IDX_TO_SQUAT_NAME[b]])
     .filter(([a, b]) => a && b);
 
-const CLASSIFICATION_COLORS = {
-    Deep: "text-green-600",
-    Shallow: "text-amber-600",
-    Invalid: "text-red-600",
-};
-
 const MODEL_URL =
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 const WASM_URL =
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm";
 const ESM_URL =
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
-
-// Number of frames the GRU model expects as a sequence window.
-const SEQ_LEN = 30;
-
-/**
- * Build a 26-float feature vector for one frame from MediaPipe world landmarks.
- * Columns: [j0_x, j0_y, j1_x, j1_y, …] in MODEL_JOINT_ORDER (alphabetical),
- * matching the sorted() column order used during training.
- */
-function buildFrameFeatures(worldLandmarks) {
-    return MODEL_JOINT_ORDER.flatMap(({ idx }) => {
-        const lm = worldLandmarks?.[idx];
-        return lm ? [lm.x, lm.y] : [0, 0];
-    });
-}
-
+const MAX_SQUAT_SCORE = 4;
+const ANALYZE_SESSION_TIMEOUT_MS = 90_000;
 
 /**
  * Create a new PoseLandmarker for continuous video/webcam detection.
@@ -266,7 +224,7 @@ function drawSkeleton(canvas, w, h, detection, off = { x: 0, y: 0 }) {
     }
 }
 
-// ── 3-D Skeleton Viewer ──────────────────────────────────────────────────────
+// 3-D Skeleton Viewer
 
 /**
  * Rotate a 3-D point by yaw (ry, around Y) then pitch (rx, around X).
@@ -287,7 +245,7 @@ function project3D(x, y, z, rxDeg, ryDeg, scale, cx, cy) {
     return { px: cx + x2 * scale, py: cy + y2 * scale, depth: z2 };
 }
 
-function Skeleton3DViewer({ frames, liveFrame }) {
+function Skeleton3DViewer({ frames, liveFrameRef }) {
     const canvasRef = useRef(null);
     const [playing, setPlaying] = useState(false);
     const [frameIdx, setFrameIdx] = useState(0);
@@ -355,25 +313,50 @@ function Skeleton3DViewer({ frames, liveFrame }) {
         // Lock rotation pivot at ankle midpoint so the model spins around the feet
         const la = frameData.joints?.["left_ankle"];
         const ra = frameData.joints?.["right_ankle"];
-        const anchor = la && ra
-            ? { x: (la.x + ra.x) / 2, y: (la.y + ra.y) / 2, z: (la.z + ra.z) / 2 }
-            : la ?? ra ?? { x: 0, y: 0, z: 0 };
+        const anchor =
+            la && ra
+                ? {
+                      x: (la.x + ra.x) / 2,
+                      y: (la.y + ra.y) / 2,
+                      z: (la.z + ra.z) / 2,
+                  }
+                : (la ?? ra ?? { x: 0, y: 0, z: 0 });
 
         // Project all joints
         const pos = {};
         for (const { name } of SQUAT_JOINT_ORDER) {
             const j = frameData.joints?.[name];
             if (!j) continue;
-            pos[name] = project3D(j.x - anchor.x, j.y - anchor.y, j.z - anchor.z, rx, ry, scale, cx, cy);
+            pos[name] = project3D(
+                j.x - anchor.x,
+                j.y - anchor.y,
+                j.z - anchor.z,
+                rx,
+                ry,
+                scale,
+                cx,
+                cy,
+            );
         }
 
-        // ── Ground plane (projected circle at y=0 in foot-anchored space) ────
+        // Ground plane (projected circle at y=0 in foot-anchored space)
         const GR = 0.5; // radius in world units
         const SEGS = 72;
         const rim = [];
         for (let i = 0; i <= SEGS; i++) {
             const t = (i / SEGS) * Math.PI * 2;
-            rim.push(project3D(GR * Math.cos(t), 0, GR * Math.sin(t), rx, ry, scale, cx, cy));
+            rim.push(
+                project3D(
+                    GR * Math.cos(t),
+                    0,
+                    GR * Math.sin(t),
+                    rx,
+                    ry,
+                    scale,
+                    cx,
+                    cy,
+                ),
+            );
         }
         // Filled disc
         ctx.beginPath();
@@ -393,11 +376,17 @@ function Skeleton3DViewer({ frames, liveFrame }) {
             const s = (i / 3) * GR;
             const clamp = Math.sqrt(Math.max(0, GR * GR - s * s));
             const xa = project3D(-clamp, 0, s, rx, ry, scale, cx, cy);
-            const xb = project3D( clamp, 0, s, rx, ry, scale, cx, cy);
-            ctx.beginPath(); ctx.moveTo(xa.px, xa.py); ctx.lineTo(xb.px, xb.py); ctx.stroke();
+            const xb = project3D(clamp, 0, s, rx, ry, scale, cx, cy);
+            ctx.beginPath();
+            ctx.moveTo(xa.px, xa.py);
+            ctx.lineTo(xb.px, xb.py);
+            ctx.stroke();
             const za = project3D(s, 0, -clamp, rx, ry, scale, cx, cy);
-            const zb = project3D(s, 0,  clamp, rx, ry, scale, cx, cy);
-            ctx.beginPath(); ctx.moveTo(za.px, za.py); ctx.lineTo(zb.px, zb.py); ctx.stroke();
+            const zb = project3D(s, 0, clamp, rx, ry, scale, cx, cy);
+            ctx.beginPath();
+            ctx.moveTo(za.px, za.py);
+            ctx.lineTo(zb.px, zb.py);
+            ctx.stroke();
         }
 
         // Draw bones
@@ -446,11 +435,7 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                         ? "#64748b"
                         : "#dc2626";
             ctx.textAlign = "center";
-            ctx.fillText(
-                cls === "NotExercise" ? "— not exercise —" : cls,
-                cx,
-                18,
-            );
+            ctx.fillText(cls === "NotExercise" ? "not exercise" : cls, cx, 18);
         }
 
         // Frame counter / live indicator
@@ -464,12 +449,25 @@ function Skeleton3DViewer({ frames, liveFrame }) {
         );
     }
 
-    // Draw whenever frameIdx, rotation, zoom, or liveFrame changes
+    // Non-live: draw whenever anything changes (frame scrub, drag, zoom).
     useEffect(() => {
-        drawFrame(liveFrame ?? frames[displayedFrameIdx], !!liveFrame);
-    }); // run on every render — canvas state is imperative
+        if (liveFrameRef) return; // live rAF loop handles drawing
+        drawFrame(frames[displayedFrameIdx], false);
+    }); // no deps — runs on every render
 
-    // ── Drag to rotate ───────────────────────────────────────────────────────
+    // Live: own rAF so detection updates never trigger React re-renders.
+    useEffect(() => {
+        if (!liveFrameRef) return;
+        let rafId;
+        function tick() {
+            drawFrame(liveFrameRef.current, true);
+            rafId = requestAnimationFrame(tick);
+        }
+        rafId = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(rafId);
+    }, [liveFrameRef]); // re-runs only when live mode toggled
+
+    // Drag to rotate
 
     function onPointerDown(e) {
         dragRef.current = { x: e.clientX, y: e.clientY };
@@ -483,7 +481,10 @@ function Skeleton3DViewer({ frames, liveFrame }) {
         rotation.current.y += dx * 0.4;
         rotation.current.x += dy * 0.4;
         dragRef.current = { x: e.clientX, y: e.clientY };
-        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+        drawFrame(
+            liveFrameRef?.current ?? frames[frameIdxRef.current],
+            !!liveFrameRef?.current,
+        );
     }
 
     function onPointerUp() {
@@ -496,17 +497,20 @@ function Skeleton3DViewer({ frames, liveFrame }) {
             80,
             Math.min(600, zoomRef.current - e.deltaY * 0.3),
         );
-        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+        drawFrame(
+            liveFrameRef?.current ?? frames[frameIdxRef.current],
+            !!liveFrameRef?.current,
+        );
     }
 
-    if (frames.length === 0 && !liveFrame) return null;
+    if (frames.length === 0 && !liveFrameRef) return null;
 
     return (
         <div className="ios-card rounded-2xl p-4 w-full flex flex-col items-center gap-3">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider self-start">
                 3-D Skeleton Replay
                 <span className="ml-2 normal-case font-normal text-slate-300">
-                    — drag to rotate · scroll or ±  to zoom
+                    drag to rotate · scroll or ± to zoom
                 </span>
             </p>
 
@@ -582,7 +586,11 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                 <button
                     onClick={() => {
                         zoomRef.current = Math.min(600, zoomRef.current + 30);
-                        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+                        drawFrame(
+                            liveFrameRef?.current ??
+                                frames[frameIdxRef.current],
+                            !!liveFrameRef?.current,
+                        );
                     }}
                     className="ios-btn w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-slate-600"
                     title="Zoom in"
@@ -592,7 +600,11 @@ function Skeleton3DViewer({ frames, liveFrame }) {
                 <button
                     onClick={() => {
                         zoomRef.current = Math.max(80, zoomRef.current - 30);
-                        drawFrame(liveFrame ?? frames[frameIdxRef.current], !!liveFrame);
+                        drawFrame(
+                            liveFrameRef?.current ??
+                                frames[frameIdxRef.current],
+                            !!liveFrameRef?.current,
+                        );
                     }}
                     className="ios-btn w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold text-slate-600"
                     title="Zoom out"
@@ -609,7 +621,103 @@ function Skeleton3DViewer({ frames, liveFrame }) {
     );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+/**
+ * Assess per-frame video quality for squat analysis.
+ * Returns { blocking, warnings } where:
+ *   blocking — issues that prevent reliable analysis (pipeline should be gated)
+ *   warnings — advisory hints shown live but never block the pipeline
+ */
+function assessVideoQuality(detection, captureCanvas) {
+    if (!detection?.landmarks?.length) {
+        return { blocking: ["No person detected in frame"], warnings: [] };
+    }
+
+    const lms = detection.landmarks[0];
+    const blocking = [];
+    const warnings = [];
+    const CORE = [11, 12, 23, 24, 25, 26, 27, 28];
+    const vis = (i) => lms[i]?.visibility ?? 0;
+
+    // BLOCKING: frame brightness
+    if (captureCanvas?.width > 0 && captureCanvas?.height > 0) {
+        try {
+            const ctx = captureCanvas.getContext("2d");
+            const { width: w, height: h } = captureCanvas;
+            const { data } = ctx.getImageData(
+                Math.floor(w * 0.25),
+                Math.floor(h * 0.15),
+                Math.floor(w * 0.5),
+                Math.floor(h * 0.7),
+            );
+            let lum = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                lum +=
+                    0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            }
+            const avg = lum / (data.length / 4);
+            // TODO: Improve values for better preformance
+            if (avg < 28)
+                blocking.push("Frame too dark: improve room lighting");
+            else if (avg > 238)
+                blocking.push(
+                    "Frame overexposed: reduce direct lighting behind the subject",
+                );
+        } catch {
+            /* cross-origin / security errors ignored */
+        }
+    }
+
+    // WARNINGS: advisory hints — never stop the pipeline
+
+    // Upside down
+    const nose = lms[0],
+        la = lms[27],
+        ra = lms[28];
+    if (nose && la && ra && nose.y > (la.y + ra.y) / 2 + 0.1) {
+        warnings.push("Video appears upside down: rotate the camera 180°");
+    }
+
+    // Hands at or below hip level — warn when arms hang at sides instead of
+    // being raised (normal squat starting position).
+    const lw = lms[15],
+        rw = lms[16],
+        lh = lms[23],
+        rh = lms[24];
+    if (lw && rw && lh && rh) {
+        const hipY = (lh.y + rh.y) / 2;
+        const wristY = (lw.y + rw.y) / 2;
+        if (wristY > hipY - 0.05) {
+            warnings.push(
+                "Hands are not raised: lift your arms into squat position",
+            );
+        }
+    }
+
+    // Key joints clipped at frame edges
+    const coreLms = CORE.map((i) => lms[i]).filter(Boolean);
+    if (
+        coreLms.filter(
+            (lm) => lm.x < 0.04 || lm.x > 0.96 || lm.y < 0.04 || lm.y > 0.96,
+        ).length >= 2
+    ) {
+        warnings.push(
+            "Person is partially out of frame: move camera back or reposition",
+        );
+    }
+
+    // Knees hidden while shoulders clearly visible (facing camera head-on)
+    if (vis(25) < 0.35 && vis(26) < 0.35 && vis(11) > 0.6 && vis(12) > 0.6) {
+        if (Math.abs((lms[12]?.x ?? 0) - (lms[11]?.x ?? 0)) > 0.15) {
+            warnings.push(
+                "Knees not visible: try a side-on camera angle for better depth measurement",
+            );
+        }
+    }
+
+    return { blocking, warnings };
+}
+
+// Main component
 
 export default function SquatAnalyzer() {
     const videoRef = useRef(null);
@@ -622,33 +730,65 @@ export default function SquatAnalyzer() {
     const videoBlobUrlRef = useRef(null);
     const lastDetectionRef = useRef(null);
     const sessionLogRef = useRef([]);
-    // Ring buffer: array of 26-float feature vectors, oldest → newest
-    const frameBufferRef = useRef([]);
-    // All kp3d frames collected during a webcam recording session (world coords for z-pred/classify)
+    // All kp3d frames collected during a webcam recording session
     const recordedKpFramesRef = useRef([]);
     // Normalized image-space landmarks [0,1] collected in parallel — fed to start-stop model
     const recordedNormFramesRef = useRef([]);
     // Offscreen canvas used to feed orientation-corrected frames to MediaPipe
     const captureCanvasRef = useRef(null);
+    // AbortController for in-flight analyze-session fetch — aborted when a new session starts
+    const analysisAbortRef = useRef(null);
 
     const [inputMode, setInputMode] = useState("webcam");
     const [sessionName, setSessionName] = useState("");
     const [status, setStatus] = useState("idle");
     const [result, setResult] = useState(null);
+    const [goodBadThreshold, setGoodBadThreshold] = useState(0.5);
+    const [PIPELINE_TIME, setPipelineTime] = useState(null); // * Updated base name for lint
+    const [pipelineTimings, setPipelineTimings] = useState(null);
     const [errorMsg, setErrorMsg] = useState("");
     const [uploadedFileName, setUploadedFileName] = useState("");
     const [videoPaused, setVideoPaused] = useState(false);
-    const [allKeypoints, setAllKeypoints] = useState([]);
+    const [ALL_KEYPOINTS, setAllKeypoints] = useState([]); // * Updated base name for lint
     const [sessionLog, setSessionLog] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
-    const [predictedZByName, setPredictedZByName] = useState({});
-    const [liveFrame3d, setLiveFrame3d] = useState(null);
+    const liveFrame3dRef = useRef(null);
     const [startStopMetrics, setStartStopMetrics] = useState(null);
+    const [qualityIssues, setQualityIssues] = useState([]);
+    const [qualityError, setQualityError] = useState(null);
+
+    const analyzeSession = useCallback(async (body) => {
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(
+            () => ctrl.abort(),
+            ANALYZE_SESSION_TIMEOUT_MS,
+        );
+        try {
+            const res = await fetch(apiUrl("/api/v1/squat/analyze-session"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+                signal: ctrl.signal,
+            });
+            if (!res.ok) throw new Error("Session analysis failed.");
+            return await res.json();
+        } catch (err) {
+            if (err?.name === "AbortError") {
+                throw new Error(
+                    "Analysis timed out. Please retry, shorten the clip, or check backend availability.",
+                );
+            }
+            throw err;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }, []);
 
     const sessionNameRef = useRef("");
-    const predictedZByNameRef = useRef({});
+    const qualityIssueCountsRef = useRef({});
+    const qualityFrameCountRef = useRef(0);
 
-    // ── Fetch model metrics on mount ─────────────────────────────────────────
+    // Fetch model metrics on mount
     useEffect(() => {
         fetch(apiUrl("/api/v1/model-info/start-stop"))
             .then((r) => (r.ok ? r.json() : null))
@@ -656,7 +796,7 @@ export default function SquatAnalyzer() {
             .catch(() => {});
     }, []);
 
-    // ── Preload VIDEO landmarker on mount ────────────────────────────────────
+    // Preload VIDEO landmarker on mount
     useEffect(() => {
         let cancelled = false;
         createVideoLandmarker()
@@ -676,8 +816,7 @@ export default function SquatAnalyzer() {
         };
     }, []);
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
+    // Helpers
     function revokeBlobUrl() {
         if (videoBlobUrlRef.current) {
             URL.revokeObjectURL(videoBlobUrlRef.current);
@@ -701,7 +840,6 @@ export default function SquatAnalyzer() {
         revokeBlobUrl();
         lastTimestampRef.current = -1;
         lastDetectionRef.current = null;
-        frameBufferRef.current = [];
         const canvas = canvasRef.current;
         if (canvas) {
             canvas
@@ -711,22 +849,18 @@ export default function SquatAnalyzer() {
         setAllKeypoints([]);
         setResult(null);
         setVideoPaused(false);
-        setPredictedZByName({});
-        predictedZByNameRef.current = {};
-        setLiveFrame3d(null);
+        liveFrame3dRef.current = null;
+        qualityIssueCountsRef.current = {};
+        qualityFrameCountRef.current = 0;
+        setQualityIssues([]);
         setStatus(nextStatus);
-    }, []);
-
-    // Discards accumulated session data (call explicitly for "new session").
-    const clearSession = useCallback(() => {
-        sessionLogRef.current = [];
-        setSessionLog([]);
-        setUploadedFileName("");
-        setErrorMsg("");
     }, []);
 
     // Full reset: stop capture + discard data (used when switching modes).
     const stopAll = useCallback(() => {
+        // Cancel any in-flight backend fetch so it can't overwrite the next session's result.
+        analysisAbortRef.current?.abort();
+        analysisAbortRef.current = null;
         stopCapture("idle");
         recordedKpFramesRef.current = [];
         recordedNormFramesRef.current = [];
@@ -734,7 +868,15 @@ export default function SquatAnalyzer() {
         setSessionLog([]);
         setUploadedFileName("");
         setErrorMsg("");
+        setQualityError(null);
+        setPipelineTime(null);
+        setPipelineTimings(null);
     }, [stopCapture]);
+
+    // Discards accumulated session data (call explicitly for "new session").
+    const clearSession = useCallback(() => {
+        stopAll();
+    }, [stopAll]);
 
     function mapAllKeypoints(landmarks) {
         return landmarks.map((lm, i) => ({
@@ -742,10 +884,7 @@ export default function SquatAnalyzer() {
             name: ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`,
             x: lm.x,
             y: lm.y,
-            predictedZ:
-                predictedZByNameRef.current[
-                    ALL_LANDMARK_NAMES[i] ?? `landmark_${i}`
-                ] ?? null,
+            predictedZ: lm.z ?? null,
         }));
     }
 
@@ -766,60 +905,80 @@ export default function SquatAnalyzer() {
         [stopAll],
     );
 
-    // ── Batch analyze (webcam stop or video end) ─────────────────────────────
+    // Batch analyze (webcam stop or video end)
     // Sends all frames at once to the full pipeline: Cut → Z-pred → Classify.
 
     const stopAndAnalyze = useCallback(async () => {
         const frames = recordedKpFramesRef.current;
         const normFrames = recordedNormFramesRef.current;
+        // Snapshot quality data before stopCapture resets it
+        const totalQFrames = qualityFrameCountRef.current;
+        const issueCounts = { ...qualityIssueCountsRef.current };
         stopCapture("analyzing");
         if (frames.length === 0) {
             setStatus("idle");
             return;
         }
+        // Quality gate: abort if any issue persisted in more than 50% of frames
+        if (totalQFrames > 10) {
+            const persistentIssues = Object.entries(issueCounts)
+                .filter(([, n]) => n / totalQFrames > 0.65)
+                .sort(([, a], [, b]) => b - a)
+                .map(([issue]) => issue);
+            if (persistentIssues.length > 0) {
+                setQualityError({ issues: persistentIssues });
+                setStatus("idle");
+                return;
+            }
+        }
+        // Register a fresh AbortController so stopAll() can cancel this fetch if the
+        // user starts a new session before this response arrives.
+        const abort = new AbortController();
+        analysisAbortRef.current = abort;
         try {
             const body = { frames };
-            if (normFrames.length === frames.length) body.norm_frames = normFrames;
-            const res = await fetch(apiUrl("/api/v1/squat/analyze-session"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-            });
-            if (!res.ok) throw new Error("Session analysis failed");
-            const data = await res.json();
-            const ones = data.results.filter(r => r.start_stop === 1).length;
-            const zeros = data.results.filter(r => r.start_stop === 0).length;
-            console.log(`[analyze-session] ${data.results.length} frames → ${ones} exercise (1), ${zeros} non-exercise (0)`);
+            if (normFrames.length === frames.length)
+                body.norm_frames = normFrames;
+            const t0 = Date.now();
+            const data = await analyzeSession(body);
+            const elapsed = Date.now() - t0;
+            setPipelineTime(elapsed);
+            setPipelineTimings(
+                data.timings
+                    ? { ...data.timings, round_trip_ms: elapsed }
+                    : null,
+            );
             const entries = frames.map((kp3d, i) => ({
                 timestamp: Date.now() + i,
                 keypoints3d: kp3d,
                 predictedZ: data.results[i]?.predicted_z ?? {},
-                classification: data.results[i]?.classification ?? null,
-                confidence: data.results[i]?.confidence ?? null,
                 startStop: data.results[i]?.start_stop ?? 1,
             }));
             sessionLogRef.current = entries;
             setSessionLog(entries);
-            const valid = data.results.filter(
-                (r) => r.start_stop === 1 && r.classification !== "Invalid" && r.classification !== "NotExercise"
+            const firstWithScore = data.results.find(
+                (r) =>
+                    r.start_stop === 1 &&
+                    (r.good_bad_score != null || r.squat_score != null),
             );
-            if (valid.length > 0) {
-                const last = valid[valid.length - 1];
+            if (firstWithScore) {
                 setResult({
-                    classification: last.classification,
-                    left_knee_angle: last.left_knee_angle,
-                    right_knee_angle: last.right_knee_angle,
-                    confidence: last.confidence,
+                    goodBadScore: firstWithScore.good_bad_score,
+                    squatScore: firstWithScore.squat_score,
                 });
             }
             setStatus("finished");
-        } catch {
-            setErrorMsg("Failed to analyze recording. Try again.");
+        } catch (err) {
+            // AbortError means a new session started — don't touch UI state.
+            if (err?.name === "AbortError") return;
+            setErrorMsg(
+                err?.message || "Failed to analyze recording. Try again.",
+            );
             setStatus("error");
         }
-    }, [stopCapture]);
+    }, [analyzeSession, stopCapture]);
 
-    // ── Video-ended auto-finish ──────────────────────────────────────────────
+    // Video-ended auto-finish
 
     useEffect(() => {
         if (status !== "running" || inputMode !== "upload") return;
@@ -830,7 +989,7 @@ export default function SquatAnalyzer() {
         return () => video.removeEventListener("ended", handleEnded);
     }, [status, inputMode, stopAndAnalyze]);
 
-    // ── Webcam ───────────────────────────────────────────────────────────────
+    // Webcam
 
     const startCamera = useCallback(async () => {
         recordedKpFramesRef.current = [];
@@ -840,12 +999,13 @@ export default function SquatAnalyzer() {
         setResult(null);
         setStatus("loading");
         setErrorMsg("");
+        setQualityError(null);
         try {
             if (!landmarkerRef.current) {
                 landmarkerRef.current = await createVideoLandmarker();
             }
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 640, height: 480 },
+                video: { width: 640, height: 480, frameRate: { ideal: 60 } },
             });
             videoRef.current.srcObject = stream;
             await videoRef.current.play();
@@ -856,12 +1016,10 @@ export default function SquatAnalyzer() {
         }
     }, []);
 
-    // ── Video upload ─────────────────────────────────────────────────────────
+    // Video upload
 
-    const handleVideoChange = useCallback(
-        async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
+    const handleVideoFile = useCallback(
+        async (file) => {
             if (!file.type.startsWith("video/")) {
                 setErrorMsg("Please select a video file.");
                 setStatus("error");
@@ -896,11 +1054,28 @@ export default function SquatAnalyzer() {
         [stopAll],
     );
 
-    // ── Image upload ─────────────────────────────────────────────────────────
-
-    const handleImageChange = useCallback(
+    const handleVideoChange = useCallback(
         async (e) => {
             const file = e.target.files?.[0];
+            if (!file) return;
+            await handleVideoFile(file);
+        },
+        [handleVideoFile],
+    );
+    const handleVideoDrop = useCallback(
+        async (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer?.files?.[0];
+            if (!file || status === "loading" || status === "analyzing") return;
+            await handleVideoFile(file);
+        },
+        [handleVideoFile, status],
+    );
+
+    // Image upload
+
+    const handleImageFile = useCallback(
+        async (file) => {
             if (!file) return;
             if (!file.type.startsWith("image/")) {
                 setErrorMsg("Please select an image file.");
@@ -945,30 +1120,109 @@ export default function SquatAnalyzer() {
                 ctx.fillRect(0, 0, DISPLAY_W, DISPLAY_H);
                 ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
 
-                const detection = imageLandmarker.detect(img);
+                const detection = imageLandmarker.detect(canvas);
 
                 if (detection.landmarks?.length > 0) {
-                    drawSkeleton(canvas, drawW, drawH, detection, {
-                        x: offsetX,
-                        y: offsetY,
+                    // Quality check — canvas has raw image pixels before skeleton draw
+                    const { blocking, warnings } = assessVideoQuality(
+                        detection,
+                        canvas,
+                    );
+                    drawSkeleton(canvas, DISPLAY_W, DISPLAY_H, detection, {
+                        x: 0,
+                        y: 0,
                     });
                     setAllKeypoints(mapAllKeypoints(detection.landmarks[0]));
+                    if (warnings.length > 0) setQualityIssues(warnings);
+                    if (blocking.length > 0) {
+                        setQualityError({ issues: blocking });
+                    }
+
                     const kp3d = filterSquatKeypoints3d(
                         detection.worldLandmarks?.[0] ?? [],
                     );
-                    sendFrame(kp3d);
+                    const normKp = filterSquatKeypoints3d(
+                        detection.landmarks?.[0] ?? [],
+                    );
+                    if (kp3d.length > 0) {
+                        const body = { frames: [kp3d] };
+                        if (normKp.length === kp3d.length) {
+                            body.norm_frames = [normKp];
+                        }
+
+                        const t0 = Date.now();
+                        const data = await analyzeSession(body);
+                        const elapsed = Date.now() - t0;
+                        setPipelineTime(elapsed);
+                        setPipelineTimings(
+                            data.timings
+                                ? { ...data.timings, round_trip_ms: elapsed }
+                                : null,
+                        );
+
+                        const firstResult =
+                            data.results?.find(
+                                (r) =>
+                                    r.good_bad_score != null ||
+                                    r.squat_score != null,
+                            ) ??
+                            data.results?.[0] ??
+                            {};
+                        const entry = {
+                            timestamp: Date.now(),
+                            keypoints3d: kp3d,
+                            predictedZ: firstResult.predicted_z ?? {},
+                            startStop: firstResult.start_stop ?? 1,
+                            classification: null,
+                            confidence: null,
+                        };
+                        sessionLogRef.current = [entry];
+                        setSessionLog([entry]);
+
+                        if (
+                            (firstResult.good_bad_score !== null &&
+                                firstResult.good_bad_score !== undefined) ||
+                            (firstResult.squat_score !== null &&
+                                firstResult.squat_score !== undefined)
+                        ) {
+                            setResult({
+                                goodBadScore:
+                                    firstResult.good_bad_score ?? null,
+                                squatScore: firstResult.squat_score ?? null,
+                            });
+                        }
+                        setStatus("finished");
+                        return;
+                    }
                 }
                 setStatus("idle");
             } catch (err) {
                 setStatus("error");
-                setErrorMsg(String(err));
+                setErrorMsg(err?.message || String(err));
             } finally {
                 imageLandmarker?.close?.();
                 URL.revokeObjectURL(blobUrl);
                 if (imageInputRef.current) imageInputRef.current.value = "";
             }
         },
-        [stopAll],
+        [analyzeSession, stopAll],
+    );
+    const handleImageChange = useCallback(
+        async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            await handleImageFile(file);
+        },
+        [handleImageFile],
+    );
+    const handleImageDrop = useCallback(
+        async (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer?.files?.[0];
+            if (!file || status === "loading" || status === "analyzing") return;
+            await handleImageFile(file);
+        },
+        [handleImageFile, status],
     );
 
     const togglePlayPause = useCallback(() => {
@@ -983,185 +1237,152 @@ export default function SquatAnalyzer() {
         }
     }, []);
 
-    // ── Detection loop ───────────────────────────────────────────────────────
+    // Detection loop
     //
-    // Uploaded video: MediaPipe runs once per video frame (currentTime gating).
-    // Webcam: MediaPipe throttled to ~20 Hz (every 3 rAF frames).
-    // Backend + z-prediction: every 15 detections (~1–2 Hz).
-    // Overlay canvas: always redrawn at full rAF rate from latest detection.
+    // Drawing and detection are intentionally separated:
+    // - rAF loop: draws the skeleton overlay at 60 fps, never blocked by inference.
+    // - setInterval loop: runs MediaPipe inference at ~20 Hz independently.
+    //   Because detectForVideo is synchronous (~20-50 ms), putting it in the rAF
+    //   callback would block painting and cause visible lag.
 
     useEffect(() => {
         if (status !== "running") return;
 
-        // frameCounter: every rAF tick.
-        // lastDetectedVideoTime: used to gate detection to one-per-video-frame for uploads.
-        let frameCounter = 0;
         let lastDetectedVideoTime = -1;
 
-        // Webcam: throttle MediaPipe to ~20 Hz (rAF runs at ~60 Hz).
-        // Video upload: detect once per video frame via currentTime gating instead.
-        const DETECT_EVERY = 3;
-
-        function detect(timestamp) {
+        // --- rAF: draw overlay only (fast, never blocked by inference) ---
+        function draw() {
             const video = videoRef.current;
             const canvas = canvasRef.current;
-            const landmarker = landmarkerRef.current;
-
-            if (!video || !canvas || !landmarker || video.readyState < 2) {
-                rafRef.current = requestAnimationFrame(detect);
+            if (!video || !canvas) {
+                rafRef.current = requestAnimationFrame(draw);
                 return;
             }
-            if (video.paused || video.ended) {
-                rafRef.current = requestAnimationFrame(detect);
-                return;
-            }
-            if (video.videoWidth === 0 || video.videoHeight === 0) {
-                rafRef.current = requestAnimationFrame(detect);
-                return;
-            }
-            if (timestamp <= lastTimestampRef.current) {
-                rafRef.current = requestAnimationFrame(detect);
-                return;
-            }
-            lastTimestampRef.current = timestamp;
-            frameCounter++;
-
             const vw = video.videoWidth;
             const vh = video.videoHeight;
-
-            // ── Gate detection ──
-            // Uploaded video: detect exactly once per video frame by watching
-            // currentTime. This keeps the overlay perfectly in sync without
-            // running MediaPipe on duplicate frames (which wastes CPU and causes
-            // playback stutters).
-            // Webcam: fall back to the rAF-based throttle.
-            const isVideoUpload = inputMode === "upload";
-            const videoTime = video.currentTime;
-            const shouldDetect = isVideoUpload
-                ? videoTime !== lastDetectedVideoTime
-                : frameCounter % DETECT_EVERY === 0;
-
-            if (shouldDetect) {
-                if (isVideoUpload) lastDetectedVideoTime = videoTime;
-
-                // Draw the current frame into an intermediate canvas so the browser
-                // applies any rotation metadata before MediaPipe sees the pixels.
-                try {
-                    const cap = captureCanvasRef.current;
-                    if (cap && vw > 0 && vh > 0) {
-                        if (cap.width !== vw || cap.height !== vh) {
-                            cap.width = vw;
-                            cap.height = vh;
-                        }
-                        cap.getContext("2d").drawImage(video, 0, 0, vw, vh);
-                        lastDetectionRef.current = landmarker.detectForVideo(cap, timestamp);
-                    } else {
-                        lastDetectionRef.current = landmarker.detectForVideo(video, timestamp);
-                    }
-                } catch {
-                    // Transient error — skip this frame, keep loop alive.
-                }
-
-                // Update ring buffer and live 3-D skeleton on every detection
-                const det = lastDetectionRef.current;
-                if (det?.worldLandmarks?.length > 0) {
-                    const frame = buildFrameFeatures(det.worldLandmarks[0]);
-                    const buf = frameBufferRef.current;
-                    buf.push(frame);
-                    if (buf.length > SEQ_LEN) buf.shift();
-
-                    // Live 3-D frame: update on every detection tick
-                    const joints = {};
-                    for (const { name, idx } of SQUAT_JOINT_ORDER) {
-                        const lm = det.worldLandmarks[0][idx];
-                        if (!lm) continue;
-                        joints[name] = {
-                            x: lm.x,
-                            y: lm.y,
-                            z: predictedZByNameRef.current[name] ?? lm.z ?? 0,
-                        };
-                    }
-                    setLiveFrame3d({ classification: null, joints });
-
-                    // Collect every detected frame for batch send on stop/end.
-                    // World coords → z-prediction + classification.
-                    // Normalized image coords [0,1] → start-stop model (trained on these).
-                    recordedKpFramesRef.current.push(
-                        filterSquatKeypoints3d(det.worldLandmarks[0]),
-                    );
-                    if (det.landmarks?.[0]) {
-                        recordedNormFramesRef.current.push(
-                            filterSquatKeypoints3d(det.landmarks[0]),
-                        );
-                    }
-                }
-
-                // Update 2-D keypoints panel (uses normalized landmarks, not world coords)
-                if (det?.landmarks?.length > 0) {
-                    setAllKeypoints(mapAllKeypoints(det.landmarks[0]));
-                }
-            }
-
-            // ── Redraw skeleton overlay at full rAF rate ──
-            // Always uses the freshest detection result, so the overlay never
-            // drifts behind the video even if detection ran on a previous tick.
-            const detection = lastDetectionRef.current;
             const DISPLAY_W = 640;
             const DISPLAY_H = 480;
             if (canvas.width !== DISPLAY_W || canvas.height !== DISPLAY_H) {
                 canvas.width = DISPLAY_W;
                 canvas.height = DISPLAY_H;
             }
-            const scale = vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
+            const scale =
+                vw && vh ? Math.min(DISPLAY_W / vw, DISPLAY_H / vh) : 1;
             const drawW = vw * scale;
             const drawH = vh * scale;
-            const offsetX = (DISPLAY_W - drawW) / 2;
-            const offsetY = (DISPLAY_H - drawH) / 2;
             canvas.getContext("2d").clearRect(0, 0, DISPLAY_W, DISPLAY_H);
-            if (detection) drawSkeleton(canvas, drawW, drawH, detection, { x: offsetX, y: offsetY });
+            const detection = lastDetectionRef.current;
+            if (detection)
+                drawSkeleton(canvas, drawW, drawH, detection, {
+                    x: (DISPLAY_W - drawW) / 2,
+                    y: (DISPLAY_H - drawH) / 2,
+                });
+            rafRef.current = requestAnimationFrame(draw);
+        }
+        rafRef.current = requestAnimationFrame(draw);
 
-            rafRef.current = requestAnimationFrame(detect);
+        // --- setInterval: inference at ~20 Hz, decoupled from paint ---
+        function runDetection() {
+            const video = videoRef.current;
+            const landmarker = landmarkerRef.current;
+            if (
+                !video ||
+                !landmarker ||
+                video.readyState < 2 ||
+                video.paused ||
+                video.ended ||
+                !video.videoWidth ||
+                !video.videoHeight
+            )
+                return;
+
+            const isVideoUpload = inputMode === "upload";
+            const videoTime = video.currentTime;
+            if (isVideoUpload && videoTime === lastDetectedVideoTime) return;
+            if (isVideoUpload) lastDetectedVideoTime = videoTime;
+
+            const timestamp = performance.now();
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+
+            qualityFrameCountRef.current += 1;
+            const qualityDue =
+                qualityFrameCountRef.current > 15 &&
+                qualityFrameCountRef.current % 20 === 0;
+
+            try {
+                const cap = captureCanvasRef.current;
+                if ((isVideoUpload || qualityDue) && cap && vw > 0 && vh > 0) {
+                    if (cap.width !== vw || cap.height !== vh) {
+                        cap.width = vw;
+                        cap.height = vh;
+                    }
+                    cap.getContext("2d").drawImage(video, 0, 0, vw, vh);
+                    lastDetectionRef.current = landmarker.detectForVideo(
+                        cap,
+                        timestamp,
+                    );
+                } else {
+                    lastDetectionRef.current = landmarker.detectForVideo(
+                        video,
+                        timestamp,
+                    );
+                }
+            } catch {
+                return;
+            }
+
+            const det = lastDetectionRef.current;
+            if (det?.worldLandmarks?.length > 0) {
+                const joints = {};
+                for (const { name, idx } of SQUAT_JOINT_ORDER) {
+                    const lm = det.worldLandmarks[0][idx];
+                    if (!lm) continue;
+                    joints[name] = {
+                        x: lm.x,
+                        y: lm.y,
+                        z: lm.z ?? 0,
+                    };
+                }
+                liveFrame3dRef.current = { classification: null, joints };
+
+                recordedKpFramesRef.current.push(
+                    filterSquatKeypoints3d(det.worldLandmarks[0]),
+                );
+                if (det.landmarks?.[0]) {
+                    recordedNormFramesRef.current.push(
+                        filterSquatKeypoints3d(det.landmarks[0]),
+                    );
+                }
+            }
+
+            if (qualityDue && det?.landmarks?.length > 0) {
+                const { blocking, warnings } = assessVideoQuality(
+                    det,
+                    captureCanvasRef.current,
+                );
+                blocking.forEach((issue) => {
+                    qualityIssueCountsRef.current[issue] =
+                        (qualityIssueCountsRef.current[issue] || 0) + 1;
+                });
+                setQualityIssues([...blocking, ...warnings]);
+            }
         }
 
-        rafRef.current = requestAnimationFrame(detect);
-        return () => cancelAnimationFrame(rafRef.current);
+        // 50 ms ≈ 20 Hz; if inference takes longer the interval self-throttles.
+        const detectionInterval = setInterval(runDetection, 50);
+
+        return () => {
+            cancelAnimationFrame(rafRef.current);
+            clearInterval(detectionInterval);
+        };
     }, [status, inputMode]);
 
-    useEffect(() => {
-        predictedZByNameRef.current = predictedZByName;
-    }, [predictedZByName]);
-
-    // ── Backend + session log ────────────────────────────────────────────────
+    // Backend + session log
 
     sessionNameRef.current = sessionName;
 
-    async function sendFrame(keypoints3d) {
-        let data = null;
-        try {
-            const res = await fetch(apiUrl("/api/v1/squat/classify"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ keypoints_3d: keypoints3d }),
-            });
-            if (res.ok) data = await res.json();
-        } catch {
-            /* network errors silently ignored */
-        }
-
-        if (data) setResult(data);
-
-        const entry = {
-            timestamp: Date.now(),
-            keypoints3d,
-            predictedZ: { ...predictedZByNameRef.current },
-            classification: data?.classification ?? null,
-            confidence: data?.confidence ?? null,
-        };
-        sessionLogRef.current = [...sessionLogRef.current, entry];
-        setSessionLog(sessionLogRef.current);
-    }
-
-    // ── Manual save to Supabase ───────────────────────────────────────────────
+    // Manual save to Supabase
 
     async function handleSave() {
         if (!supabase || sessionLogRef.current.length === 0) return;
@@ -1180,7 +1401,7 @@ export default function SquatAnalyzer() {
         setIsSaving(false);
     }
 
-    // ── CSV export ────────────────────────────────────────────────────────────
+    // CSV export
 
     function downloadCSV() {
         const log = sessionLogRef.current;
@@ -1226,9 +1447,8 @@ export default function SquatAnalyzer() {
         URL.revokeObjectURL(url);
     }
 
-    // ── Viewer frames (memoised) ──────────────────────────────────────────────
-    // Builds the 3-D viewer data from session log: x/y from MediaPipe world coords,
-    // z from DL model prediction (falls back to MediaPipe world z if unavailable).
+    // Viewer frames (memoised)
+    // Builds the 3-D viewer data from session log.
 
     const viewerFrames = useMemo(() => {
         const toViewerFrame = (entry) => {
@@ -1252,14 +1472,16 @@ export default function SquatAnalyzer() {
         // Strict filter: only replay frames the model labelled as exercise.
         // No fallback slice — if the model returns no 1s the viewer is empty,
         // which makes a broken model visible rather than hiding it.
-        return sessionLog.filter(e => e.startStop === 1).map(toViewerFrame);
+        return sessionLog.filter((e) => e.startStop === 1).map(toViewerFrame);
     }, [sessionLog]);
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    // Render
 
-    const colorClass = result
-        ? (CLASSIFICATION_COLORS[result.classification] ?? "text-slate-700")
-        : "";
+    const formScore = result?.goodBadScore ?? null;
+    const formIsGood = formScore != null && formScore >= goodBadThreshold;
+    const formPct = formScore != null ? Math.round(formScore * 100) : 0;
+    const threshPct = Math.round(goodBadThreshold * 100);
+    const squatScore = result?.squatScore ?? null;
 
     return (
         <div className="flex flex-col items-center gap-5 px-6 py-8 max-w-3xl mx-auto">
@@ -1269,8 +1491,8 @@ export default function SquatAnalyzer() {
                     Squat Analyzer
                 </h2>
                 <p className="text-slate-500 text-sm mt-1">
-                    MediaPipe detects all 33 body landmarks. Squat depth is
-                    classified by the Python backend.
+                    MediaPipe detects body landmarks. Classifies if squat and
+                    gives a score based on these landmarks.
                 </p>
             </div>
 
@@ -1322,15 +1544,13 @@ export default function SquatAnalyzer() {
 
             {/* Video + canvas overlay */}
             <div
-                className="ios-card relative rounded-2xl overflow-hidden bg-black"
-                style={{ width: 640, height: 480 }}
+                className="ios-card relative rounded-2xl overflow-hidden bg-black w-full"
+                style={{ maxWidth: 640, aspectRatio: "4/3" }}
             >
                 <video
                     ref={videoRef}
-                    className="block bg-black"
+                    className="absolute inset-0 bg-black w-full h-full"
                     style={{
-                        width: 640,
-                        height: 480,
                         objectFit: "contain",
                         visibility:
                             inputMode === "image" ? "hidden" : "visible",
@@ -1340,9 +1560,37 @@ export default function SquatAnalyzer() {
                 />
                 <canvas
                     ref={canvasRef}
-                    className="absolute inset-0 pointer-events-none"
-                    style={{ width: 640, height: 480 }}
+                    width={640}
+                    height={480}
+                    className="absolute inset-0 pointer-events-none w-full h-full"
                 />
+                {/* Live quality warning overlay */}
+                {qualityIssues.length > 0 && status === "running" && (
+                    <div className="absolute top-2 inset-x-2">
+                        <div
+                            className="rounded-xl px-3 py-2.5"
+                            style={{
+                                background: "rgba(245,158,11,0.88)",
+                                backdropFilter: "blur(14px)",
+                                border: "1px solid rgba(251,191,36,0.35)",
+                                boxShadow: "0 4px 20px rgba(245,158,11,0.28)",
+                            }}
+                        >
+                            <p className="text-white text-xs font-bold uppercase tracking-wide mb-1">
+                                Video quality
+                            </p>
+                            {qualityIssues.map((issue, i) => (
+                                <p
+                                    key={i}
+                                    className="text-white/95 text-xs leading-snug"
+                                >
+                                    {issue}
+                                </p>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {(status === "loading" || status === "analyzing") && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                         <p className="text-white text-sm font-semibold animate-pulse">
@@ -1361,7 +1609,10 @@ export default function SquatAnalyzer() {
                         {status !== "running" ? (
                             <button
                                 onClick={startCamera}
-                                disabled={status === "loading" || status === "analyzing"}
+                                disabled={
+                                    status === "loading" ||
+                                    status === "analyzing"
+                                }
                                 className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
                             >
                                 {status === "loading"
@@ -1384,7 +1635,11 @@ export default function SquatAnalyzer() {
 
             {/* Controls — video upload */}
             {inputMode === "upload" && (
-                <div className="flex flex-col items-center gap-2">
+                <div
+                    className="flex flex-col items-center gap-2"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleVideoDrop}
+                >
                     <input
                         ref={fileInputRef}
                         type="file"
@@ -1411,7 +1666,10 @@ export default function SquatAnalyzer() {
                         ) : (
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                disabled={status === "loading" || status === "analyzing"}
+                                disabled={
+                                    status === "loading" ||
+                                    status === "analyzing"
+                                }
                                 className="ios-btn ios-btn-primary px-6 py-2 rounded-full text-sm font-semibold disabled:opacity-50"
                             >
                                 {status === "loading" || status === "analyzing"
@@ -1422,7 +1680,7 @@ export default function SquatAnalyzer() {
                     </div>
                     {status === "finished" && (
                         <p className="text-green-600 text-sm font-semibold">
-                            ✓ Analysis complete — review results below
+                            ✓ Analysis complete · review results below
                         </p>
                     )}
                     {uploadedFileName && (
@@ -1430,12 +1688,21 @@ export default function SquatAnalyzer() {
                             {uploadedFileName}
                         </p>
                     )}
+                    {status !== "running" && (
+                        <p className="text-slate-400 text-xs">
+                            or drop a video file here
+                        </p>
+                    )}
                 </div>
             )}
 
             {/* Controls — image upload */}
             {inputMode === "image" && (
-                <div className="flex flex-col items-center gap-2">
+                <div
+                    className="flex flex-col items-center gap-2"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleImageDrop}
+                >
                     <input
                         ref={imageInputRef}
                         type="file"
@@ -1455,6 +1722,9 @@ export default function SquatAnalyzer() {
                             {uploadedFileName}
                         </p>
                     )}
+                    <p className="text-slate-400 text-xs">
+                        or drop an image file here
+                    </p>
                 </div>
             )}
 
@@ -1463,6 +1733,51 @@ export default function SquatAnalyzer() {
                 <p className="text-red-500 text-sm">
                     {errorMsg || "An error occurred."}
                 </p>
+            )}
+
+            {/* Quality error card */}
+            {qualityError && (
+                <div
+                    className="ios-card rounded-2xl p-5 w-full"
+                    style={{
+                        border: "1px solid rgba(251,191,36,0.4)",
+                        boxShadow: "0 8px 32px rgba(245,158,11,0.12)",
+                    }}
+                >
+                    <div className="flex items-start gap-3 mb-3">
+                        <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shrink-0"
+                            style={{
+                                background:
+                                    "radial-gradient(circle at 35% 30%, rgba(254,243,199,0.95), rgba(253,230,138,0.85))",
+                                border: "1px solid rgba(251,191,36,0.4)",
+                                color: "#92400e",
+                            }}
+                        >
+                            !
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-amber-700">
+                                Video quality too poor to analyze
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                Fix the issues below and record again
+                            </p>
+                        </div>
+                    </div>
+                    <ul className="space-y-2 pl-1">
+                        {qualityError.issues.map((issue, i) => (
+                            <li key={i} className="flex items-start gap-2">
+                                <span className="text-amber-400 font-bold shrink-0 mt-0.5">
+                                    ·
+                                </span>
+                                <span className="text-sm text-slate-600">
+                                    {issue}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             )}
 
             {/* Model quality indicator — Start/Stop MAE from DagsHub */}
@@ -1475,39 +1790,118 @@ export default function SquatAnalyzer() {
                 </p>
             )}
 
-            {/* Classification result */}
-            {result && (
-                <div className="ios-card rounded-2xl p-5 text-center w-72">
-                    <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">
-                        Classification
-                    </p>
-                    <p className={`text-4xl font-bold mb-4 ${colorClass}`}>
-                        {result.classification}
-                    </p>
-                    <div className="flex justify-around text-sm">
-                        <div>
-                            <p className="text-slate-400 text-xs">Left knee</p>
-                            <p className="font-mono text-slate-700 font-semibold">
-                                {result.left_knee_angle?.toFixed(1)}°
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-slate-400 text-xs">Right knee</p>
-                            <p className="font-mono text-slate-700 font-semibold">
-                                {result.right_knee_angle?.toFixed(1)}°
-                            </p>
-                        </div>
-                        {result.confidence != null && (
-                            <div>
-                                <p className="text-slate-400 text-xs">
-                                    Confidence
-                                </p>
-                                <p className="font-mono text-slate-700 font-semibold">
-                                    {(result.confidence * 100).toFixed(0)}%
+            {/* Form quality + threshold */}
+            {(formScore != null || squatScore != null) && (
+                <div className="ios-card rounded-2xl p-5 w-full">
+                    {formScore != null && (
+                        <>
+                            {/* Header row */}
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
+                                        Exercise Quality
+                                    </p>
+                                    <p
+                                        className={`text-2xl font-bold ${formIsGood ? "text-green-500" : "text-red-500"}`}
+                                    >
+                                        {formIsGood ? "A squat" : "Not a squat"}
+                                    </p>
+                                    {squatScore != null && (
+                                        <p className="text-sm text-slate-500 mt-1">
+                                            Score:{" "}
+                                            <span className="font-semibold text-slate-700 tabular-nums">
+                                                {squatScore.toFixed(2)} / 4
+                                            </span>{" "}
+                                            (0 good, 4 bad)
+                                        </p>
+                                    )}
+                                </div>
+                                <div
+                                    className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold ios-card ${
+                                        formIsGood
+                                            ? "text-green-500"
+                                            : "text-red-500"
+                                    }`}
+                                    style={{
+                                        background: formIsGood
+                                            ? "radial-gradient(circle at 35% 30%, rgba(220,252,231,0.95), rgba(187,247,208,0.85))"
+                                            : "radial-gradient(circle at 35% 30%, rgba(254,226,226,0.95), rgba(252,165,165,0.70))",
+                                        border: formIsGood
+                                            ? "1px solid rgba(74,222,128,0.35)"
+                                            : "1px solid rgba(248,113,113,0.35)",
+                                    }}
+                                >
+                                    {formIsGood ? "✓" : "✗"}
+                                </div>
+                            </div>
+
+                            {/* Score bar with threshold marker */}
+                            <div className="mb-5">
+                                <div className="flex justify-between text-xs mb-2">
+                                    <span className="text-slate-400">
+                                        Probability of squat
+                                    </span>
+                                    <span className="font-bold text-slate-600 tabular-nums">
+                                        {formPct}%
+                                    </span>
+                                </div>
+                                <div className="relative h-3 rounded-full bg-slate-100 overflow-visible">
+                                    <div
+                                        className="h-full rounded-full transition-all duration-700 ease-out"
+                                        style={{
+                                            width: `${formPct}%`,
+                                            background: formIsGood
+                                                ? "linear-gradient(to right, #fbbf24, #4ade80)"
+                                                : "linear-gradient(to right, #f87171, #fbbf24)",
+                                            boxShadow: formIsGood
+                                                ? "0 0 12px rgba(74,222,128,0.4)"
+                                                : "0 0 12px rgba(248,113,113,0.35)",
+                                        }}
+                                    />
+                                    {/* Threshold marker line */}
+                                    <div
+                                        className="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-slate-500 opacity-60"
+                                        style={{
+                                            left: `calc(${threshPct}% - 1px)`,
+                                        }}
+                                    />
+                                </div>
+                                <p className="text-xs text-slate-300 text-right mt-1 tabular-nums">
+                                    threshold at {threshPct}%
                                 </p>
                             </div>
-                        )}
-                    </div>
+
+                            {/* Threshold slider */}
+                            <div>
+                                <div className="flex justify-between text-xs mb-2">
+                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                        Threshold
+                                    </span>
+                                    <span className="font-bold text-slate-600 tabular-nums">
+                                        {threshPct}%
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    value={threshPct}
+                                    onChange={(e) =>
+                                        setGoodBadThreshold(
+                                            Number(e.target.value) / 100,
+                                        )
+                                    }
+                                    className="ios-slider"
+                                    style={{ width: "100%", display: "block" }}
+                                />
+                                <div className="flex justify-between text-xs text-slate-300 mt-2">
+                                    <span>Bad</span>
+                                    <span>Good</span>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 
@@ -1545,77 +1939,122 @@ export default function SquatAnalyzer() {
                 </div>
             )}
 
-            {/* Debug panel — 33 keypoints with x/y (MediaPipe) + predicted z (DL) */}
-            {(status === "running" || allKeypoints.length > 0) && (
-                <div className="ios-card rounded-2xl p-4 w-full">
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                        Keypoints
-                        {status === "running" && (
-                            <span className="ml-2 normal-case font-normal text-slate-300">
-                                — live
-                            </span>
-                        )}
-                    </p>
-                    <p className="text-xs text-slate-300 mb-3">
-                        x · y from MediaPipe &nbsp;·&nbsp; z from DL model
-                        <span className="ml-2 text-sky-400 font-semibold">
-                            (squat joints highlighted)
-                        </span>
-                    </p>
-                    {allKeypoints.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic">
-                            Waiting for pose detection…
-                        </p>
-                    ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-0.5 gap-x-4 text-xs font-mono max-h-56 overflow-y-auto pr-1">
-                            {allKeypoints.map((kp) => {
-                                const isSquat = SQUAT_INDICES.has(kp.index);
-                                return (
-                                    <div
-                                        key={kp.index}
-                                        className={`flex items-baseline gap-1.5 py-0.5 ${
-                                            isSquat
-                                                ? "text-sky-600 font-bold"
-                                                : "text-slate-400"
-                                        }`}
-                                    >
-                                        <span className="w-5 text-right text-slate-300">
-                                            {kp.index}
-                                        </span>
-                                        <span className="w-28 truncate">
-                                            {kp.name}
-                                        </span>
-                                        <span className="tabular-nums">
-                                            {kp.x.toFixed(3)}
-                                        </span>
-                                        <span className="tabular-nums">
-                                            {kp.y.toFixed(3)}
-                                        </span>
-                                        {isSquat && (
-                                            <span
-                                                className={`tabular-nums ${
-                                                    kp.predictedZ == null
-                                                        ? "text-slate-500 italic"
-                                                        : "text-emerald-500"
-                                                }`}
-                                            >
-                                                {kp.predictedZ == null
-                                                    ? "—"
-                                                    : kp.predictedZ.toFixed(3)}
+            {/* Pipeline timing breakdown */}
+            {pipelineTimings != null &&
+                (() => {
+                    const steps = [
+                        {
+                            key: "network_ms",
+                            label: "Network (round-trip)",
+                            sub: "client ↔ server",
+                            value: Math.max(
+                                0,
+                                pipelineTimings.round_trip_ms -
+                                    pipelineTimings.total_ms,
+                            ),
+                        },
+                        {
+                            key: "start_stop_ms",
+                            label: "Start/Stop model",
+                            sub: "exercise detection",
+                            value: pipelineTimings.start_stop_ms ?? 0,
+                        },
+                        {
+                            key: "goodbad_ms",
+                            label: "GoodBad model",
+                            sub: "form quality",
+                            value: pipelineTimings.goodbad_ms ?? 0,
+                        },
+                        {
+                            key: "scoring_ms",
+                            label: "Scoring model",
+                            sub: "0 good → 4 bad",
+                            value: pipelineTimings.scoring_ms ?? 0,
+                        },
+                        {
+                            key: "feature_build_ms",
+                            label: "Feature extraction",
+                            sub: "preprocessing",
+                            value: pipelineTimings.feature_build_ms ?? 0,
+                        },
+                    ];
+                    const maxVal = Math.max(...steps.map((s) => s.value), 1);
+                    return (
+                        <div className="ios-card rounded-2xl p-5 w-full">
+                            <div className="flex items-baseline justify-between mb-4">
+                                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                    Pipeline Timing
+                                </p>
+                                <span className="text-xs font-mono text-slate-400">
+                                    Total:{" "}
+                                    <span className="text-sky-500 font-semibold">
+                                        {(
+                                            pipelineTimings.round_trip_ms / 1000
+                                        ).toFixed(2)}
+                                        s
+                                    </span>
+                                </span>
+                            </div>
+                            <div className="space-y-3">
+                                {steps.map(({ key, label, sub, value }) => (
+                                    <div key={key}>
+                                        <div className="flex items-baseline justify-between mb-1">
+                                            <div>
+                                                <span className="text-xs font-semibold text-slate-600">
+                                                    {label}
+                                                </span>
+                                                <span className="ml-2 text-xs text-slate-400">
+                                                    {sub}
+                                                </span>
+                                            </div>
+                                            <span className="text-xs font-mono font-bold text-slate-600 tabular-nums">
+                                                {value < 1
+                                                    ? "<1"
+                                                    : Math.round(value)}
+                                                ms
                                             </span>
-                                        )}
+                                        </div>
+                                        <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-700 ease-out"
+                                                style={{
+                                                    width: `${Math.max(1, (value / maxVal) * 100)}%`,
+                                                    background:
+                                                        key === "network_ms"
+                                                            ? "linear-gradient(to right, #94a3b8, #64748b)"
+                                                            : key ===
+                                                                "start_stop_ms"
+                                                              ? "linear-gradient(to right, #38bdf8, #0ea5e9)"
+                                                              : key ===
+                                                                  "z_prediction_ms"
+                                                                ? "linear-gradient(to right, #a78bfa, #7c3aed)"
+                                                                : key ===
+                                                                    "goodbad_ms"
+                                                                  ? "linear-gradient(to right, #4ade80, #16a34a)"
+                                                                  : key ===
+                                                                      "scoring_ms"
+                                                                    ? "linear-gradient(to right, #f97316, #ea580c)"
+                                                                    : "linear-gradient(to right, #fbbf24, #d97706)",
+                                                }}
+                                            />
+                                        </div>
                                     </div>
-                                );
-                            })}
+                                ))}
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-400">
+                                <span>Backend processing</span>
+                                <span className="font-mono font-semibold text-slate-600">
+                                    {Math.round(pipelineTimings.total_ms)}ms
+                                </span>
+                            </div>
                         </div>
-                    )}
-                </div>
-            )}
+                    );
+                })()}
 
             {/* 3-D interactive skeleton viewer */}
             <Skeleton3DViewer
                 frames={viewerFrames}
-                liveFrame={status === "running" ? liveFrame3d : null}
+                liveFrameRef={status === "running" ? liveFrame3dRef : null}
             />
         </div>
     );

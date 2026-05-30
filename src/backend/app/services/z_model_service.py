@@ -249,3 +249,23 @@ def predict_one(
 
     pred = y[0] if hasattr(y, "__len__") else y
     return float(pred), uri, run_id
+
+
+def predict_batch(
+    features_list: list[list[float]], variant: str = "champion"
+) -> list[float]:
+    """Predict z for many samples in a single model call.
+
+    Parameters
+    ----------
+    features_list:
+        List of feature vectors, each of shape (n_features,).
+
+    Returns
+    -------
+    Flat list of z predictions, one per input row.
+    """
+    model, _uri, _run_id = get_model(variant)
+    X = np.array(features_list, dtype=float)
+    y = np.asarray(model.predict(X), dtype=float)
+    return y.flatten().tolist()
