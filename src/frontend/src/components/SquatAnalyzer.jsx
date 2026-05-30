@@ -746,6 +746,7 @@ export default function SquatAnalyzer() {
     const [goodBadThreshold, setGoodBadThreshold] = useState(0.5);
     const [PIPELINE_TIME, setPipelineTime] = useState(null); // * Updated base name for lint
     const [pipelineTimings, setPipelineTimings] = useState(null);
+    const [showPipelineTimings, setShowPipelineTimings] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
     const [uploadedFileName, setUploadedFileName] = useState("");
     const [videoPaused, setVideoPaused] = useState(false);
@@ -871,6 +872,7 @@ export default function SquatAnalyzer() {
         setQualityError(null);
         setPipelineTime(null);
         setPipelineTimings(null);
+        setShowPipelineTimings(false);
     }, [stopCapture]);
 
     // Discards accumulated session data (call explicitly for "new session").
@@ -1940,7 +1942,18 @@ export default function SquatAnalyzer() {
             )}
 
             {/* Pipeline timing breakdown */}
+            {pipelineTimings != null && (
+                <label className="mb-3 inline-flex items-center gap-2 text-sm text-slate-600 select-none">
+                    <input
+                        type="checkbox"
+                        checked={showPipelineTimings}
+                        onChange={(e) => setShowPipelineTimings(e.target.checked)}
+                    />
+                    Show pipeline timing window
+                </label>
+            )}
             {pipelineTimings != null &&
+                showPipelineTimings &&
                 (() => {
                     const steps = [
                         {
