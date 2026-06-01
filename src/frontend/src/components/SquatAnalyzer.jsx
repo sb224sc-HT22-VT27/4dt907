@@ -615,7 +615,7 @@ function Skeleton3DViewer({ frames, liveFrameRef }) {
 
             <p className="text-xs text-slate-400 self-start">
                 Frame {displayedFrameIdx + 1} of {frames.length}
-                {" · exercise frames only · z from DL model"}
+                {" · exercise frames only"}
             </p>
         </div>
     );
