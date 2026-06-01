@@ -1,6 +1,9 @@
 # 4dt907 - Project in data intensive systems
 
-A full-stack ML application with a FastAPI backend and React frontend, deployed on Vercel.
+A full-stack ML application with a FastAPI backend and React (Vite + Tailwind)
+frontend, deployed via Vercel (frontend) and Render (backend). The UI includes a
+MediaPipe-based squat analyzer (webcam/video/image), 3-D replay, and model-driven
+session scoring.
 
 ## Quick Start
 
@@ -42,7 +45,6 @@ A full-stack ML application with a FastAPI backend and React frontend, deployed 
 │   ├── ml-research/       # Jupyter notebooks for ML experiments
 │   └── docker-compose.yml
 ├── .github/               # CI/CD workflows, issue templates, PR template
-├── api/                   # Vercel serverless entry point
 ├── .env.example           # Environment variable template
 ├── CHANGELOG.md           # Version history
 ├── CONTRIBUTING.md        # Contribution guidelines

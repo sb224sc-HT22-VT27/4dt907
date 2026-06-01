@@ -157,6 +157,12 @@ services:
    | `Z_MODEL_URI_PROD` | Z-predictor production model URI |
    | `Z_MODEL_URI_DEV` | Z-predictor development model URI |
    | `Z_MODEL_URI_BACKUP` | Z-predictor backup model URI |
+   | `START_STOP_MODEL_URI_PROD` | Start/Stop production model URI |
+   | `START_STOP_MODEL_URI_DEV` | Start/Stop development model URI |
+   | `START_STOP_MODEL_URI_BACKUP` | Start/Stop backup model URI |
+   | `GOODBAD_MODEL_URI_PROD` | Good/Bad production model URI |
+   | `GOODBAD_MODEL_URI_DEV` | Good/Bad development model URI |
+   | `GOODBAD_MODEL_URI_BACKUP` | Good/Bad backup model URI |
    | `SCORING_MODEL_URI_PROD` | Squat scoring production model URI (0 good → 4 bad) |
    | `SCORING_MODEL_URI_DEV` | Squat scoring development model URI |
    | `SCORING_MODEL_URI_BACKUP` | Squat scoring backup model URI |
@@ -185,10 +191,11 @@ services:
 
    | Variable | Value |
    | -------- | ----- |
-   | `VITE_BACKEND_URL` | Render service URL from Step 3 (e.g. `https://4dt907-backend.onrender.com`) |
+   | `VITE_BACKEND_URL` | Render service URL from Step 3 (optional if using `/api` rewrites) |
    | `VITE_SUPABASE_URL` | Supabase project URL from Step 2 |
    | `VITE_SUPABASE_ANON_KEY` | Supabase anon key from Step 2 |
 
 3. Trigger a new deployment (or let Vercel deploy automatically on push).
-   The static build will bake `VITE_BACKEND_URL` into the bundle so every API call
-   goes directly to Render.
+   If `VITE_BACKEND_URL` is set the static build bakes it into the bundle so every
+   API call goes directly to Render. Leaving it empty keeps `/api` calls relative,
+   which works with Vercel rewrites or a shared domain proxy.

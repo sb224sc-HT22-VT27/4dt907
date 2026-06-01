@@ -7,8 +7,9 @@ FastAPI backend service for 4dt907 ML data-intensive system.
 - **Squat classification** — `POST /api/v1/squat/classify` accepts MediaPipe 3-D keypoints,
   calculates knee angles (law of cosines) and returns `Deep` / `Shallow` / `Invalid` with a
   confidence score. Uses MediaPipe z values directly.
-- **Squat session scoring** — `POST /api/v1/squat/analyze-session` runs the session pipeline
-  and returns both a Good/Bad probability and a squat score in the range `0..4` (`0` good, `4` bad).
+- **Squat session scoring** — `POST /api/v1/squat/analyze-session` runs the start/stop model to
+  isolate exercise frames, then returns both a Good/Bad probability and a squat score in the
+  range `0..4` (`0` good, `4` bad) for each frame.
 - **Expert-score prediction** — `POST /api/v1/predict/champion` and `/latest` (MLflow model)
 - **Weakest-link classification** — `POST /api/v1/weakest-link/champion` and `/latest`
 - **Z-predictor** — `POST /api/v1/z-predictor/champion` and `/latest`
@@ -28,7 +29,7 @@ python -m venv .venv
 source .venv/bin/activate # On Windows: .venv\Scripts\activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ### Environment variables (.env)
@@ -56,14 +57,14 @@ The API available at:
 ### Running Tests
 
 ```bash
-pytest -v           # Verbose output
-pytest --cov=app    # With coverage report
+pytest tests/ -v --tb=short   # Verbose output (CI parity)
+pytest --cov=app              # With coverage report
 ```
 
 ### Linting
 
 ```bash
-flake8 .
+flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 black .
 ```
 
@@ -135,10 +136,11 @@ Use the docker compose file to build entire project which uses the local Dockerf
 
 ## MLflow Integration
 
-The `/api/v1/predict/*` and `/api/v1/weakest-link/*` endpoints load models from MLflow
-(DagsHub) at startup. Set `MLFLOW_TRACKING_URI` and the appropriate `MODEL_URI_*` /
-`WEAKLINK_MODEL_URI_*` / `Z_MODEL_URI_*` / `SCORING_MODEL_URI_*` environment
-variables (see `.env.example`).
+The `/api/v1/predict/*`, `/api/v1/weakest-link/*`, and session-analysis endpoints load models
+from MLflow (DagsHub) at startup. Set `MLFLOW_TRACKING_URI` and the appropriate
+`MODEL_URI_*`, `WEAKLINK_MODEL_URI_*`, `Z_MODEL_URI_*`, `START_STOP_MODEL_URI_*`,
+`GOODBAD_MODEL_URI_*`, and `SCORING_MODEL_URI_*` environment variables (see
+`.env.example`).
 
 ## Project Structure
 

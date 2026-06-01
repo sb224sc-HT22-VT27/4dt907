@@ -21,7 +21,7 @@ Jupyter notebooks for ML experiments and assignment reporting. Each assignment h
 | $A12$ | Session analysis pipeline | Integrated Start_Stop_Predictor_ModelV2 for per-frame exercise detection; end-to-end analyze-session endpoint; frontend switched from real-time streaming to record-and-send |
 | $A13$ | Good vs Bad Exercise Classifier | Trained `GoodBad_ClassifierV2` using the A12 Start/Stop model to segment sequences; augmentation (mirror, rotate, scale, noise); feature engineering with 16 inter-joint distances + 6 joint angles; fixed-length resampling to 10 frames |
 | $A14$ | Good vs Ugly Exercise Classifier | This was not implementedwith a model but rather with a Rule-based approach |
-| $A15$ | Squat Exercise Scoring Classifier | - |
+| $A15$ | Squat Exercise Scoring Classifier | Score regressor notebooks + architecture sweeps (ACNN/ARNN/Dense) with cross-val results |
 | $A16$ | - | - |
 
 Models are tracked in MLflow on DagsHub using a utils file, ml_utils.py.
