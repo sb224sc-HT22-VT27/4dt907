@@ -7,10 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.0.0] – 2026-06-01
+
 ### Added
 
 - **SquatAnalyzer drag-and-drop uploads** — users can now drop files directly in the Upload Video
   and Upload Image tabs (in addition to choosing files via button click).
+
+### Changed
+
+- **Documentation refresh** — updated README and deployment guidance to align with current
+  runtime behavior and 1.0.0 release notes.
 
 ### Fixed
 

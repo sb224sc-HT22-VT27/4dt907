@@ -1,8 +1,9 @@
 # Frontend Application
 
 React + Vite frontend for the 4dt907 ML data-intensive system.
-Includes a live squat analyzer powered by MediaPipe pose detection and a
-prediction form that sends feature vectors to the backend.
+Includes a live squat analyzer powered by MediaPipe pose detection (webcam,
+video, and image uploads), a 3-D skeleton replay, and a prediction form that
+sends feature vectors to the backend.
 
 ## Getting Started
 
@@ -24,16 +25,23 @@ The application will be available at <http://localhost:3030>
 ### Other
 
 ```bash
-npm run build   # Build for production
-npm run preview # Preview production build
-npm run lint    # Run linting
-npm run test    # Run tests
+npm run build     # Build for production
+npm run preview   # Preview production build
+npm run lint      # Run linting
+npm run test      # Run tests (watch mode)
+npm run test:run  # Run tests once (CI)
 ```
 
 ## Configuration
 
-The Vite dev server proxies `/api/*` requests to the backend (default `http://localhost:8080`).
-Override by setting `BACKEND_URL` or `BACKEND_PORT` in your `.env` file at the project root.
+The Vite dev server proxies `/api/*` requests to the backend (default
+`http://localhost:8080`). Override by setting `BACKEND_URL` or `BACKEND_PORT` in
+your `.env` file at the project root.
+
+For production builds, `VITE_BACKEND_URL` controls where API calls go. Leave it
+empty to keep calls relative to `/api` (useful for Vercel rewrites or a shared
+domain), or set it to the Render service URL when hosting frontend + backend
+separately.
 
 ### Supabase (optional)
 

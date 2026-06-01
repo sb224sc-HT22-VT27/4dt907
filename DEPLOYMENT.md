@@ -150,16 +150,14 @@ services:
    | `MLFLOW_TRACKING_URI` | DagsHub MLflow tracking URI (from Step 1) |
    | `MODEL_URI_PROD` | Production model URI |
    | `MODEL_URI_DEV` | Development model URI |
-   | `MODEL_URI_BACKUP` | Backup model URI |
    | `WEAKLINK_MODEL_URI_PROD` | Weakest-Link production model URI |
    | `WEAKLINK_MODEL_URI_DEV` | Weakest-Link development model URI |
-   | `WEAKLINK_MODEL_URI_BACKUP` | Weakest-Link backup model URI |
-   | `Z_MODEL_URI_PROD` | Z-predictor production model URI |
-   | `Z_MODEL_URI_DEV` | Z-predictor development model URI |
-   | `Z_MODEL_URI_BACKUP` | Z-predictor backup model URI |
+   | `START_STOP_MODEL_URI_PROD` | Start/Stop production model URI |
+   | `START_STOP_MODEL_URI_DEV` | Start/Stop development model URI |
+   | `GOODBAD_MODEL_URI_PROD` | Good/Bad production model URI |
+   | `GOODBAD_MODEL_URI_DEV` | Good/Bad development model URI |
    | `SCORING_MODEL_URI_PROD` | Squat scoring production model URI (0 good → 4 bad) |
    | `SCORING_MODEL_URI_DEV` | Squat scoring development model URI |
-   | `SCORING_MODEL_URI_BACKUP` | Squat scoring backup model URI |
    | `PRODUCTION_URL` | Your Vercel frontend URL (for CORS), e.g. `https://your-project.vercel.app` |
 
 4. Deploy the service and note the external URL (e.g. `https://4dt907-backend.onrender.com`).
