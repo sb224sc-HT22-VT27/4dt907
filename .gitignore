@@ -273,4 +273,4 @@ __marimo__/
 *.fdb_latexmk
 
 # Include
-!pp.pdf
+!pp*.pdf
