@@ -6,7 +6,7 @@ scikit-learn
 imbalanced-learn
 python-dotenv
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.2.2
+torch==2.12.0+cpu
 tqdm==4.66.1
 optree==0.17.0
 dill==0.4.0
